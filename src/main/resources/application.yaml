@@ -1,0 +1,97 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: agri-trade-ls # Tên ứng dụng
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/agri_trade_ls_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: root # Thay đổi
+    password: root # Thay đổi
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update # Để Flyway quản lý schema
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect # Hoặc phiên bản mới hơn
+
+  flyway:
+    enabled: true
+    # baseline-on-migrate: true # Chỉ dùng lần đầu nếu DB đã có bảng
+
+  # Cấu hình Mail (Ví dụ với Gmail - Cần bật Less Secure App hoặc dùng App Password)
+#  mail:
+#    host: smtp.gmail.com
+#    port: 587
+#    username: your-email@gmail.com # Thay đổi
+#    password: your-gmail-app-password # Thay đổi
+#    properties:
+#      mail:
+#        smtp:
+#          auth: true
+#          starttls:
+#            enable: true
+#          # connectiontimeout: 5000
+#          # timeout: 5000
+#          # writetimeout: 5000
+  mail:
+    host: sandbox.smtp.mailtrap.io # Hoặc host Mailtrap cung cấp
+    port: 2525           # Hoặc port Mailtrap cung cấp (thường là 25, 465, 587, 2525)
+    username: dabd14f1bb39bf  # Username từ Mailtrap
+    password: 2502b8b827ca4a # Password từ Mailtrap
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true # Hoặc false tùy theo port
+
+  # Cấu hình cho JWT (Sẽ dùng ở Bước 10)
+  security:
+    jwt:
+      secret: be7aa243bf7c384f2714e9e11316da6cb659ab0a0c63bc0db96f1c543e9bbeec38ded28c9aa9055e11c385a83882b81417e32675e3bc9ef2d615309fea3bc1d2f742a1ac90c2e410656c18cbaf0b33b97bd48f12cb8daa85d36e091767805a11dfabe5bf92c324f56d3bee63f04d501a538ebb7f300098dca28a6db4780830e0e6efc513f1b7472a1dcda8df1c92f9391a4944a91a46877a44896c52a0f0dd902f785742e0d3af5404327aacf95927830de3a2764fa72538f9a586261a1fcf4a50721156ff43ef8eaeb66bdd3261c6e12bf971cbbfe9d20621380afdc7021eefdd034e5f1d6faad989e45eb3ee765f6dc24f1859f58c17d336cb3cc8824268d2 # Thay bằng key bí mật thực sự dài và an toàn
+      expiration-ms: 86400000 # 1 ngày (tính bằng mili giây)
+      refresh-token:
+        expiration-ms: 604800000 # 7 ngày
+
+# Cấu hình cho SpringDoc OpenAPI (Swagger UI)
+springdoc:
+  api-docs:
+    path: /api-docs # Đường dẫn tới file JSON/YAML mô tả API
+  swagger-ui:
+    path: /swagger-ui.html # Đường dẫn tới giao diện Swagger UI
+    display-request-duration: true
+    groups-order: DESC
+    operations-sorter: method
+
+# Cấu hình Log (ví dụ)
+logging:
+  level:
+    root: INFO
+    com.yourcompany.agritradels: DEBUG # Log chi tiết hơn cho package của bạn
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG # Log câu lệnh SQL (nếu spring.jpa.show-sql=false)
+    org.hibernate.type.descriptor.sql: TRACE # Log tham số của câu lệnh SQL
+
+# --- Cấu hình cho các môi trường khác (ví dụ: dev) ---
+# Tạo file application-dev.yaml nếu cần cấu hình riêng cho dev
+# --- Cấu hình cho môi trường production ---
+# Tạo file application-prod.yaml nếu cần cấu hình riêng cho prod
+
+app:
+  admin:
+    email: admin@agritradels.com
+    password: 123456
+    fullname: Quản Trị Viên
+
+# File Storage Configuration
+storage:
+  location: upload-dir # Tên thư mục gốc để lưu file (sẽ tạo trong thư mục chạy ứng dụng)
+  base-url: /api/files/download # Đường dẫn cơ sở để truy cập file qua API
+

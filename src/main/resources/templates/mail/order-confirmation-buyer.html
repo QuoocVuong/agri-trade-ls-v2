@@ -1,0 +1,39 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Xác nhận đơn hàng</title><style>/* CSS cơ bản + table */ table{width:100%; border-collapse:collapse;} th,td{border:1px solid #ddd; padding:8px; text-align:left;} th{background-color:#f2f2f2;}</style></head><body>
+<div class="container"><h1>Xác nhận đơn hàng <span th:text="${order.orderCode}">#LS1234</span></h1>
+  <p>Xin chào <strong th:text="${buyerName}">Bạn</strong>,</p>
+  <p>Cảm ơn bạn đã đặt hàng tại <span th:text="${appName}">AgriTradeLS</span>. Đơn hàng của bạn đã được ghi nhận thành công.</p>
+  <p><strong>Thông tin đơn hàng:</strong></p>
+  <ul>
+    <li>Mã đơn hàng: <strong th:text="${order.orderCode}">#LS1234</strong></li>
+    <li>Ngày đặt: <span th:text="${#temporals.format(order.createdAt, 'dd/MM/yyyy HH:mm')}">dd/MM/yyyy HH:mm</span></li>
+    <li>Trạng thái: <strong th:text="${order.status.name()}">PENDING</strong></li>
+    <li>Thanh toán: <span th:text="${order.paymentMethod.name()}">COD</span> (<span th:text="${order.paymentStatus.name()}">PENDING</span>)</li>
+  </ul>
+  <p><strong>Địa chỉ giao hàng:</strong></p>
+  <p>
+    <span th:text="${order.shippingFullName}">Tên người nhận</span><br/>
+    <span th:text="${order.shippingPhoneNumber}">Số điện thoại</span><br/>
+    <span th:text="${order.shippingAddressDetail}">Địa chỉ chi tiết</span><br/>
+    <!-- Thêm xã/huyện/tỉnh nếu cần -->
+  </p>
+  <p><strong>Chi tiết sản phẩm:</strong></p>
+  <table><thead><tr><th>Sản phẩm</th><th>Đơn giá</th><th>Số lượng</th><th>Thành tiền</th></tr></thead>
+    <tbody>
+    <tr th:each="item : ${order.orderItems}">
+      <td th:text="${item.productName}">Tên sản phẩm</td>
+      <td th:text="${#numbers.formatDecimal(item.pricePerUnit, 0, 'COMMA', 0, 'POINT')} + ' đ / ' + ${item.unit}">10,000 đ / kg</td>
+      <td th:text="${item.quantity}">1</td>
+      <td th:text="${#numbers.formatDecimal(item.totalPrice, 0, 'COMMA', 0, 'POINT')} + ' đ'">10,000 đ</td>
+    </tr>
+    </tbody></table>
+  <p style="text-align: right;">
+    Tạm tính: <strong th:text="${#numbers.formatDecimal(order.subTotal, 0, 'COMMA', 0, 'POINT')} + ' đ'">0 đ</strong><br/>
+    Phí vận chuyển: <span th:text="${#numbers.formatDecimal(order.shippingFee, 0, 'COMMA', 0, 'POINT')} + ' đ'">0 đ</span><br/>
+    Giảm giá: <span th:text="'-' + ${#numbers.formatDecimal(order.discountAmount, 0, 'COMMA', 0, 'POINT')} + ' đ'">-0 đ</span><br/>
+    <strong>Tổng cộng: <span style="color: red; font-size: 1.2em;" th:text="${#numbers.formatDecimal(order.totalAmount, 0, 'COMMA', 0, 'POINT')} + ' đ'">0 đ</span></strong>
+  </p>
+  <p>Bạn có thể xem chi tiết đơn hàng tại đây:</p>
+  <p><a th:href="${orderUrl}" class="button">Xem đơn hàng</a></p>
+  <p>Chúng tôi sẽ thông báo cho bạn khi đơn hàng được cập nhật trạng thái.</p>
+  <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div></body></html>

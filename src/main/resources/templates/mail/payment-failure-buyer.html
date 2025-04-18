@@ -1,0 +1,11 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Thanh toán thất bại</title><style>/* CSS cơ bản */</style></head><body>
+<div class="container"><h1>Thanh toán không thành công</h1>
+  <p>Xin chào <strong th:text="${buyerName}">Bạn</strong>,</p>
+  <p>Rất tiếc, giao dịch thanh toán cho đơn hàng <strong th:text="${order.orderCode}">#LS1234</strong> của bạn đã không thành công.</p>
+  <p>Lý do: <span th:text="${#strings.defaultString(order.payments?.get(0)?.gatewayMessage, 'Lỗi không xác định')}">[Thông báo lỗi từ cổng thanh toán]</span></p> <!-- Cần lấy lỗi từ Payment -->
+  <p>Vui lòng thử lại thanh toán hoặc chọn phương thức thanh toán khác.</p>
+  <p>Bạn có thể xem lại đơn hàng và thử thanh toán lại tại đây:</p>
+  <p><a th:href="${orderUrl}" class="button">Xem lại đơn hàng</a></p>
+  <p>Nếu bạn cần hỗ trợ, vui lòng liên hệ chúng tôi.</p>
+  <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div></body></html>

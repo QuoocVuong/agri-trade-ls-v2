@@ -1,0 +1,48 @@
+spring:
+  # --- Cấu hình Datasource sẽ được Testcontainers cung cấp động ---
+  # Không cần khai báo url, username, password ở đây nữa
+  # datasource:
+  #   url: ...
+  #   username: ...
+  #   password: ...
+
+  jpa:
+    hibernate:
+      # Quan trọng: Để Hibernate tự tạo schema trong DB test (container)
+      # Hoặc để Flyway chạy lại từ đầu trong container
+      ddl-auto: create # Hoặc 'create-drop' để xóa sau khi test, hoặc 'none' nếu muốn Flyway chạy
+    show-sql: false # Tắt show-sql trong test cho đỡ rối log (tùy chọn)
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect # Vẫn cần dialect
+
+  # --- Cấu hình Flyway cho Test (Tùy chọn) ---
+  flyway:
+    # Bật Flyway để chạy migration trên container mới mỗi lần test
+    # Nếu dùng ddl-auto=create hoặc create-drop thì có thể tắt flyway
+    enabled: true
+    clean-disabled: false # Cho phép clean DB trước khi migrate (nếu cần)
+    # baseline-on-migrate: true # Có thể cần nếu DB container không rỗng ban đầu
+
+  # --- Tắt các tính năng không cần thiết khi test (Tùy chọn) ---
+  # mail:
+  #   host: localhost # Tránh gửi mail thật khi test
+  #   port: 1025 # Port của MailHog/Mailtrap giả lập nếu có
+  # Tắt CommandLineRunner để tránh tạo dữ liệu thừa khi test
+  main:
+    banner-mode: "off"
+  # Cloud config, discovery client... nếu có thì tắt đi
+
+# Log level cho test (ví dụ: chỉ hiện lỗi)
+logging:
+  level:
+    root: WARN
+    com.yourcompany.agritradels: INFO # Hoặc DEBUG nếu cần xem log ứng dụng
+    org.springframework.test: INFO
+    org.testcontainers: INFO # Log của Testcontainers
+
+# Cấu hình Testcontainers (có thể không cần nếu dùng @DynamicPropertySource)
+# testcontainers:
+#   mysql:
+#     image-name: mysql:8.0 # Chỉ định image MySQL

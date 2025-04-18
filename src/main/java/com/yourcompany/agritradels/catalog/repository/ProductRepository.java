@@ -1,0 +1,122 @@
+package com.yourcompany.agritradels.catalog.repository;
+
+import com.yourcompany.agritradels.catalog.domain.Product;
+import com.yourcompany.agritradels.catalog.domain.ProductStatus;
+import com.yourcompany.agritradels.catalog.dto.response.TopProductResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor; // Import cho truy vấn động
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+// Kế thừa JpaSpecificationExecutor để dùng Specification API cho filter động
+public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
+
+    Optional<Product> findBySlug(String slug);
+    boolean existsBySlug(String slug);
+    boolean existsBySlugAndIdNot(String slug, Long id);
+
+    // Tìm sản phẩm theo ID và Farmer ID (kiểm tra ownership)
+    Optional<Product> findByIdAndFarmerId(Long id, Long farmerId);
+
+    // Tìm sản phẩm theo Slug và Farmer ID
+    Optional<Product> findBySlugAndFarmerId(String slug, Long farmerId);
+
+    // Lấy sản phẩm của một Farmer (phân trang)
+    Page<Product> findByFarmerId(Long farmerId, Pageable pageable);
+
+    // Lấy sản phẩm public theo slug
+    Optional<Product> findBySlugAndStatus(String slug, ProductStatus status);
+
+    // Lấy sản phẩm public theo ID
+    Optional<Product> findByIdAndStatus(Long id, ProductStatus status);
+
+    // Đếm sản phẩm theo category (hữu ích khi xóa category)
+    long countByCategoryId(Integer categoryId);
+
+    // Ví dụ truy vấn phức tạp hơn với JPQL (có thể thay bằng Specification)
+    @Query("SELECT p FROM Product p WHERE p.farmer.id = :farmerId AND (:status IS NULL OR p.status = :status)")
+    Page<Product> findByFarmerIdAndOptionalStatus(@Param("farmerId") Long farmerId,
+                                                  @Param("status") ProductStatus status,
+                                                  Pageable pageable);
+
+
+    // Sử dụng Native Query với MATCH AGAINST cho Full-Text Search
+    // Lưu ý: Cần đảm bảo index FULLTEXT đã được tạo trên name, description
+    // countQuery dùng để Spring Data tính tổng số trang
+    @Query(value = "SELECT p.* FROM products p " +
+            "JOIN categories c ON p.category_id = c.id " + // Join nếu cần lọc category
+            "WHERE p.status = 'PUBLISHED' AND p.is_deleted = false " +
+            "AND (:categoryId IS NULL OR p.category_id = :categoryId) " +
+            "AND (:provinceCode IS NULL OR p.province_code = :provinceCode) " +
+            "AND (:keyword IS NULL OR MATCH(p.name, p.description) AGAINST (:keyword IN NATURAL LANGUAGE MODE))",
+            countQuery = "SELECT count(p.id) FROM products p " +
+                    "JOIN categories c ON p.category_id = c.id " +
+                    "WHERE p.status = 'PUBLISHED' AND p.is_deleted = false " +
+                    "AND (:categoryId IS NULL OR p.category_id = :categoryId) " +
+                    "AND (:provinceCode IS NULL OR p.province_code = :provinceCode) " +
+                    "AND (:keyword IS NULL OR MATCH(p.name, p.description) AGAINST (:keyword IN NATURAL LANGUAGE MODE))",
+            nativeQuery = true)
+    Page<Product> searchPublicProductsWithFullText(
+            @Param("keyword") String keyword,
+            @Param("categoryId") Integer categoryId,
+            @Param("provinceCode") String provinceCode,
+            Pageable pageable);
+
+
+    /**
+     * Tìm các sản phẩm khác trong cùng danh mục (đã published, không bao gồm sản phẩm hiện tại).
+     * Giới hạn số lượng trả về.
+     * @param categoryId ID của danh mục.
+     * @param currentProductId ID của sản phẩm đang xem (để loại trừ).
+     * @param status Trạng thái mong muốn (PUBLISHED).
+     * @param pageable Đối tượng Pageable để giới hạn số lượng (ví dụ: PageRequest.of(0, limit)).
+     * @return Danh sách sản phẩm liên quan cùng danh mục.
+     */
+    List<Product> findTopNByCategoryIdAndIdNotAndStatus(Integer categoryId, Long currentProductId, ProductStatus status, Pageable pageable);
+
+    /**
+     * Tìm các sản phẩm khác của cùng nông dân (đã published, không bao gồm sản phẩm hiện tại và các sản phẩm đã lấy ở bước trước).
+     * Giới hạn số lượng trả về.
+     * @param farmerId ID của nông dân.
+     * @param excludedProductIds Danh sách ID các sản phẩm cần loại trừ (sản phẩm hiện tại và sp cùng category đã lấy).
+     * @param status Trạng thái mong muốn (PUBLISHED).
+     * @param pageable Đối tượng Pageable để giới hạn số lượng.
+     * @return Danh sách sản phẩm liên quan cùng nông dân.
+     */
+    // Sử dụng @Query vì tên phương thức sẽ quá dài và phức tạp với nhiều điều kiện NOT IN
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.farmer.id = :farmerId " +
+            "AND p.status = :status " +
+            "AND p.id NOT IN :excludedProductIds") // Loại trừ các ID đã có
+    List<Product> findTopNByFarmerIdAndIdNotInAndStatus(
+            @Param("farmerId") Long farmerId,
+            @Param("excludedProductIds") List<Long> excludedProductIds, // Truyền list ID cần loại trừ
+            @Param("status") ProductStatus status,
+            Pageable pageable);
+
+    // Phương thức tương tự nhưng không cần loại trừ ID (dùng nếu chỉ lấy theo farmer)
+    List<Product> findTopNByFarmerIdAndIdNotAndStatus(Long farmerId, Long currentProductId, ProductStatus status, Pageable pageable);
+
+
+    // Đếm sản phẩm sắp hết hàng của Farmer (ví dụ: < 5)
+    Long countByFarmerIdAndStockQuantityLessThan(Long farmerId, int threshold);
+
+    // File: catalog/repository/ProductRepository.java
+    @Query("SELECT new com.yourcompany.agritradels.catalog.dto.response.TopProductResponse(" +
+            "oi.product.id, oi.product.name, oi.product.slug, SUM(oi.quantity), SUM(oi.totalPrice)) " + // Bỏ thumbnailUrl
+            "FROM OrderItem oi JOIN oi.product p " + // Thêm JOIN tường minh để có thể group by product
+            "WHERE oi.order.farmer.id = :farmerId AND oi.order.status = com.yourcompany.agritradels.ordering.domain.OrderStatus.DELIVERED " +
+            "GROUP BY p.id, p.name, p.slug " + // Group by các trường của product
+            "ORDER BY SUM(oi.quantity) DESC")
+    List<TopProductResponse> findTopSellingProductsByFarmerWithoutThumbnail(@Param("farmerId") Long farmerId, Pageable pageable); // Đổi tên phương thức
+
+    // Đếm sản phẩm theo trạng thái (cho Admin)
+    Long countByStatus(ProductStatus status);
+
+
+}

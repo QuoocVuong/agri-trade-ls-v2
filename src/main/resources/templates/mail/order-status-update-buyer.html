@@ -1,0 +1,11 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Cập nhật trạng thái đơn hàng</title><style>/* CSS cơ bản */</style></head><body>
+<div class="container"><h1>Cập nhật trạng thái đơn hàng <span th:text="${order.orderCode}">#LS1234</span></h1>
+    <p>Xin chào <strong th:text="${buyerName}">Bạn</strong>,</p>
+    <p>Trạng thái đơn hàng <strong th:text="${order.orderCode}">#LS1234</strong> của bạn đã được cập nhật thành: <strong style="color: #17a2b8;" th:text="${newStatus}">[Trạng thái mới]</strong>.</p>
+    <p>(Trạng thái trước đó: <span th:text="${previousStatus}">[Trạng thái cũ]</span>)</p>
+    <p th:if="${newStatus == 'SHIPPING'}">Đơn hàng của bạn đang trên đường giao đến bạn. Vui lòng chuẩn bị nhận hàng.</p>
+    <p th:if="${newStatus == 'DELIVERED'}">Đơn hàng đã được giao thành công. Cảm ơn bạn đã mua hàng!</p>
+    <p>Bạn có thể xem chi tiết đơn hàng và theo dõi tại đây:</p>
+    <p><a th:href="${orderUrl}" class="button">Xem chi tiết đơn hàng</a></p>
+    <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div></body></html>

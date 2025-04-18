@@ -1,0 +1,10 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Thanh toán thành công</title><style>/* CSS cơ bản */</style></head><body>
+<div class="container"><h1>Thanh toán thành công!</h1>
+    <p>Xin chào <strong th:text="${buyerName}">Bạn</strong>,</p>
+    <p>Chúng tôi xác nhận đã nhận được thanh toán thành công cho đơn hàng <strong th:text="${order.orderCode}">#LS1234</strong> với tổng giá trị là <strong style="color: green;" th:text="${#numbers.formatDecimal(order.totalAmount, 0, 'COMMA', 0, 'POINT')} + ' đ'">0 đ</strong>.</p>
+    <p>Đơn hàng của bạn sẽ sớm được xử lý và giao đi.</p>
+    <p>Bạn có thể xem chi tiết đơn hàng tại đây:</p>
+    <p><a th:href="${orderUrl}" class="button">Xem chi tiết đơn hàng</a></p>
+    <p>Cảm ơn bạn đã mua hàng!</p>
+    <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div></body></html>

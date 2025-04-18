@@ -1,0 +1,8 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Chào mừng bạn!</title><style>/* CSS cơ bản */</style></head><body>
+<div class="container"><h1>Chào mừng tới <span th:text="${appName}">AgriTradeLS</span>!</h1>
+    <p>Xin chào <strong th:text="${username}">Bạn</strong>,</p>
+    <p>Tài khoản của bạn đã được xác thực thành công. Cảm ơn bạn đã tham gia cộng đồng của chúng tôi.</p>
+    <p>Bây giờ bạn có thể đăng nhập và bắt đầu khám phá các sản phẩm nông sản tươi ngon từ Lạng Sơn.</p>
+    <p><a th:href="${loginUrl}" class="button">Đăng nhập ngay</a></p>
+    <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div></body></html>

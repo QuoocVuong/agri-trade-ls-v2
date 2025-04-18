@@ -1,0 +1,9 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Thông báo hủy đơn hàng</title><style>/* CSS cơ bản */</style></head><body>
+<div class="container"><h1>Đơn hàng <span th:text="${order.orderCode}">#LS1234</span> đã bị hủy</h1>
+    <p>Xin chào <strong th:text="${farmerName}">Nông dân</strong>,</p>
+    <p>Đơn hàng <strong th:text="${order.orderCode}">#LS1234</strong> của khách hàng <strong th:text="${buyerName}">Tên người mua</strong> đã bị hủy.</p>
+    <p>Bạn không cần xử lý đơn hàng này nữa. Tồn kho của các sản phẩm trong đơn hàng (nếu có) đã được hoàn lại.</p>
+    <p>Bạn có thể xem chi tiết đơn hàng đã hủy tại đây:</p>
+    <p><a th:href="${orderUrl}" class="button">Xem đơn hàng đã hủy</a></p>
+    <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div></body></html>

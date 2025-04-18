@@ -1,0 +1,59 @@
+package com.yourcompany.agritradels.catalog.dto.request;
+
+import com.yourcompany.agritradels.catalog.domain.ProductStatus;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import lombok.Data;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
+
+@Data
+public class ProductRequest {
+    @NotBlank(message = "Product name is required")
+    @Size(max = 255)
+    private String name;
+
+    @NotNull(message = "Category ID is required")
+    private Integer categoryId;
+
+    private String description;
+
+    @NotBlank(message = "Unit is required")
+    @Size(max = 50)
+    private String unit; // B2C unit
+
+    @NotNull(message = "Price is required")
+    @PositiveOrZero(message = "Price must be non-negative")
+    private BigDecimal price; // B2C price
+
+    @NotNull(message = "Stock quantity is required")
+    @PositiveOrZero(message = "Stock quantity must be non-negative")
+    private Integer stockQuantity;
+
+    // Farmer có thể chỉ được set DRAFT hoặc UNPUBLISHED ban đầu
+    private ProductStatus status = ProductStatus.DRAFT;
+
+    private Boolean isB2bAvailable = false;
+
+    @Size(max = 50)
+    private String b2bUnit;
+
+    @Min(value = 1, message = "Minimum B2B quantity must be at least 1")
+    private Integer minB2bQuantity;
+
+    @PositiveOrZero(message = "B2B price must be non-negative")
+    private BigDecimal b2bBasePrice;
+
+    // Danh sách URL ảnh, ảnh đầu tiên sẽ là default nếu không có ảnh nào isDefault=true
+//    private List<String> imageUrls;
+    // Hoặc dùng DTO riêng cho ảnh nếu cần isDefault
+    // private List<ProductImageRequest> images;
+
+    @Valid // Validate các phần tử trong list
+    private List<ProductImageRequest> images; // Sử dụng DTO mới
+
+    // Danh sách bậc giá B2B (nếu dùng)
+    @Valid // Validate các phần tử trong list
+    private List<ProductPricingTierRequest> pricingTiers;
+}

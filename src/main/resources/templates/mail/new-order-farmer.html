@@ -1,0 +1,30 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Đơn hàng mới</title><style>/* CSS tương tự order-confirmation */</style></head><body>
+<div class="container"><h1>Bạn có đơn hàng mới!</h1>
+    <p>Xin chào <strong th:text="${farmerName}">Nông dân</strong>,</p>
+    <p>Bạn vừa nhận được một đơn hàng mới trên <span th:text="${appName}">AgriTradeLS</span> từ khách hàng <strong th:text="${buyerName}">Tên người mua</strong>.</p>
+    <p><strong>Thông tin đơn hàng:</strong></p>
+    <ul>
+        <li>Mã đơn hàng: <strong th:text="${order.orderCode}">#LS1234</strong></li>
+        <li>Ngày đặt: <span th:text="${#temporals.format(order.createdAt, 'dd/MM/yyyy HH:mm')}">dd/MM/yyyy HH:mm</span></li>
+        <li>Tổng giá trị: <strong style="color: blue;" th:text="${#numbers.formatDecimal(order.totalAmount, 0, 'COMMA', 0, 'POINT')} + ' đ'">0 đ</strong></li>
+        <li>Phương thức thanh toán: <span th:text="${order.paymentMethod.name()}">COD</span></li>
+    </ul>
+    <p><strong>Thông tin giao hàng:</strong></p>
+    <p>
+        <span th:text="${order.shippingFullName}">Tên người nhận</span> (<span th:text="${order.shippingPhoneNumber}">SĐT</span>)<br/>
+        <span th:text="${order.shippingAddressDetail}">Địa chỉ chi tiết</span><br/>
+    </p>
+    <p><strong>Chi tiết sản phẩm:</strong></p>
+    <table><thead><tr><th>Sản phẩm</th><th>Đơn giá</th><th>Số lượng</th><th>Thành tiền</th></tr></thead>
+        <tbody>
+        <tr th:each="item : ${order.orderItems}">
+            <td th:text="${item.productName}">Tên sản phẩm</td>
+            <td th:text="${#numbers.formatDecimal(item.pricePerUnit, 0, 'COMMA', 0, 'POINT')} + ' đ / ' + ${item.unit}">10,000 đ / kg</td>
+            <td th:text="${item.quantity}">1</td>
+            <td th:text="${#numbers.formatDecimal(item.totalPrice, 0, 'COMMA', 0, 'POINT')} + ' đ'">10,000 đ</td>
+        </tr>
+        </tbody></table>
+    <p>Vui lòng truy cập hệ thống để xem chi tiết và xử lý đơn hàng:</p>
+    <p><a th:href="${orderUrl}" class="button">Quản lý đơn hàng</a></p>
+    <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div></body></html>
