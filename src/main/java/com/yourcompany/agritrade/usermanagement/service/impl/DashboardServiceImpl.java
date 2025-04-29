@@ -39,6 +39,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -144,8 +145,23 @@ public class DashboardServiceImpl implements DashboardService {
         // Tạo Map từ kết quả query (LocalDate -> Long count)
         Map<LocalDate, Long> countsMap = dailyCounts.stream()
                 .collect(Collectors.toMap(
-                        tuple -> tuple.get(0, LocalDate.class), // Lấy ngày (cột 0)
-                        tuple -> tuple.get(1, Long.class)      // Lấy số lượng (cột 1)
+                        tuple -> {
+                            // *** SỬA CÁCH LẤY DATE TỪ TUPLE ***
+                            // Lấy kiểu Date gốc từ DB (thường là java.sql.Date hoặc java.util.Date)
+                            Object dateObject = tuple.get(0); // Lấy cột đầu tiên (ngày)
+                            if (dateObject instanceof java.sql.Date) {
+                                return ((java.sql.Date) dateObject).toLocalDate();
+                            } else if (dateObject instanceof Date) { // Fallback cho java.util.Date
+                                return ((Date) dateObject).toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                            } else {
+                                // Xử lý trường hợp không mong muốn hoặc log lỗi
+                                log.error("Unexpected date type in tuple for order count chart: {}", dateObject != null ? dateObject.getClass() : "null");
+                                // Có thể trả về một giá trị mặc định hoặc ném lỗi tùy logic
+                                return LocalDate.MIN; // Ví dụ trả về ngày nhỏ nhất để dễ lọc bỏ
+                            }
+                            // **********************************
+                        },
+                        tuple -> tuple.get(1, Long.class) // Lấy số lượng (cột 1)
                 ));
 
         // Tạo danh sách đầy đủ các ngày trong khoảng thời gian
@@ -158,7 +174,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .map(date -> {
                     Long count = countsMap.getOrDefault(date, 0L); // Lấy count hoặc 0 nếu không có
                     // Sử dụng constructor ChartDataDto(LocalDate, Long) nếu có, hoặc tạo mới
-                    return new FarmerChartDataResponse(date.toString(), BigDecimal.valueOf(count)); // Trả về String label, BigDecimal value
+                    return new FarmerChartDataResponse(date, count); // Dùng constructor (LocalDate, Long)
                     // Hoặc nếu ChartDataDto có constructor (LocalDate, Long):
                     // return new ChartDataDto(date, count);
                 })
@@ -185,11 +201,24 @@ public class DashboardServiceImpl implements DashboardService {
 
         // Tạo Map từ kết quả query (LocalDate -> BigDecimal revenue)
         Map<LocalDate, BigDecimal> revenuesMap = dailyRevenues.stream()
-                .filter(tuple -> tuple.get(1) != null) // Đảm bảo SUM không trả về null
+                .filter(tuple -> tuple.get(1, BigDecimal.class) != null)
                 .collect(Collectors.toMap(
-                        tuple -> tuple.get(0, LocalDate.class),   // Lấy ngày (cột 0)
+                        tuple -> {
+                            // *** SỬA CÁCH LẤY DATE TỪ TUPLE (TƯƠNG TỰ NHƯ TRÊN) ***
+                            Object dateObject = tuple.get(0);
+                            if (dateObject instanceof java.sql.Date) {
+                                return ((java.sql.Date) dateObject).toLocalDate();
+                            } else if (dateObject instanceof Date) {
+                                return ((Date) dateObject).toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                            } else {
+                                log.error("Unexpected date type in tuple for revenue chart: {}", dateObject != null ? dateObject.getClass() : "null");
+                                return LocalDate.MIN;
+                            }
+                            // *******************************************************
+                        },
                         tuple -> tuple.get(1, BigDecimal.class) // Lấy doanh thu (cột 1)
                 ));
+
 
         // Tạo danh sách đầy đủ các ngày trong khoảng thời gian
         List<LocalDate> dateRange = Stream.iterate(startDate, date -> date.plusDays(1))
@@ -201,7 +230,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .map(date -> {
                     BigDecimal revenue = revenuesMap.getOrDefault(date, BigDecimal.ZERO); // Lấy revenue hoặc 0
                     // Sử dụng constructor ChartDataDto(String, BigDecimal)
-                    return new FarmerChartDataResponse(date.toString(), revenue);
+                    return new FarmerChartDataResponse(date.toString(), revenue); // Dùng constructor (String, BigDecimal)
                 })
                 .collect(Collectors.toList());
     }

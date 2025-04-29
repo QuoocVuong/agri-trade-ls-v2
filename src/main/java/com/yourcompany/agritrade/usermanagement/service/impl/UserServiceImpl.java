@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.usermanagement.service.impl;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.model.RoleType;
+import com.yourcompany.agritrade.common.model.VerificationStatus;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
@@ -24,21 +25,27 @@ import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileReposito
 import com.yourcompany.agritrade.usermanagement.repository.RoleRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import com.yourcompany.agritrade.usermanagement.service.UserService;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -383,6 +390,87 @@ public class UserServiceImpl implements UserService {
         return responseList;
     }
     // =====================================
+
+
+    // ===== IMPLEMENT PHƯƠNG THỨC MỚI =====
+    @Override
+    @Transactional(readOnly = true)
+    public Page<FarmerSummaryResponse> searchPublicFarmers(String keyword, String provinceCode, Pageable pageable) {
+        log.debug("Searching public farmers with keyword: '{}', provinceCode: {}, pageable: {}", keyword, provinceCode, pageable);
+
+        // *** Tạo Specification cho FarmerProfile ***
+        Specification<FarmerProfile> spec = Specification.where(isVerified()) // Lọc profile đã VERIFIED
+                .and(hasKeywordInProfileOrUser(keyword)) // Lọc theo keyword
+                .and(hasProvince(provinceCode)); // Lọc theo tỉnh
+
+        // *** Gọi findAll trên FarmerProfileRepository ***
+        Page<FarmerProfile> farmerProfilePage = farmerProfileRepository.findAll(spec, pageable);
+
+        // Map sang Page<FarmerSummaryResponse> và xử lý null bên trong map
+        return farmerProfilePage.map(profile -> {
+            User user = profile.getUser();
+            if (user == null) {
+                // Trường hợp này rất hiếm nếu DB đúng, nhưng cần xử lý
+                log.error("User is null for FarmerProfile with userId: {}. Returning empty summary.", profile.getUserId());
+                // Trả về một đối tượng rỗng hoặc một giá trị mặc định thay vì null
+                // để tránh lỗi filter sau này và giữ đúng cấu trúc Page
+                return new FarmerSummaryResponse(profile.getUserId(), profile.getFarmName(), "[User not found]", null, profile.getProvinceCode(), 0); // Ví dụ
+            }
+            // Gọi mapper để tạo DTO hoàn chỉnh
+            return farmerSummaryMapper.toFarmerSummaryResponse(user, profile);
+        }); // <-- Bỏ .filter(Objects::nonNull) ở đây
+    }
+    // =====================================
+
+    // --- Specification Helper Methods ---
+    private Specification<FarmerProfile> isVerified() {
+        return (root, query, cb) ->
+                cb.equal(root.get("verificationStatus"), VerificationStatus.VERIFIED);
+    }
+    private Specification<FarmerProfile> hasKeywordInProfileOrUser(String keyword) {
+        return (root, query, cb) -> {
+            if (!StringUtils.hasText(keyword)) {
+                return cb.conjunction();
+            }
+            String pattern = "%" + keyword.toLowerCase() + "%";
+            // Join với User từ FarmerProfile
+            Join<FarmerProfile, User> userJoin = root.join("user", JoinType.INNER); // INNER JOIN vì farmer phải có user
+
+            Predicate farmNameLike = cb.like(cb.lower(root.get("farmName")), pattern);
+            Predicate userFullNameLike = cb.like(cb.lower(userJoin.get("fullName")), pattern);
+            // Predicate userEmailLike = cb.like(cb.lower(userJoin.get("email")), pattern); // Thêm nếu muốn tìm theo email
+
+            return cb.or(farmNameLike, userFullNameLike /*, userEmailLike */);
+        };
+    }
+
+    private Specification<User> hasKeywordInUserOrProfile(String keyword) {
+        return (root, query, cb) -> {
+            if (!StringUtils.hasText(keyword)) {
+                return cb.conjunction(); // Không lọc nếu keyword rỗng
+            }
+            String pattern = "%" + keyword.toLowerCase() + "%";
+            // Join với farmer_profiles (LEFT JOIN để vẫn lấy user dù chưa có profile)
+            Join<User, FarmerProfile> profileJoin = root.join("farmerProfile", JoinType.LEFT);
+
+            // Tạo các điều kiện LIKE
+            Predicate nameLike = cb.like(cb.lower(root.get("fullName")), pattern);
+            Predicate farmNameLike = cb.like(cb.lower(profileJoin.get("farmName")), pattern);
+            // Predicate descriptionLike = cb.like(cb.lower(profileJoin.get("description")), pattern); // Thêm nếu muốn tìm trong mô tả
+
+            // Kết hợp bằng OR
+            return cb.or(nameLike, farmNameLike /*, descriptionLike */);
+        };
+    }
+
+    private Specification<FarmerProfile> hasProvince(String provinceCode) {
+        return (root, query, cb) -> {
+            if (!StringUtils.hasText(provinceCode)) {
+                return cb.conjunction();
+            }
+            return cb.equal(root.get("provinceCode"), provinceCode);
+        };
+    }
 
 
 

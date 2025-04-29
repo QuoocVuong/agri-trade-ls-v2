@@ -71,4 +71,15 @@ public interface UserService {
      */
     List<FarmerSummaryResponse> getFeaturedFarmers(int limit);
     // ===========================
+
+    // ===== PHƯƠNG THỨC MỚI =====
+    /**
+     * Tìm kiếm và lọc danh sách Farmer công khai (đã được duyệt).
+     * @param keyword Từ khóa tìm kiếm (tên user, tên trang trại).
+     * @param provinceCode Mã tỉnh để lọc.
+     * @param pageable Thông tin phân trang và sắp xếp.
+     * @return Trang chứa FarmerSummaryResponse.
+     */
+    Page<FarmerSummaryResponse> searchPublicFarmers(String keyword, String provinceCode, Pageable pageable);
+    // ===========================
 }

@@ -13,6 +13,9 @@ public class ProductRequest {
     @Size(max = 255)
     private String name;
 
+    @Size(max = 255)
+    private String slug;
+
     @NotNull(message = "Category ID is required")
     private Integer categoryId;
 

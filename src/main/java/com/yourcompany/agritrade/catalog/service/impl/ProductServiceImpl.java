@@ -58,6 +58,8 @@ public class ProductServiceImpl implements ProductService {
     private final FileStorageService fileStorageService;
     private static final int RELATED_PRODUCTS_LIMIT = 4; // Số lượng sản phẩm liên quan muốn hiển thị
 
+    private final ProductPricingTierMapper productPricingTierMapper;
+
     // --- Farmer Methods ---
 
     @Override
@@ -121,55 +123,207 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @Transactional
+    @Transactional // Đảm bảo tất cả thao tác trong một transaction
     public ProductDetailResponse updateMyProduct(Authentication authentication, Long productId, ProductRequest request) {
-        User farmer = getUserFromAuthentication(authentication);
-        Product product = findMyProductById(productId, farmer.getId()); // Kiểm tra ownership
+        User farmer = getUserFromAuthentication(authentication); // 1. Lấy thông tin Farmer
+        Product existingProduct = findMyProductById(productId, farmer.getId()); // 2. Tìm sản phẩm và kiểm tra ownership
 
-        // Logic kiểm tra trạng thái sản phẩm trước khi cho cập nhật (ví dụ)
-        if (product.getStatus() == ProductStatus.PENDING_APPROVAL || product.getStatus() == ProductStatus.REJECTED) {
-            throw new BadRequestException("Cannot update product while it is pending approval or rejected.");
+        ProductStatus previousStatus = existingProduct.getStatus(); // Lưu trạng thái cũ
+        boolean wasPublished = previousStatus == ProductStatus.PUBLISHED;
+
+        // 3. Cập nhật các trường cơ bản (trừ collection, category, slug, status)
+        productMapper.updateProductFromRequest(request, existingProduct);
+
+        // 4. Cập nhật Category nếu có thay đổi
+        updateCategoryIfNeeded(request, existingProduct);
+
+        // 5. Cập nhật Slug nếu tên hoặc slug trong request thay đổi
+        updateSlugIfNeeded(request, existingProduct);
+
+        // 6. Cập nhật danh sách Ảnh (dùng clear/addAll)
+        updateProductImages(existingProduct, request.getImages());
+
+        // 7. Cập nhật danh sách Bậc giá B2B (dùng clear/addAll)
+        updatePricingTiers(existingProduct, request.getIsB2bAvailable(), request.getPricingTiers());
+
+        // 8. Xử lý cập nhật Trạng thái sản phẩm
+        updateProductStatusForFarmer(request, existingProduct, previousStatus, wasPublished);
+
+        // 9. Lưu sản phẩm và các thay đổi liên quan
+        Product savedProduct = productRepository.save(existingProduct);
+        log.info("Updated product {} for farmer {}", productId, farmer.getId());
+
+        // 10. Gửi thông báo nếu trạng thái chuyển về PENDING_APPROVAL
+        if (savedProduct.getStatus() == ProductStatus.PENDING_APPROVAL && wasPublished) {
+            // notificationService.sendProductNeedsReapprovalNotification(savedProduct); // Cần tạo hàm này
+            log.info("Product {} requires re-approval after update.", savedProduct.getId());
         }
-        if (product.getStatus() == ProductStatus.PUBLISHED && request.getStatus() != ProductStatus.UNPUBLISHED && request.getStatus() != ProductStatus.PUBLISHED) {
-            // Nếu đã publish, farmer chỉ có thể chuyển sang UNPUBLISHED
-            log.warn("Farmer {} trying to change status of published product {} to {}", farmer.getId(), productId, request.getStatus());
-            // Giữ nguyên status hoặc set là UNPUBLISHED tùy logic
-            // request.setStatus(product.getStatus()); // Ví dụ: giữ nguyên
-            request.setStatus(ProductStatus.UNPUBLISHED); // Ví dụ: Chuyển thành ẩn
-        } else if (product.getStatus() != ProductStatus.PUBLISHED && request.getStatus() != ProductStatus.DRAFT && request.getStatus() != ProductStatus.UNPUBLISHED) {
-            // Nếu chưa publish, farmer chỉ được set DRAFT hoặc UNPUBLISHED
-            log.warn("Farmer {} trying to set invalid status {} for non-published product {}", farmer.getId(), request.getStatus(), productId);
-            request.setStatus(product.getStatus()); // Giữ nguyên status cũ
-        }
 
+        // 11. Load lại đầy đủ thông tin để trả về DTO chi tiết
+        // Gọi lại getMyProductById để đảm bảo fetch đúng các association
+        return getMyProductById(authentication, savedProduct.getId());
+    }
 
-        // Cập nhật slug nếu tên thay đổi
-        String newSlug = product.getSlug();
-        if (StringUtils.hasText(request.getName()) && !request.getName().equals(product.getName())) {
-            newSlug = generateUniqueSlug(request.getName(), productId);
-        }
+    // --- Helper Methods for updateMyProduct ---
 
-        // Cập nhật category nếu có thay đổi
+    private void updateCategoryIfNeeded(ProductRequest request, Product product) {
         if (request.getCategoryId() != null && !request.getCategoryId().equals(product.getCategory().getId())) {
             Category category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
             product.setCategory(category);
         }
+    }
 
-        // Cập nhật các trường khác
-        productMapper.updateProductFromRequest(request, product);
-        product.setSlug(newSlug); // Gán slug mới (có thể là slug cũ nếu tên không đổi)
+    private void updateSlugIfNeeded(ProductRequest request, Product product) {
+        String currentSlug = product.getSlug();
+        String potentialNewSlug = currentSlug; // Giữ slug cũ mặc định
 
-        // Xử lý cập nhật ảnh thông minh
-        updateProductImagesFromRequest(product, request.getImages()); // Gọi helper mới
+        // Ưu tiên slug do người dùng nhập nếu có và khác slug hiện tại (sau khi slugify)
+        if (StringUtils.hasText(request.getSlug())) {
+            String requestedSlugified = slugify.slugify(request.getSlug());
+            if (!requestedSlugified.equals(currentSlug)) {
+                potentialNewSlug = requestedSlugified;
+            }
+        }
+        // Nếu slug không được nhập thủ công VÀ tên sản phẩm thay đổi -> tạo slug mới từ tên
+        else if (StringUtils.hasText(request.getName()) && !request.getName().equals(product.getName())) {
+            String nameSlugified = slugify.slugify(request.getName());
+            if (!nameSlugified.equals(currentSlug)) {
+                potentialNewSlug = nameSlugified;
+            }
+        }
 
-        // Xử lý cập nhật ảnh và bậc giá
-//        updateProductImages(product, request.getImageUrls());
-        updatePricingTiers(product, request.getIsB2bAvailable(), request.getPricingTiers());
+        // Chỉ kiểm tra và cập nhật nếu slug tiềm năng khác slug hiện tại
+        if (!potentialNewSlug.equals(currentSlug)) {
+            // Kiểm tra trùng lặp với các sản phẩm khác
+            if (productRepository.existsBySlugAndIdNot(potentialNewSlug, product.getId())) {
+                // Có thể tạo slug duy nhất bằng cách thêm số hoặc ném lỗi yêu cầu người dùng sửa
+                // Ví dụ: Ném lỗi
+                throw new BadRequestException("Slug '" + potentialNewSlug + "' đã được sử dụng. Vui lòng chọn slug khác hoặc để trống để tự động tạo.");
+                // Ví dụ: Tạo slug duy nhất (cần hàm generateUniqueSlug phức tạp hơn)
+                // product.setSlug(generateUniqueSlug(potentialNewSlug, product.getId()));
+            } else {
+                product.setSlug(potentialNewSlug); // Gán slug mới nếu không trùng
+            }
+        }
+        // Nếu slug tiềm năng giống slug hiện tại -> không làm gì cả
+    }
 
-        Product updatedProduct = productRepository.save(product);
-        log.info("Product updated with id: {} by farmer: {}", updatedProduct.getId(), farmer.getId());
-        return productMapper.toProductDetailResponse(updatedProduct);
+
+    private void updateProductImages(Product product, List<ProductImageRequest> imageRequests) {
+        Set<ProductImage> existingImages = product.getImages();
+        if (existingImages == null) {
+            existingImages = new HashSet<>();
+            product.setImages(existingImages);
+        }
+
+        Set<ProductImage> requestedImages = new HashSet<>();
+        boolean hasDefaultInRequest = false;
+        if (imageRequests != null) {
+            int order = 0;
+            for (ProductImageRequest req : imageRequests) {
+                // Logic này giả định FE gửi đầy đủ list ảnh mong muốn cuối cùng
+                // và không gửi ID cho ảnh mới, chỉ gửi ID cho ảnh muốn giữ lại/cập nhật
+                ProductImage img = productImageMapper.requestToProductImage(req);
+                img.setProduct(product);
+                img.setDisplayOrder(order++); // Gán lại thứ tự dựa trên request
+                img.setDefault(req.getIsDefault() != null && req.getIsDefault()); // Cập nhật isDefault
+                if (img.isDefault()) {
+                    hasDefaultInRequest = true;
+                }
+                requestedImages.add(img);
+            }
+        }
+
+        // Sử dụng clear/addAll với orphanRemoval=true
+        existingImages.clear();
+        existingImages.addAll(requestedImages);
+
+        // Đảm bảo có ảnh default nếu list không rỗng và chưa có default nào được set từ request
+        if (!existingImages.isEmpty() && !hasDefaultInRequest) {
+            existingImages.stream().min(Comparator.comparingInt(ProductImage::getDisplayOrder))
+                    .ifPresent(img -> img.setDefault(true));
+        }
+    }
+
+    private void updatePricingTiers(Product product, Boolean isB2bAvailable, List<ProductPricingTierRequest> tierRequests) {
+        Set<ProductPricingTier> existingTiers = product.getPricingTiers();
+        if (existingTiers == null) {
+            existingTiers = new HashSet<>();
+            product.setPricingTiers(existingTiers);
+        }
+
+        // Xóa hết tier cũ nếu sản phẩm không còn là B2B hoặc request gửi list rỗng
+        if (Boolean.FALSE.equals(isB2bAvailable) || (tierRequests != null && tierRequests.isEmpty())) {
+            if (!existingTiers.isEmpty()) {
+                existingTiers.clear(); // orphanRemoval sẽ xóa khỏi DB
+                log.debug("Cleared pricing tiers for product {}", product.getId());
+            }
+            return; // Kết thúc nếu không cho B2B hoặc list rỗng
+        }
+
+        // Chỉ cập nhật nếu tierRequests được gửi (không phải null)
+        if (tierRequests != null) {
+            Set<ProductPricingTier> requestedTiers = tierRequests.stream()
+                    .map(req -> {
+                        ProductPricingTier tier = productPricingTierMapper.requestToProductPricingTier(req);
+                        tier.setProduct(product);
+                        return tier;
+                    })
+                    .collect(Collectors.toSet());
+
+            // Dùng clear/addAll
+            existingTiers.clear();
+            existingTiers.addAll(requestedTiers);
+            log.debug("Updated pricing tiers for product {}", product.getId());
+        }
+        // Nếu tierRequests là null -> không làm gì, giữ nguyên tier cũ
+    }
+
+    private void updateProductStatusForFarmer(ProductRequest request, Product product, ProductStatus previousStatus, boolean wasPublished) {
+        ProductStatus requestedStatus = request.getStatus();
+
+        // Chỉ cho phép Farmer set DRAFT hoặc UNPUBLISHED
+        if (requestedStatus == ProductStatus.DRAFT || requestedStatus == ProductStatus.UNPUBLISHED) {
+            // Nếu trước đó đã public/pending, giờ chỉ có thể là UNPUBLISHED
+            if (wasPublished || previousStatus == ProductStatus.PENDING_APPROVAL) {
+                product.setStatus(ProductStatus.UNPUBLISHED);
+            } else {
+                product.setStatus(requestedStatus); // Cho phép đổi giữa Draft/Unpublished
+            }
+        } else if (requestedStatus != null && requestedStatus != previousStatus) {
+            // Nếu Farmer cố set trạng thái khác (PUBLISHED, REJECTED, PENDING) -> bỏ qua, giữ trạng thái cũ
+            log.warn("Farmer attempted to set invalid status {} for product {}. Keeping status {}.",
+                    requestedStatus, product.getId(), previousStatus);
+            product.setStatus(previousStatus); // Giữ nguyên trạng thái cũ
+        }
+        // Không cần else vì nếu request.status là null hoặc giống previousStatus thì không đổi
+
+        // Logic chuyển về PENDING khi sửa sản phẩm PUBLISHED
+        boolean significantChange = wasPublished && hasSignificantChanges(product, request); // Kiểm tra thay đổi
+        // Chỉ chuyển về PENDING nếu trạng thái hiện tại *không phải* là UNPUBLISHED (do farmer chủ động ẩn)
+        if (significantChange && product.getStatus() != ProductStatus.UNPUBLISHED) {
+            log.info("Significant changes detected for published product {}. Setting status to PENDING_APPROVAL.", product.getId());
+            product.setStatus(ProductStatus.PENDING_APPROVAL);
+        }
+    }
+
+    private boolean hasSignificantChanges(Product existingProduct, ProductRequest request) {
+        // So sánh các trường quan trọng
+        if (request.getName() != null && !Objects.equals(existingProduct.getName(), request.getName())) return true;
+        if (request.getDescription() != null && !Objects.equals(existingProduct.getDescription(), request.getDescription())) return true;
+        if (request.getPrice() != null && (existingProduct.getPrice() == null || existingProduct.getPrice().compareTo(request.getPrice()) != 0)) return true;
+        if (request.getCategoryId() != null && !Objects.equals(existingProduct.getCategory().getId(), request.getCategoryId())) return true;
+        if (request.getUnit() != null && !Objects.equals(existingProduct.getUnit(), request.getUnit())) return true;
+        // Thêm kiểm tra cho các trường B2B nếu cần thiết
+        if (!Objects.equals(existingProduct.isB2bAvailable(), request.getIsB2bAvailable())) return true;
+        if (Boolean.TRUE.equals(request.getIsB2bAvailable())) {
+            if (request.getB2bUnit() != null && !Objects.equals(existingProduct.getB2bUnit(), request.getB2bUnit())) return true;
+            if (request.getMinB2bQuantity() != null && !Objects.equals(existingProduct.getMinB2bQuantity(), request.getMinB2bQuantity())) return true;
+            if (request.getB2bBasePrice() != null && (existingProduct.getB2bBasePrice() == null || existingProduct.getB2bBasePrice().compareTo(request.getB2bBasePrice()) != 0)) return true;
+            // Có thể kiểm tra cả thay đổi trong pricingTiers và images nếu muốn chặt chẽ hơn
+        }
+        return false;
     }
 
     @Override
@@ -232,22 +386,21 @@ public class ProductServiceImpl implements ProductService {
 //    }
 
     //cái này là tìm kiếm like % .... %
+    // *** SỬA LẠI: Dùng Specification API (LIKE Search) ***
     @Override
     @Transactional(readOnly = true)
     public Page<ProductSummaryResponse> searchPublicProducts(String keyword, Integer categoryId, String provinceCode, Pageable pageable) {
-        // *** Quay lại sử dụng Specification API ***
-        Specification<Product> spec = Specification.where(ProductSpecifications.isPublished()) // Bắt đầu với điều kiện published
-                // .and(ProductSpecifications.isNotDeleted()) // Thêm nếu không dùng @Where
+        log.debug("Searching public products with keyword: '{}', categoryId: {}, provinceCode: {}, pageable: {}", keyword, categoryId, provinceCode, pageable);
+        Specification<Product> spec = Specification.where(ProductSpecifications.isPublished())
                 .and(ProductSpecifications.hasKeyword(keyword))
                 .and(ProductSpecifications.inCategory(categoryId))
                 .and(ProductSpecifications.inProvince(provinceCode));
-
-        // findAll với Specification và Pageable (bao gồm sort từ client)
+        // findAll với Specification và Pageable (đã bao gồm sort)
         Page<Product> productPage = productRepository.findAll(spec, pageable);
-
         // Map kết quả sang DTO
         return productPage.map(productMapper::toProductSummaryResponse);
     }
+    // *************************************************
 
 
     @Override
@@ -483,24 +636,24 @@ public class ProductServiceImpl implements ProductService {
 
 
 
-    // Helper xử lý cập nhật bậc giá B2B
-    private void updatePricingTiers(Product product, Boolean isB2bAvailable, List<ProductPricingTierRequest> tierRequests) {
-        if (tierRequests != null) { // Chỉ xử lý nếu có gửi list (kể cả rỗng)
-            pricingTierRepository.deleteByProductId(product.getId()); // Xóa bậc giá cũ
-            product.getPricingTiers().clear(); // Xóa khỏi collection
-
-            if (Boolean.TRUE.equals(isB2bAvailable) && !CollectionUtils.isEmpty(tierRequests)) {
-                Set<ProductPricingTier> tiers = tierRequests.stream()
-                        .map(tierReq -> {
-                            ProductPricingTier tier = pricingTierMapper.requestToProductPricingTier(tierReq);
-                            tier.setProduct(product);
-                            return tier;
-                        }).collect(Collectors.toSet());
-                product.setPricingTiers(tiers); // Thêm vào collection mới
-            }
-        }
-        // Nếu tierRequests là null -> không làm gì cả, giữ nguyên bậc giá cũ
-    }
+//    // Helper xử lý cập nhật bậc giá B2B
+//    private void updatePricingTiers(Product product, Boolean isB2bAvailable, List<ProductPricingTierRequest> tierRequests) {
+//        if (tierRequests != null) { // Chỉ xử lý nếu có gửi list (kể cả rỗng)
+//            pricingTierRepository.deleteByProductId(product.getId()); // Xóa bậc giá cũ
+//            product.getPricingTiers().clear(); // Xóa khỏi collection
+//
+//            if (Boolean.TRUE.equals(isB2bAvailable) && !CollectionUtils.isEmpty(tierRequests)) {
+//                Set<ProductPricingTier> tiers = tierRequests.stream()
+//                        .map(tierReq -> {
+//                            ProductPricingTier tier = pricingTierMapper.requestToProductPricingTier(tierReq);
+//                            tier.setProduct(product);
+//                            return tier;
+//                        }).collect(Collectors.toSet());
+//                product.setPricingTiers(tiers); // Thêm vào collection mới
+//            }
+//        }
+//        // Nếu tierRequests là null -> không làm gì cả, giữ nguyên bậc giá cũ
+//    }
 
     // --- Helper Method mới để tìm sản phẩm liên quan ---
     private List<ProductSummaryResponse> findRelatedProducts(Product currentProduct) {

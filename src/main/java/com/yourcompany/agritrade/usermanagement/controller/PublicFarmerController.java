@@ -4,6 +4,9 @@ import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.FarmerSummaryResponse;
 import com.yourcompany.agritrade.usermanagement.service.UserService; // Inject UserService
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,4 +43,15 @@ public class PublicFarmerController {
         // ...
     }
     */
+    // ===== ENDPOINT MỚI CHO TÌM KIẾM/LỌC =====
+    @GetMapping
+    public ResponseEntity<ApiResponse<Page<FarmerSummaryResponse>>> searchPublicFarmers(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String provinceCode,
+            @PageableDefault(size = 12, sort = "farmName,asc") Pageable pageable) { // Ví dụ sort theo tên farm
+
+        Page<FarmerSummaryResponse> farmerPage = userService.searchPublicFarmers(keyword, provinceCode, pageable);
+        return ResponseEntity.ok(ApiResponse.success(farmerPage));
+    }
+    // =======================================
 }

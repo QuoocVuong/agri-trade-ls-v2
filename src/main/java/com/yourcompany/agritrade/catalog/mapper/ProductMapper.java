@@ -61,17 +61,19 @@ public interface ProductMapper {
     // --- Update Mapper ---
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "slug", ignore = true)
     @Mapping(target = "farmer", ignore = true)
-    @Mapping(target = "category", ignore = true) // Category có thể cho phép cập nhật, cần xử lý riêng
-    @Mapping(target = "provinceCode", ignore = true)
+    @Mapping(target = "category", ignore = true) // Category xử lý riêng
+    @Mapping(target = "slug", ignore = true) // Slug xử lý riêng
+    @Mapping(target = "status", ignore = true) // Status xử lý riêng
     @Mapping(target = "averageRating", ignore = true)
     @Mapping(target = "ratingCount", ignore = true)
     @Mapping(target = "favoriteCount", ignore = true)
-    @Mapping(target = "images", ignore = true)
-    @Mapping(target = "pricingTiers", ignore = true)
+    @Mapping(target = "images", ignore = true) // <-- Bỏ qua collection
+    @Mapping(target = "pricingTiers", ignore = true) // <-- Bỏ qua collection
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+   // @Mapping(target = "isDeleted", ignore = true)
+    @Mapping(target = "version", ignore = true) // Không map version
     //@Mapping(target = "isDeleted", ignore = true)
     void updateProductFromRequest(ProductRequest request, @MappingTarget Product product);
 
