@@ -10,6 +10,22 @@ import org.springframework.util.StringUtils;
 
 public class ProductSpecifications {
 
+    // ****** THÊM PHƯƠNG THỨC NÀY ******
+    public static Specification<Product> fetchFarmerAndProfile() {
+        return (root, query, cb) -> {
+            // Chỉ thực hiện fetch khi query không phải là count query
+            if (Long.class != query.getResultType() && long.class != query.getResultType()) {
+                // Fetch farmer (User)
+                Fetch<Product, User> farmerFetch = root.fetch("farmer", JoinType.INNER); // INNER vì product phải có farmer
+                // Fetch farmerProfile từ farmer đã fetch
+                farmerFetch.fetch("farmerProfile", JoinType.LEFT); // LEFT vì farmer có thể chưa có profile
+            }
+            // Trả về một Predicate luôn đúng để không ảnh hưởng đến điều kiện WHERE
+            return cb.conjunction();
+        };
+    }
+    // **********************************
+
     // Specification: Lấy sản phẩm có trạng thái PUBLISHED
     public static Specification<Product> isPublished() {
         return (root, query, criteriaBuilder) ->

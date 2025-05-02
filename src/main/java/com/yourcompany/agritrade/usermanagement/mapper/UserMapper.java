@@ -1,7 +1,9 @@
 package com.yourcompany.agritrade.usermanagement.mapper;
 
+import com.yourcompany.agritrade.interaction.websocket.WebSocketEventListener;
 import com.yourcompany.agritrade.usermanagement.domain.Role;
 import com.yourcompany.agritrade.usermanagement.domain.User;
+import com.yourcompany.agritrade.usermanagement.dto.response.UserInfoSimpleResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserProfileResponse; // Import mới
 import com.yourcompany.agritrade.usermanagement.dto.response.UserResponse;
 import org.mapstruct.Mapper;
@@ -9,6 +11,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 import org.springframework.beans.factory.annotation.Autowired; // Autowired để inject mapper khác
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -19,6 +22,11 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
     protected FarmerProfileMapper farmerProfileMapper;
     @Autowired
     protected BusinessProfileMapper businessProfileMapper;
+
+    // ****** INJECT WebSocketEventListener ******
+    @Autowired
+    protected WebSocketEventListener presenceService;
+    // ***************************************
 
 
     // Chỉ map các trường cơ bản từ User sang UserResponse
@@ -35,6 +43,19 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
     // MapStruct sẽ tự động map các trường giống tên từ User sang các trường kế thừa trong UserProfileResponse
     // Các trường farmerProfile và businessProfile sẽ là null sau khi map này, và được gán giá trị trong Service
     public abstract UserProfileResponse toUserProfileResponse(User user);
+
+    // ****** THÊM PHƯƠNG THỨC MAP SANG UserInfoSimpleResponse ******
+    @Mapping(target = "id", source = "id")
+    @Mapping(target = "fullName", source = "fullName")
+    @Mapping(target = "avatarUrl", source = "avatarUrl")
+    // Thêm mapping cho isOnline, gọi hàm từ presenceService
+    @Mapping(target = "online", expression = "java(presenceService.isUserOnline(user.getId()))")
+    public abstract UserInfoSimpleResponse toUserInfoSimpleResponse(User user);
+    // ***********************************************************
+
+    // ****** THÊM PHƯƠNG THỨC MAP LIST SANG UserInfoSimpleResponse ******
+    public abstract List<UserInfoSimpleResponse> toUserInfoSimpleResponseList(List<User> users);
+    // ****************************************************************
 
 
     @Named("rolesToRoleNames")

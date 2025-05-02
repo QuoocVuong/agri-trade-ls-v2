@@ -2,6 +2,9 @@ package com.yourcompany.agritrade.interaction.mapper;
 
 import com.yourcompany.agritrade.interaction.domain.ChatMessage;
 import com.yourcompany.agritrade.interaction.dto.response.ChatMessageResponse;
+import com.yourcompany.agritrade.interaction.websocket.WebSocketEventListener;
+import com.yourcompany.agritrade.usermanagement.domain.User;
+import com.yourcompany.agritrade.usermanagement.dto.response.UserInfoSimpleResponse;
 import com.yourcompany.agritrade.usermanagement.mapper.UserMapper; // Import UserMapper để lấy UserInfoSimpleResponse
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -11,25 +14,29 @@ import java.util.List;
 
 // uses UserMapper để map thông tin sender và recipient
 @Mapper(componentModel = "spring", uses = {UserMapper.class})
-public abstract class ChatMessageMapper { // Đổi thành abstract class
+public interface ChatMessageMapper {
 
-    @Autowired // Inject UserMapper
-    protected UserMapper userMapper;
+    // @Autowired // Bỏ inject UserMapper nếu dùng uses
+    // protected UserMapper userMapper;
+
+    // Bỏ inject presenceService
+    // @Autowired
+    // protected WebSocketEventListener presenceService;
 
     @Mapping(target = "roomId", source = "room.id")
-    // MapStruct sẽ tự động tìm phương thức phù hợp trong UserMapper để map User sang UserInfoSimpleResponse
-    // nếu bạn đã định nghĩa phương thức đó trong UserMapper.
-    // Nếu chưa có, bạn cần tạo phương thức ví dụ: UserInfoSimpleResponse userToUserInfoSimpleResponse(User user) trong UserMapper
-    @Mapping(target = "sender", source = "sender") // Giả sử UserMapper có hàm map sang UserInfoSimpleResponse
-    @Mapping(target = "recipient", source = "recipient") // Giả sử UserMapper có hàm map sang UserInfoSimpleResponse
-    public abstract ChatMessageResponse toChatMessageResponse(ChatMessage chatMessage);
+    // MapStruct sẽ dùng UserMapper trong 'uses' để gọi hàm map User -> UserInfoSimpleResponse
+    @Mapping(target = "sender", source = "sender")
+    @Mapping(target = "recipient", source = "recipient")
+    ChatMessageResponse toChatMessageResponse(ChatMessage chatMessage); // Đổi về non-abstract nếu là interface
 
-    public abstract List<ChatMessageResponse> toChatMessageResponseList(List<ChatMessage> messages);
+    List<ChatMessageResponse> toChatMessageResponseList(List<ChatMessage> messages); // Đổi về non-abstract
 
-    // Nếu UserMapper chưa có hàm map sang UserInfoSimpleResponse, bạn có thể định nghĩa ở đây
-    // Hoặc tốt hơn là định nghĩa trong UserMapper và gọi nó ở đây nếu cần thiết (thông qua @Named)
+    // Bỏ hàm userToUserInfoSimple ở đây vì nó nên nằm trong UserMapper
     /*
-    @Mapping(target="...", source="...") // Map các trường cần thiết
+    @Mapping(target = "id", source = "id")
+    @Mapping(target = "fullName", source = "fullName")
+    @Mapping(target = "avatarUrl", source = "avatarUrl")
+    @Mapping(target = "isOnline", expression = "java(presenceService.isUserOnline(user.getId()))")
     abstract UserInfoSimpleResponse userToUserInfoSimple(User user);
     */
 }

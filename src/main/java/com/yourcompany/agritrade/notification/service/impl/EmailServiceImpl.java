@@ -1,5 +1,6 @@
 package com.yourcompany.agritrade.notification.service.impl;
 
+import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
@@ -193,6 +194,62 @@ public class EmailServiceImpl implements EmailService {
         String htmlBody = thymeleafTemplateEngine.process("mail/payment-failure-buyer", context);
         sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
     }
+
+
+    @Override
+    @Async("taskExecutor")
+    public void sendProductApprovedEmailToFarmer(Product product, User farmer) { // Thêm User farmer
+        if (farmer == null || farmer.getEmail() == null) {
+            log.error("Cannot send product approved email. Farmer or farmer email is null for product ID: {}", product.getId());
+            return;
+        }
+        try {
+            String subject = String.format("[%s] Sản phẩm của bạn đã được duyệt", appName);
+            Context context = new Context();
+            context.setVariable("productName", product.getName());
+            context.setVariable("productUrl", frontendUrl + "/products/" + product.getSlug());
+            context.setVariable("appName", appName);
+            // Thêm tên farmer vào context nếu template cần
+            context.setVariable("farmerName", farmer.getFullName());
+            String htmlBody = thymeleafTemplateEngine.process("mail/product-approved-farmer", context);
+
+            // Sử dụng email từ đối tượng farmer đã truyền vào
+            String recipientEmail = farmer.getEmail();
+            log.info("Attempting to send product approved email to {}", recipientEmail);
+            sendHtmlEmail(subject, recipientEmail, htmlBody);
+            log.info("Successfully sent product approved email to {}", recipientEmail);
+        } catch (Exception e) {
+            log.error("Error sending product approved email to {}: {}", farmer.getEmail(), e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Async("taskExecutor")
+    public void sendProductRejectedEmailToFarmer(Product product, String reason, User farmer) { // Thêm User farmer
+        if (farmer == null || farmer.getEmail() == null) {
+            log.error("Cannot send product rejected email. Farmer or farmer email is null for product ID: {}", product.getId());
+            return;
+        }
+        try {
+            String subject = String.format("[%s] Sản phẩm của bạn bị từ chối", appName);
+            Context context = new Context();
+            context.setVariable("productName", product.getName());
+            context.setVariable("reason", reason);
+            context.setVariable("productUrl", frontendUrl + "/products/" + product.getSlug());
+            context.setVariable("appName", appName);
+            context.setVariable("farmerName", farmer.getFullName()); // Dùng farmer đã truyền vào
+            String htmlBody = thymeleafTemplateEngine.process("mail/product-rejected-farmer", context);
+
+            String recipientEmail = farmer.getEmail(); // Dùng email từ farmer đã truyền vào
+            log.info("Attempting to send product rejected email to {}", recipientEmail);
+            sendHtmlEmail(subject, recipientEmail, htmlBody);
+            log.info("Successfully sent product rejected email to {}", recipientEmail);
+        } catch (Exception e) {
+            log.error("Error sending product rejected email to {}: {}", farmer.getEmail(), e.getMessage(), e);
+        }
+    }
+
+
 
 
     // --- Private Helper Method ---

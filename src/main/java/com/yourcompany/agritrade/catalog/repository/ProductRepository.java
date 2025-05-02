@@ -99,6 +99,19 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             @Param("status") ProductStatus status,
             Pageable pageable);
 
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.status = :published " +
+            "AND p.id <> :productId " +
+            "AND (p.category.id = :categoryId OR p.farmer.id = :farmerId)")
+    List<Product> findRelatedProducts(
+            @Param("productId") Long productId,
+            @Param("categoryId") Long categoryId,
+            @Param("farmerId") Long farmerId,
+            @Param("published") ProductStatus published,
+            Pageable pageable
+    );
+
+
     // Phương thức tương tự nhưng không cần loại trừ ID (dùng nếu chỉ lấy theo farmer)
     List<Product> findTopNByFarmerIdAndIdNotAndStatus(Long farmerId, Long currentProductId, ProductStatus status, Pageable pageable);
 
@@ -120,6 +133,28 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     // Trong ProductRepository.java
     Page<Product> findByFarmerIdAndStatus(Long farmerId, ProductStatus status, Pageable pageable);
+
+    // ****** THÊM PHƯƠNG THỨC NÀY ******
+    // Cách 1: Dùng @Query với JOIN FETCH (Như đã làm cho OrderRepository)
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.farmer f " +
+            "LEFT JOIN FETCH f.farmerProfile fp " +
+            "LEFT JOIN FETCH p.category c " +
+            "LEFT JOIN FETCH p.images img " +       // Fetch images
+            "LEFT JOIN FETCH p.pricingTiers pt " + // Fetch pricing tiers
+            "WHERE p.id = :productId")
+    Optional<Product> findByIdWithDetails(@Param("productId") Long productId);
+
+    // Cách 2: Dùng @EntityGraph (Gọn hơn)
+    /*
+    @EntityGraph(attributePaths = {
+        "farmer", "farmer.farmerProfile", "category", "images", "pricingTiers"
+    })
+    Optional<Product> findById(Long productId); // Có thể override findById hoặc tạo tên mới
+    // Nếu override findById, hãy đảm bảo bạn hiểu rõ ảnh hưởng của nó đến các lời gọi findById khác
+    // Tạo tên mới như findByIdWithDetails có thể an toàn hơn.
+    */
+    // **********************************
 
 
 }

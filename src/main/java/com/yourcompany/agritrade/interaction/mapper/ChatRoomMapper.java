@@ -2,7 +2,9 @@ package com.yourcompany.agritrade.interaction.mapper;
 
 import com.yourcompany.agritrade.interaction.domain.ChatRoom;
 import com.yourcompany.agritrade.interaction.dto.response.ChatRoomResponse;
+import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.mapper.UserMapper; // Import UserMapper
+import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import org.mapstruct.AfterMapping; // Import AfterMapping
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -22,6 +24,11 @@ public abstract class ChatRoomMapper {
     @Autowired
     protected ChatMessageMapper chatMessageMapper; // Để map lastMessage
 
+    // ****** INJECT UserRepository ĐỂ LẤY currentUserId ******
+    @Autowired
+    protected UserRepository userRepository;
+    // ****************************************************
+
     // Map các trường cơ bản
     @Mapping(target = "user1", source = "user1") // Dùng UserMapper -> UserInfoSimpleResponse
     @Mapping(target = "user2", source = "user2") // Dùng UserMapper -> UserInfoSimpleResponse
@@ -35,34 +42,32 @@ public abstract class ChatRoomMapper {
     // Tính toán các trường phụ sau khi map cơ bản xong
     @AfterMapping
     protected void afterMappingToChatRoomResponse(ChatRoom chatRoom, @MappingTarget ChatRoomResponse response) {
-        if (chatRoom == null || response == null) {
-            return;
-        }
-
-        // Lấy thông tin user đang đăng nhập để xác định "my" và "other"
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
-            String currentUsername = authentication.getName(); // Lấy email/username
+        Long currentUserId = getCurrentUserId(authentication); // Gọi hàm helper
 
-            // Xác định myUnreadCount và otherUser
-            if (chatRoom.getUser1() != null && chatRoom.getUser1().getEmail().equals(currentUsername)) {
-                response.setMyUnreadCount(chatRoom.getUser1UnreadCount());
-                response.setOtherUser(response.getUser2()); // Người còn lại là user2
-            } else if (chatRoom.getUser2() != null && chatRoom.getUser2().getEmail().equals(currentUsername)) {
-                response.setMyUnreadCount(chatRoom.getUser2UnreadCount());
-                response.setOtherUser(response.getUser1()); // Người còn lại là user1
+        if (currentUserId != null) {
+            // Tính myUnreadCount và otherUser dựa trên UserInfoSimpleResponse đã được map (bao gồm isOnline)
+            if (response.getUser1() != null && response.getUser1().getId().equals(currentUserId)) {
+                response.setMyUnreadCount(chatRoom.getUser1UnreadCount()); // Lấy unread count từ entity
+                response.setOtherUser(response.getUser2());
+            } else if (response.getUser2() != null && response.getUser2().getId().equals(currentUserId)) {
+                response.setMyUnreadCount(chatRoom.getUser2UnreadCount()); // Lấy unread count từ entity
+                response.setOtherUser(response.getUser1());
             } else {
-                // Trường hợp không xác định được user hiện tại (ví dụ: gọi từ context khác)
                 response.setMyUnreadCount(0);
                 response.setOtherUser(null);
             }
         } else {
-            // Nếu không có user đăng nhập, không tính được
             response.setMyUnreadCount(0);
             response.setOtherUser(null);
         }
-        // Xóa thông tin user1, user2 nếu đã có otherUser để response gọn hơn (tùy chọn)
-        // response.setUser1(null);
-        // response.setUser2(null);
+    }
+
+    // Hàm helper để lấy currentUserId (giờ đã có UserRepository)
+    private Long getCurrentUserId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) return null;
+        String email = authentication.getName();
+        // Dùng UserRepository đã inject
+        return userRepository.findByEmail(email).map(User::getId).orElse(null);
     }
 }

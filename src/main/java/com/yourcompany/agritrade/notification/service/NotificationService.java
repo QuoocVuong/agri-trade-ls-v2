@@ -1,5 +1,6 @@
 package com.yourcompany.agritrade.notification.service;
 
+import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
@@ -20,6 +21,9 @@ public interface NotificationService {
     void sendPaymentFailureNotification(Order order);
     void sendNewChatMessageNotification(User recipient, User sender, Long roomId); // Ví dụ cho chat
     // ... thêm các phương thức gửi khác ...
+
+    void sendProductApprovedNotification(Product product,  User farmer);
+    void sendProductRejectedNotification(Product product, String reason,  User farmer);
 
     // --- Quản lý thông báo trong ứng dụng (Cho user hiện tại) ---
     Page<NotificationResponse> getMyNotifications(Authentication authentication, Pageable pageable);
@@ -52,4 +56,7 @@ public interface NotificationService {
     void sendReviewApprovedNotification(Review review); // Thêm mới
     /** Gửi thông báo cho user khi review của họ bị từ chối */
     void sendReviewRejectedNotification(Review review); // Thêm mới
+
+
+
 }

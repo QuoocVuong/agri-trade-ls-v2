@@ -1,5 +1,6 @@
 package com.yourcompany.agritrade.notification.service.impl;
 
+import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.NotificationType;
 import com.yourcompany.agritrade.interaction.domain.Review;
@@ -108,6 +109,32 @@ public class NotificationServiceImpl implements NotificationService {
         inAppNotificationService.createAndSendInAppNotification(order.getBuyer(), buyerMsg, NotificationType.PAYMENT_FAILURE, buyerLink);
         // emailService.sendPaymentFailureEmailToBuyer(order);
     }
+
+    @Override
+    public void sendProductApprovedNotification(Product product, User farmer) { // Thêm User farmer
+        if (farmer == null) {
+            log.error("Cannot send product approved notification: Farmer is null for product ID: {}", product.getId());
+            return;
+        }
+        log.info("Sending product approved notification for product {} to farmer {}", product.getId(), farmer.getId());
+        String message = String.format("Sản phẩm '%s' của bạn đã được duyệt.", product.getName());
+        String link = frontendUrl + "/products/" + product.getSlug();
+        // Sử dụng đối tượng farmer đã được truyền vào
+        inAppNotificationService.createAndSendInAppNotification(farmer, message, NotificationType.PRODUCT_APPROVED, link);
+    }
+
+    @Override
+    public void sendProductRejectedNotification(Product product, String reason,  User farmer) {
+        if (farmer == null) {
+            log.error("Cannot send product rejected notification: Farmer is null for product ID: {}", product.getId());
+            return;
+        }
+        log.info("Sending product rejected notification for product {} to farmer {}", product.getId(), farmer.getId());
+        String message = String.format("Sản phẩm '%s' của bạn đã bị từ chối. Lý do: %s", product.getName(), reason);
+        String link = frontendUrl + "/farmer/products/";
+        inAppNotificationService.createAndSendInAppNotification(farmer, message, NotificationType.PRODUCT_REJECTED, link);
+    }
+
 
 
     @Override

@@ -34,7 +34,7 @@ public class ProductDetailResponse { // Hoặc kế thừa ProductSummaryRespons
     private List<ProductImageResponse> images; // Dùng List để có thứ tự
 
     // Thông tin B2B
-    private boolean isB2bAvailable;
+    private boolean b2bEnabled ;
     private String b2bUnit;
     private Integer minB2bQuantity;
     private BigDecimal b2bBasePrice;

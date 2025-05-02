@@ -18,6 +18,8 @@ import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus; // Import VerificationStatus
 import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.notification.service.EmailService;
+import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
@@ -59,6 +61,10 @@ public class ProductServiceImpl implements ProductService {
     private static final int RELATED_PRODUCTS_LIMIT = 4; // Số lượng sản phẩm liên quan muốn hiển thị
 
     private final ProductPricingTierMapper productPricingTierMapper;
+
+    private final NotificationService notificationService;
+    private final EmailService emailService;
+
 
     // --- Farmer Methods ---
 
@@ -113,7 +119,7 @@ public class ProductServiceImpl implements ProductService {
 
         // Xử lý ảnh và bậc giá
 //        updateProductImages(product, request.getImageUrls());
-        updatePricingTiers(product, request.getIsB2bAvailable(), request.getPricingTiers());
+        updatePricingTiers(product, request.isB2bEnabled(), request.getPricingTiers());
 
         Product savedProduct = productRepository.save(product);
         log.info("Product created with id: {} by farmer: {}", savedProduct.getId(), farmer.getId());
@@ -144,7 +150,7 @@ public class ProductServiceImpl implements ProductService {
         updateProductImages(existingProduct, request.getImages());
 
         // 7. Cập nhật danh sách Bậc giá B2B (dùng clear/addAll)
-        updatePricingTiers(existingProduct, request.getIsB2bAvailable(), request.getPricingTiers());
+        updatePricingTiers(existingProduct, request.isB2bEnabled(), request.getPricingTiers());
 
         // 8. Xử lý cập nhật Trạng thái sản phẩm
         updateProductStatusForFarmer(request, existingProduct, previousStatus, wasPublished);
@@ -259,7 +265,8 @@ public class ProductServiceImpl implements ProductService {
                 existingTiers.clear(); // orphanRemoval sẽ xóa khỏi DB
                 log.debug("Cleared pricing tiers for product {}", product.getId());
             }
-            return; // Kết thúc nếu không cho B2B hoặc list rỗng
+            // Nếu không phải B2B thì không cần làm gì thêm với tier
+            if (Boolean.FALSE.equals(isB2bAvailable)) return; // Chỉ return nếu isB2bAvailable là FALSE
         }
 
         // Chỉ cập nhật nếu tierRequests được gửi (không phải null)
@@ -316,8 +323,8 @@ public class ProductServiceImpl implements ProductService {
         if (request.getCategoryId() != null && !Objects.equals(existingProduct.getCategory().getId(), request.getCategoryId())) return true;
         if (request.getUnit() != null && !Objects.equals(existingProduct.getUnit(), request.getUnit())) return true;
         // Thêm kiểm tra cho các trường B2B nếu cần thiết
-        if (!Objects.equals(existingProduct.isB2bAvailable(), request.getIsB2bAvailable())) return true;
-        if (Boolean.TRUE.equals(request.getIsB2bAvailable())) {
+        if (!Objects.equals(existingProduct.isB2bEnabled(), request.isB2bEnabled())) return true;
+        if (Boolean.TRUE.equals(request.isB2bEnabled())) {
             if (request.getB2bUnit() != null && !Objects.equals(existingProduct.getB2bUnit(), request.getB2bUnit())) return true;
             if (request.getMinB2bQuantity() != null && !Objects.equals(existingProduct.getMinB2bQuantity(), request.getMinB2bQuantity())) return true;
             if (request.getB2bBasePrice() != null && (existingProduct.getB2bBasePrice() == null || existingProduct.getB2bBasePrice().compareTo(request.getB2bBasePrice()) != 0)) return true;
@@ -394,7 +401,8 @@ public class ProductServiceImpl implements ProductService {
         Specification<Product> spec = Specification.where(ProductSpecifications.isPublished())
                 .and(ProductSpecifications.hasKeyword(keyword))
                 .and(ProductSpecifications.inCategory(categoryId))
-                .and(ProductSpecifications.inProvince(provinceCode));
+                .and(ProductSpecifications.inProvince(provinceCode))
+                .and(ProductSpecifications.fetchFarmerAndProfile());
         // findAll với Specification và Pageable (đã bao gồm sort)
         Page<Product> productPage = productRepository.findAll(spec, pageable);
         // Map kết quả sang DTO
@@ -406,6 +414,15 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public ProductDetailResponse getPublicProductBySlug(String slug) {
+
+        // Cần đảm bảo fetch đủ thông tin cho trang chi tiết nữa
+        // Cách 1: Tạo phương thức repo riêng với @Query và JOIN FETCH
+        // Cách 2: Dùng Specification tương tự như searchPublicProducts
+        Specification<Product> spec = Specification
+                .where(ProductSpecifications.fetchFarmerAndProfile()) // Fetch farmer/profile
+                .and((root, query, cb) -> cb.equal(root.get("slug"), slug))
+                .and((root, query, cb) -> cb.equal(root.get("status"), ProductStatus.PUBLISHED));
+
         Product product = productRepository.findBySlugAndStatus(slug, ProductStatus.PUBLISHED)
                 .orElseThrow(() -> new ResourceNotFoundException("Published Product", "slug", slug));
         ProductDetailResponse response = productMapper.toProductDetailResponse(product);
@@ -417,10 +434,15 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public ProductDetailResponse getPublicProductById(Long id) {
-        Product product = productRepository.findByIdAndStatus(id, ProductStatus.PUBLISHED)
+        Specification<Product> spec = Specification
+                .where(ProductSpecifications.fetchFarmerAndProfile())
+                .and((root, query, cb) -> cb.equal(root.get("id"), id))
+                .and((root, query, cb) -> cb.equal(root.get("status"), ProductStatus.PUBLISHED));
+
+        Product product = productRepository.findOne(spec)
                 .orElseThrow(() -> new ResourceNotFoundException("Published Product", "id", id));
+
         ProductDetailResponse response = productMapper.toProductDetailResponse(product);
-        // Lấy và gán sản phẩm liên quan
         response.setRelatedProducts(findRelatedProducts(product));
         return response;
     }
@@ -487,8 +509,28 @@ public class ProductServiceImpl implements ProductService {
             product.setRejectReason(null); // Xóa lý do từ chối nếu có
             Product savedProduct = productRepository.save(product);
             log.info("Product {} approved by admin.", productId);
-            // Gửi thông báo cho farmer (nếu có NotificationService)
-            return productMapper.toProductDetailResponse(savedProduct);
+            // ****** TẢI TRƯỚC THÔNG TIN FARMER ******
+            // Cách 1: Load lại User đầy đủ (nếu cần nhiều thông tin)
+            User farmer = userRepository.findById(savedProduct.getFarmer().getId())
+                    .orElse(null); // Lấy lại farmer từ DB
+
+            // Cách 2: Hoặc chỉ cần email thì có thể lấy trực tiếp nếu không LAZY quá sâu
+            // String farmerEmail = savedProduct.getFarmer().getEmail(); // Có thể vẫn lỗi nếu User là proxy
+
+            // ****** GỌI HÀM ASYNC VỚI DỮ LIỆU ĐÃ LOAD ******
+            if (farmer != null) {
+                notificationService.sendProductApprovedNotification(savedProduct, farmer); // Truyền farmer đã load
+                emailService.sendProductApprovedEmailToFarmer(savedProduct, farmer); // Truyền farmer đã load
+            } else {
+                log.error("Could not find farmer with ID {} for product {}", savedProduct.getFarmer().getId(), productId);
+            }
+            // ********************************************
+
+            // Trả về response - cần load lại đầy đủ thông tin product
+            // Nên dùng một phương thức repository có fetch join đầy đủ ở đây
+            Product reloadedProduct = productRepository.findByIdWithDetails(savedProduct.getId()) // Giả sử có hàm này
+                    .orElse(savedProduct);
+            return productMapper.toProductDetailResponse(reloadedProduct);
         } else {
             log.warn("Admin tried to approve product {} which is already in status {}", productId, product.getStatus());
             throw new BadRequestException("Product cannot be approved from its current status: " + product.getStatus());
@@ -497,18 +539,34 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
-    public ProductDetailResponse rejectProduct(Long productId, String reason) { // Thêm reason nếu cần lưu lại
+    public ProductDetailResponse rejectProduct(Long productId, String reason) {
         Product product = findProductByIdForAdmin(productId);
         if (product.getStatus() == ProductStatus.PENDING_APPROVAL || product.getStatus() == ProductStatus.DRAFT) {
             product.setStatus(ProductStatus.REJECTED);
-            // Lưu lý do từ chối vào đâu đó nếu cần (ví dụ: thêm trường reject_reason vào Product)
-            product.setRejectReason(StringUtils.hasText(reason) ? reason : "Rejected without specific reason."); // Lưu lý do
+            product.setRejectReason(StringUtils.hasText(reason) ? reason : "Rejected without specific reason.");
             Product savedProduct = productRepository.save(product);
             log.info("Product {} rejected by admin. Reason: {}", productId, reason);
-            // Gửi thông báo cho farmer
-            return productMapper.toProductDetailResponse(savedProduct);
+
+            // ****** TẢI TRƯỚC THÔNG TIN FARMER ******
+            User farmer = userRepository.findById(savedProduct.getFarmer().getId())
+                    .orElse(null);
+            // ***************************************
+
+            // ****** GỌI HÀM ASYNC VỚI DỮ LIỆU ĐÃ LOAD ******
+            if (farmer != null) {
+                notificationService.sendProductRejectedNotification(savedProduct, reason, farmer); // Truyền farmer
+                emailService.sendProductRejectedEmailToFarmer(savedProduct, reason, farmer);    // Truyền farmer
+            } else {
+                log.error("Could not find farmer with ID {} for product {}", savedProduct.getFarmer().getId(), productId);
+            }
+            // ********************************************
+
+            // Trả về response - cần load lại đầy đủ
+            Product reloadedProduct = productRepository.findByIdWithDetails(savedProduct.getId()) // Giả sử có hàm này
+                    .orElse(savedProduct);
+            return productMapper.toProductDetailResponse(reloadedProduct);
         } else {
-            log.warn("Admin tried to reject product {} which is already in status {}", productId, product.getStatus());
+            // ... xử lý lỗi BadRequestException ...
             throw new BadRequestException("Product cannot be rejected from its current status: " + product.getStatus());
         }
     }

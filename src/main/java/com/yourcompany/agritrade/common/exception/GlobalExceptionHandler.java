@@ -1,94 +1,90 @@
 package com.yourcompany.agritrade.common.exception;
 
-import com.yourcompany.agritrade.common.dto.ApiResponse;
-import jakarta.persistence.EntityNotFoundException; // Import thêm
+import com.yourcompany.agritrade.common.dto.ApiResponse; // Đảm bảo import đúng
+import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.dao.DataIntegrityViolationException; // Import thêm
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException; // Import thêm
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.BadCredentialsException; // Import thêm
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
-import org.springframework.web.HttpMediaTypeNotSupportedException; // Import thêm
-import org.springframework.web.HttpRequestMethodNotSupportedException; // Import thêm
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingServletRequestParameterException; // Import thêm
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException; // Import thêm
-import org.springframework.web.servlet.NoHandlerFoundException; // Import thêm (thay cho NoResourceFoundException trực tiếp)
-import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler; // Kế thừa để xử lý nhiều lỗi Spring MVC chuẩn
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+// ****** THÊM CÁC IMPORT NÀY ******
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+// **********************************
 
 @RestControllerAdvice
 @Slf4j
-@Order(Ordered.HIGHEST_PRECEDENCE) // Đảm bảo ưu tiên hơn các handler mặc định
-public class GlobalExceptionHandler extends ResponseEntityExceptionHandler { // Kế thừa để override các handler chuẩn
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    // --- Xử lý các lỗi Validation (@Valid) ---
-    // (Override từ ResponseEntityExceptionHandler để tùy chỉnh response body)
+    // --- Các phương thức handle* được override từ ResponseEntityExceptionHandler ---
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        Map<String, String> errors = new HashMap<>();
+        Map<String, String> fieldErrors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+            fieldErrors.put(fieldName, errorMessage);
         });
-        String errorDetails = errors.entrySet().stream()
-                .map(entry -> "'" + entry.getKey() + "': " + entry.getValue())
+        String errorDetailsMessage = fieldErrors.entrySet().stream()
+                .map(entry -> String.format("'%s': %s", entry.getKey(), entry.getValue()))
                 .collect(Collectors.joining(", "));
-        log.warn("Validation failed: [{}] for request: {}", errorDetails, request.getDescription(false));
-        ApiResponse<Map<String, String>> apiResponse = ApiResponse.badRequest("Validation Failed. Details: " + errorDetails);
-        apiResponse.setData(errors); // Vẫn giữ data chi tiết cho frontend xử lý từng field
-        return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
+        log.warn("Validation failed: [{}] for request: {}", errorDetailsMessage, request.getDescription(false));
+
+        // Tạo ApiResponse với details chứa các lỗi field
+        ApiResponse<Object> apiResponse = ApiResponse.error(
+                HttpStatus.BAD_REQUEST.value(), // Lấy status code từ HttpStatus
+                "Validation Failed", // Message chung
+                fieldErrors // Đưa map lỗi field vào details
+        );
+        // Chuyển đổi HttpStatusCode sang HttpStatus nếu cần, hoặc dùng status trực tiếp nếu là HttpStatus
+        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
+        return new ResponseEntity<>(apiResponse, httpStatus);
     }
 
-    // --- Xử lý lỗi Request Body không đọc được (JSON sai cú pháp) ---
-    // (Override từ ResponseEntityExceptionHandler)
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String message = "Malformed JSON request. Please check the request body format.";
         log.warn("Malformed JSON request: {} for request: {}", ex.getMessage(), request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.badRequest("Malformed JSON request. Please check the request body format.");
-        return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message, ex.getMessage()); // Có thể đưa lỗi gốc vào details
+        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
+        return new ResponseEntity<>(apiResponse, httpStatus);
     }
 
-    // --- Xử lý lỗi thiếu Request Parameter (@RequestParam required=true) ---
-    // (Override từ ResponseEntityExceptionHandler)
     @Override
     protected ResponseEntity<Object> handleMissingServletRequestParameter(
             MissingServletRequestParameterException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        String error = ex.getParameterName() + " parameter is missing";
-        log.warn("Missing request parameter: {} for request: {}", error, request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.badRequest(error);
-        return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
+        String message = ex.getParameterName() + " parameter is missing";
+        log.warn("Missing request parameter: {} for request: {}", message, request.getDescription(false));
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message, null);
+        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
+        return new ResponseEntity<>(apiResponse, httpStatus);
     }
 
-    // --- Xử lý lỗi sai kiểu dữ liệu của Request Parameter hoặc Path Variable ---
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatch(
-            MethodArgumentTypeMismatchException ex, WebRequest request) {
-        String error = String.format("The parameter '%s' of value '%s' could not be converted to type '%s'",
-                ex.getName(), ex.getValue(), ex.getRequiredType().getSimpleName());
-        log.warn("Type mismatch: {} for request: {}", error, request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.badRequest(error);
-        return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
-    }
-
-
-    // --- Xử lý lỗi sai phương thức HTTP (GET, POST,...) ---
-    // (Override từ ResponseEntityExceptionHandler)
     @Override
     protected ResponseEntity<Object> handleHttpRequestMethodNotSupported(
             HttpRequestMethodNotSupportedException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -96,13 +92,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler { // 
         builder.append(ex.getMethod());
         builder.append(" method is not supported for this request. Supported methods are ");
         ex.getSupportedHttpMethods().forEach(t -> builder.append(t).append(" "));
-        log.warn("Method not supported: {} for request: {}", builder.toString(), request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.error(builder.toString(), HttpStatus.METHOD_NOT_ALLOWED);
-        return new ResponseEntity<>(apiResponse, HttpStatus.METHOD_NOT_ALLOWED);
+        String message = builder.toString();
+        log.warn("Method not supported: {} for request: {}", message, request.getDescription(false));
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.METHOD_NOT_ALLOWED.value(), message, null);
+        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
+        return new ResponseEntity<>(apiResponse, httpStatus);
     }
 
-    // --- Xử lý lỗi sai kiểu Content-Type của request body ---
-    // (Override từ ResponseEntityExceptionHandler)
     @Override
     protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(
             HttpMediaTypeNotSupportedException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -110,86 +107,116 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler { // 
         builder.append(ex.getContentType());
         builder.append(" media type is not supported. Supported media types are ");
         ex.getSupportedMediaTypes().forEach(t -> builder.append(t).append(" "));
-        log.warn("Media type not supported: {} for request: {}", builder.toString(), request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.error(builder.toString(), HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        return new ResponseEntity<>(apiResponse, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        String message = builder.toString();
+        log.warn("Media type not supported: {} for request: {}", message, request.getDescription(false));
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(), message, null);
+        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
+        return new ResponseEntity<>(apiResponse, httpStatus);
     }
 
-    // --- Xử lý lỗi Không tìm thấy Handler (URL không khớp) ---
-    // (Override từ ResponseEntityExceptionHandler)
-    // **Quan trọng:** Cần cấu hình `spring.mvc.throw-exception-if-no-handler-found=true`
-    // và `spring.web.resources.add-mappings=false` trong application.properties
     @Override
     protected ResponseEntity<Object> handleNoHandlerFoundException(
             NoHandlerFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        String error = "No handler found for " + ex.getHttpMethod() + " " + ex.getRequestURL();
-        log.warn("No handler found: {} ", error);
-        ApiResponse<Void> apiResponse = ApiResponse.notFound(error);
-        return new ResponseEntity<>(apiResponse, HttpStatus.NOT_FOUND);
+        String message = "No handler found for " + ex.getHttpMethod() + " " + ex.getRequestURL();
+        log.warn("No handler found: {} ", message);
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.NOT_FOUND.value(), message, null);
+        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
+        return new ResponseEntity<>(apiResponse, httpStatus);
     }
 
-    // --- Xử lý lỗi Bad Request tùy chỉnh (do logic nghiệp vụ) ---
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBadRequestException(BadRequestException ex, WebRequest request) {
-        log.warn("Bad Request (Custom): {} for request: {}", ex.getMessage(), request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.badRequest(ex.getMessage());
+    // --- Các phương thức @ExceptionHandler ---
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMethodArgumentTypeMismatch( // Đổi kiểu trả về
+                                                                                 MethodArgumentTypeMismatchException ex, WebRequest request) {
+        String message = String.format("The parameter '%s' of value '%s' could not be converted to type '%s'",
+                ex.getName(), ex.getValue(), ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown");
+        log.warn("Type mismatch: {} for request: {}", message, request.getDescription(false));
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.BAD_REQUEST.value(), message, null);
         return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
     }
 
-    // --- Xử lý lỗi Resource Not Found tùy chỉnh (do logic nghiệp vụ) ---
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBadRequestException(BadRequestException ex, WebRequest request) { // Đổi kiểu trả về
+        log.warn("Bad Request (Custom): {} for request: {}", ex.getMessage(), request.getDescription(false));
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), null);
+        return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(OutOfStockException.class)
+    public ResponseEntity<ApiResponse<Object>> handleOutOfStockException(OutOfStockException ex, WebRequest request) {
+        log.warn("Out Of Stock Exception: {} for request: {}", ex.getMessage(), request.getDescription(false));
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("errorCode", "ERR_OUT_OF_STOCK");
+        if (ex.getAvailableStock() != null) {
+            errorDetails.put("availableStock", ex.getAvailableStock());
+        }
+        // Tạo ApiResponse với details
+        ApiResponse<Object> apiResponse = ApiResponse.error(
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                errorDetails
+        );
+        return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(ResourceNotFoundException ex, WebRequest request) {
+    public ResponseEntity<ApiResponse<Object>> handleResourceNotFoundException(ResourceNotFoundException ex, WebRequest request) { // Đổi kiểu trả về
         log.warn("Resource Not Found (Custom): {} for request: {}", ex.getMessage(), request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.notFound(ex.getMessage());
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.NOT_FOUND.value(), ex.getMessage(), null);
         return new ResponseEntity<>(apiResponse, HttpStatus.NOT_FOUND);
     }
 
-    // --- Xử lý lỗi Entity Not Found (thường từ JPA getReferenceById,...) ---
     @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleEntityNotFound(EntityNotFoundException ex, WebRequest request) {
-        // Message của EntityNotFoundException có thể chứa tên class, nên trả về thông báo chung chung hơn
+    public ResponseEntity<ApiResponse<Object>> handleEntityNotFound(EntityNotFoundException ex, WebRequest request) { // Đổi kiểu trả về
+        String message = "The requested entity was not found.";
         log.warn("Entity Not Found: {} for request: {}", ex.getMessage(), request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.notFound("The requested entity was not found.");
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.NOT_FOUND.value(), message, ex.getMessage()); // Có thể đưa lỗi gốc vào details
         return new ResponseEntity<>(apiResponse, HttpStatus.NOT_FOUND);
     }
 
-
-    // --- Xử lý lỗi Xác thực thất bại (Sai username/password) ---
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBadCredentialsException(BadCredentialsException ex, WebRequest request) {
+    public ResponseEntity<ApiResponse<Object>> handleBadCredentialsException(BadCredentialsException ex, WebRequest request) { // Đổi kiểu trả về
+        String message = "Invalid username or password.";
         log.warn("Authentication Failed: Invalid credentials for request: {}", request.getDescription(false));
-        // Không nên ghi rõ là sai username hay password
-        ApiResponse<Void> apiResponse = ApiResponse.unauthorized("Invalid username or password.");
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), message, null);
         return new ResponseEntity<>(apiResponse, HttpStatus.UNAUTHORIZED);
     }
 
-
-    // --- Xử lý lỗi Từ chối truy cập (Phân quyền - @PreAuthorize,...) ---
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
+    public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) { // Đổi kiểu trả về
+        String message = "You do not have permission to access this resource.";
         log.warn("Access Denied: {} for request: {}", ex.getMessage(), request.getDescription(false));
-        ApiResponse<Void> apiResponse = ApiResponse.forbidden("You do not have permission to access this resource.");
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.FORBIDDEN.value(), message, ex.getMessage()); // Có thể đưa lỗi gốc vào details
         return new ResponseEntity<>(apiResponse, HttpStatus.FORBIDDEN);
     }
 
-    // --- Xử lý lỗi Vi phạm ràng buộc dữ liệu (Unique, Foreign Key,...) ---
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex, WebRequest request) {
-        // Log lỗi gốc để debug nhưng không trả về chi tiết cho client
-        log.error("Data Integrity Violation: {} for request: {}", ex.getMostSpecificCause().getMessage(), request.getDescription(false), ex);
-        // Trả về lỗi 409 Conflict hoặc 400 Bad Request tùy ngữ cảnh
-        // 409 thường phù hợp hơn cho unique constraint
-        ApiResponse<Void> apiResponse = ApiResponse.error("Data integrity violation. There might be conflicting data (e.g., duplicate entry).", HttpStatus.CONFLICT);
+    public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex, WebRequest request) { // Đổi kiểu trả về
+        String specificCauseMessage = ex.getMostSpecificCause().getMessage();
+        String message = "Data integrity violation. There might be conflicting data (e.g., duplicate entry).";
+        log.error("Data Integrity Violation: {} for request: {}", specificCauseMessage, request.getDescription(false), ex);
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.CONFLICT.value(), message, specificCauseMessage); // Đưa lỗi cụ thể vào details
         return new ResponseEntity<>(apiResponse, HttpStatus.CONFLICT);
     }
 
-
-    // --- Xử lý tất cả các lỗi còn lại (Fallback) ---
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex, WebRequest request) {
-        // Log lỗi nghiêm trọng với stack trace
+    public ResponseEntity<ApiResponse<Object>> handleGlobalException(Exception ex, WebRequest request) { // Đổi kiểu trả về
+        String message = "An unexpected internal server error occurred. Please try again later.";
         log.error("Unexpected error processing request: {}", request.getDescription(false), ex);
-        ApiResponse<Void> apiResponse = ApiResponse.internalError("An unexpected internal server error occurred. Please try again later.");
+        // Tạo ApiResponse
+        ApiResponse<Object> apiResponse = ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), message, ex.getMessage()); // Đưa lỗi gốc vào details
         return new ResponseEntity<>(apiResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+
 }

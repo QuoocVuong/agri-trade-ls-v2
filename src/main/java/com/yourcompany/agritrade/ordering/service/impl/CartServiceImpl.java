@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
+import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.ordering.domain.CartItem;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemRequest;
@@ -60,9 +61,16 @@ public class CartServiceImpl implements CartService {
         User user = getUserFromAuthentication(authentication);
         Product product = findAvailableProduct(request.getProductId()); // Helper kiểm tra tồn tại và status
 
-        // Kiểm tra tồn kho cơ bản
-        if (product.getStockQuantity() < request.getQuantity()) {
-            throw new BadRequestException("Not enough stock for product: " + product.getName());
+        int currentStock = product.getStockQuantity(); // Lấy tồn kho hiện tại
+
+        // Kiểm tra số lượng yêu cầu (chỉ cho lần thêm này)
+        if (currentStock < request.getQuantity()) {
+            // ****** SỬA DÒNG NÀY ******
+            throw new OutOfStockException(
+                    "Not enough stock for product: " + product.getName(),
+                    currentStock // Truyền số lượng tồn thực tế
+            );
+            // *************************
         }
 
         Optional<CartItem> existingItemOpt = cartItemRepository.findByUserIdAndProductId(user.getId(), product.getId());
@@ -70,11 +78,17 @@ public class CartServiceImpl implements CartService {
         if (existingItemOpt.isPresent()) {
             // Cập nhật số lượng
             cartItem = existingItemOpt.get();
-            int newQuantity = cartItem.getQuantity() + request.getQuantity();
-            if (product.getStockQuantity() < newQuantity) {
-                throw new BadRequestException("Not enough stock for product: " + product.getName());
+            int newTotalQuantity = cartItem.getQuantity() + request.getQuantity(); // Tính tổng số lượng sẽ có trong giỏ
+            // Kiểm tra lại tồn kho với tổng số lượng mới
+            if (currentStock < newTotalQuantity) {
+                // ****** SỬA DÒNG NÀY ******
+                throw new OutOfStockException(
+                        "Not enough stock for product: " + product.getName() + " (requested total: " + newTotalQuantity + ")",
+                        currentStock // Vẫn là số lượng tồn thực tế
+                );
+                // *************************
             }
-            cartItem.setQuantity(newQuantity);
+            cartItem.setQuantity(newTotalQuantity);
             log.info("Updated quantity for product {} in cart for user {}", product.getId(), user.getId());
         } else {
             // Tạo mới
@@ -101,10 +115,18 @@ public class CartServiceImpl implements CartService {
         }
 
         Product product = findAvailableProduct(cartItem.getProduct().getId()); // Kiểm tra lại sản phẩm
+        int currentStock = product.getStockQuantity(); // Lấy tồn kho hiện tại
+        int newQuantity = request.getQuantity(); // Số lượng mới yêu cầu
 
-        // Kiểm tra tồn kho
-        if (product.getStockQuantity() < request.getQuantity()) {
-            throw new BadRequestException("Not enough stock for product: " + product.getName());
+        // Kiểm tra tồn kho với số lượng mới
+        if (currentStock < newQuantity) {
+            // ****** SỬA DÒNG NÀY ******
+            throw new OutOfStockException(
+                    "Not enough stock for product: " + product.getName(),
+                    currentStock // Truyền số lượng tồn thực tế
+
+            );
+            // *************************
         }
 
         cartItem.setQuantity(request.getQuantity());
@@ -151,7 +173,7 @@ public class CartServiceImpl implements CartService {
         Product product = productRepository.findById(productId) // findById đã lọc is_deleted=false
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
         if(product.getStatus() != ProductStatus.PUBLISHED) {
-            throw new BadRequestException("Product is not available for purchase: " + product.getName());
+            throw new BadRequestException("Product is not available: " + product.getName());
         }
         return product;
     }

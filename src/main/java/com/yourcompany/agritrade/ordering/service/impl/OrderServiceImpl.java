@@ -5,6 +5,7 @@ import com.yourcompany.agritrade.catalog.domain.ProductPricingTier;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
+import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.notification.service.EmailService; // Import EmailService
@@ -139,8 +140,14 @@ public class OrderServiceImpl implements OrderService {
 
                 int currentStock = product.getStockQuantity();
                 if (currentStock < requestedQuantity) {
-                    throw new BadRequestException("Not enough stock for product: " + product.getName() + ". Available: " + currentStock);
+                    throw new OutOfStockException(
+                            "Not enough stock for product: " + product.getName() + ". Available: " + currentStock,
+                            currentStock // Truyền số lượng tồn thực tế
+
+                    );
                 }
+
+
 
                 // Trừ kho
                 product.setStockQuantity(currentStock - requestedQuantity);
@@ -476,7 +483,7 @@ public class OrderServiceImpl implements OrderService {
 
     private BigDecimal determinePrice(Product product, int quantity, OrderType type) {
         // Logic xác định giá B2C/B2B, có thể dựa vào bậc giá
-        if (type == OrderType.B2B && product.isB2bAvailable()) {
+        if (type == OrderType.B2B && product.isB2bEnabled()) {
             // Tìm bậc giá phù hợp (nếu dùng pricing tiers)
             BigDecimal tieredPrice = product.getPricingTiers().stream()
                     .filter(tier -> quantity >= tier.getMinQuantity())
@@ -493,7 +500,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private String determineUnit(Product product, OrderType type) {
-        if (type == OrderType.B2B && product.isB2bAvailable() && StringUtils.hasText(product.getB2bUnit())) {
+        if (type == OrderType.B2B && product.isB2bEnabled() && StringUtils.hasText(product.getB2bUnit())) {
             return product.getB2bUnit();
         }
         return product.getUnit();

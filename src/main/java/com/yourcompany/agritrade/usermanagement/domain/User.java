@@ -60,6 +60,16 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
+    // ****** THÊM PHẦN NÀY ******
+    @OneToOne(
+            mappedBy = "user", // Quan trọng: Chỉ định rằng mối quan hệ được quản lý bởi trường 'user' trong FarmerProfile
+            cascade = CascadeType.ALL, // Thường dùng ALL để khi xóa User thì Profile cũng bị xóa
+            fetch = FetchType.LAZY,    // LAZY là tốt nhất để tránh load không cần thiết
+            orphanRemoval = true     // Xóa Profile nếu nó không còn được tham chiếu bởi User nào
+    )
+    private FarmerProfile farmerProfile; // Tên trường để truy cập profile từ User
+    // ****************************
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

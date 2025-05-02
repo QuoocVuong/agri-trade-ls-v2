@@ -22,7 +22,7 @@ import java.util.Set;
 @Getter
 @Setter
 @NoArgsConstructor
-@SQLDelete(sql = "UPDATE products SET is_deleted = true WHERE id = ?")
+@SQLDelete(sql = "UPDATE products SET is_deleted = true WHERE id = ? and version = ?")
 @Where(clause = "is_deleted = false")
 public class Product {
     @Id
@@ -74,7 +74,7 @@ public class Product {
     private Integer ratingCount = 0;
 
     @Column(nullable = false)
-    private boolean isB2bAvailable = false;
+    private boolean b2bEnabled  = false;
 
     @Column(length = 50)
     private String b2bUnit;

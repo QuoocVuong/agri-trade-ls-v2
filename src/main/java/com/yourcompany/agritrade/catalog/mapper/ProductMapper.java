@@ -6,8 +6,10 @@ import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.FarmerInfoResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
+import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User; // Import User
 import org.mapstruct.*;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Comparator; // Import Comparator
 import java.util.List; // Import List
@@ -21,26 +23,45 @@ import java.util.Set;
         ProductPricingTierMapper.class, // Thêm nếu dùng
         FarmerInfoMapper.class // Dùng mapper riêng cho FarmerInfo
 })
-public interface ProductMapper {
+public abstract class   ProductMapper {
+
+
+    @Autowired
+    protected FarmerInfoMapper farmerInfoMapper;
 
     // --- Response Mappers ---
 
     @Mapping(target = "thumbnailUrl", source = "images", qualifiedByName = "getDefaultImageUrl")
-    @Mapping(target = "farmerInfo", source = "farmer", qualifiedByName = "mapFarmerToInfo") // Dùng method tùy chỉnh
-    ProductSummaryResponse toProductSummaryResponse(Product product);
+    @Mapping(target = "farmerInfo", source = "product", qualifiedByName = "mapProductToFarmerInfo") // Dùng method tùy chỉnh
+    // @Mapping(target = "isNew", ignore = true) // Map isNew nếu cần logic riêng
+    @Mapping(target = "category", source = "category")
+    @Mapping(target = "b2bEnabled", source = "b2bEnabled")
 
-    List<ProductSummaryResponse> toProductSummaryResponseList(List<Product> products);
+    @Mapping(target = "b2bUnit", source = "b2bUnit")
+    @Mapping(target = "b2bBasePrice", source = "b2bBasePrice")
+    // ***************************************
+    public abstract ProductSummaryResponse toProductSummaryResponse(Product product);
+
+    public abstract List<ProductSummaryResponse> toProductSummaryResponseList(List<Product> products);
 
     @Mapping(target = "category", source = "category") // MapStruct dùng CategoryMapper
-    @Mapping(target = "farmer", source = "farmer", qualifiedByName = "mapFarmerToInfo") // Dùng method tùy chỉnh
+    @Mapping(target = "farmer", source = "product", qualifiedByName = "mapProductToFarmerInfo") // Dùng method tùy chỉnh
     @Mapping(target = "images", source = "images") // MapStruct dùng ProductImageMapper (cho List)
     @Mapping(target = "pricingTiers", source = "pricingTiers") // MapStruct dùng ProductPricingTierMapper (cho List)
+    // relatedProducts cần xử lý riêng trong service, không map ở đây
+    @Mapping(target = "relatedProducts", ignore = true)
+
+    @Mapping(target = "b2bEnabled", source = "b2bEnabled")
+
+    @Mapping(target = "b2bUnit", source = "b2bUnit")
+    @Mapping(target = "minB2bQuantity", source = "minB2bQuantity")
+    @Mapping(target = "b2bBasePrice", source = "b2bBasePrice")
 
 
 
 
 
-    ProductDetailResponse toProductDetailResponse(Product product);
+    public abstract ProductDetailResponse toProductDetailResponse(Product product);
 
     // --- Request Mapper ---
     @Mapping(target = "id", ignore = true)
@@ -55,8 +76,12 @@ public interface ProductMapper {
     @Mapping(target = "pricingTiers", ignore = true) // Sẽ xử lý riêng trong service
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    //@Mapping(target = "isDeleted", ignore = true)
-    Product requestToProduct(ProductRequest request);
+    @Mapping(target = "version", ignore = true) // Bỏ qua version khi tạo mới
+    @Mapping(target = "rejectReason", ignore = true) // Bỏ qua rejectReason khi tạo mới
+    @Mapping(target = "b2bEnabled", source = "b2bEnabled")
+
+    @Mapping(target = "deleted", ignore = true) // Bỏ qua isDeleted khi tạo mới
+    public abstract Product requestToProduct(ProductRequest request);
 
     // --- Update Mapper ---
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -72,14 +97,14 @@ public interface ProductMapper {
     @Mapping(target = "pricingTiers", ignore = true) // <-- Bỏ qua collection
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-   // @Mapping(target = "isDeleted", ignore = true)
+    @Mapping(target = "b2bEnabled", source = "b2bEnabled")
     @Mapping(target = "version", ignore = true) // Không map version
     //@Mapping(target = "isDeleted", ignore = true)
-    void updateProductFromRequest(ProductRequest request, @MappingTarget Product product);
+    public abstract void updateProductFromRequest(ProductRequest request, @MappingTarget Product product);
 
     // --- Helper Methods ---
     @Named("getDefaultImageUrl")
-    default String getDefaultImageUrl(Set<ProductImage> images) {
+     String getDefaultImageUrl(Set<ProductImage> images) {
         if (images == null || images.isEmpty()) {
             return null; // Hoặc trả về URL ảnh placeholder
         }
@@ -110,18 +135,31 @@ public interface ProductMapper {
          return farmerInfoMapper.userToFarmerInfoResponse(farmer);
      }
      */
-    // Hoặc map thủ công nếu không muốn inject repo vào mapper
-    @Named("mapFarmerToInfo")
-    default FarmerInfoResponse mapFarmerToInfoManual(User farmer) {
-        if (farmer == null) return null;
-        FarmerInfoResponse info = new FarmerInfoResponse();
-        info.setFarmerId(farmer.getId());
-        info.setFarmerAvatarUrl(farmer.getAvatarUrl());
-        // Cần truy vấn hoặc có sẵn FarmerProfile để lấy farmName và provinceCode
-        // info.setFarmName(farmer.getFarmerProfile().getFarmName()); // Ví dụ nếu có quan hệ trực tiếp
-        // info.setProvinceCode(farmer.getFarmerProfile().getProvinceCode());
+    @Named("mapProductToFarmerInfo")
+    protected FarmerInfoResponse mapProductToFarmerInfo(Product product) { // protected hoặc public
+        if (product == null || product.getFarmer() == null) {
+            return null;
+        }
+        User farmer = product.getFarmer();
+        // Quan trọng: Dòng này yêu cầu FarmerProfile phải được load sẵn (do JOIN FETCH)
+        FarmerProfile profile = farmer.getFarmerProfile();
+
+        // Gọi FarmerInfoMapper đã inject
+        FarmerInfoResponse info = farmerInfoMapper.toFarmerInfoResponse(farmer, profile);
+
+        // Fallback logic nếu cần (ví dụ: nếu profile null hoặc farmName trong profile là null)
+        if (info != null && (info.getFarmName() == null || info.getFarmName().isEmpty()) && farmer.getFullName() != null) {
+            info.setFarmName(farmer.getFullName()); // Dùng fullName của User làm dự phòng
+        }
+
         return info;
     }
+
+//    @Named("resolveIsB2bAvailable")
+//    protected boolean resolveIsB2bAvailable(Boolean input) {
+//        return input != null && input;
+//    }
+
 
 }
 // Lưu ý: Để dùng @Autowired trong Mapper, cần đổi thành abstract class thay vì interface.

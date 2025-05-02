@@ -36,7 +36,7 @@ public class ProductRequest {
     // Farmer có thể chỉ được set DRAFT hoặc UNPUBLISHED ban đầu
     private ProductStatus status = ProductStatus.DRAFT;
 
-    private Boolean isB2bAvailable = false;
+    private boolean b2bEnabled  = false;
 
     @Size(max = 50)
     private String b2bUnit;

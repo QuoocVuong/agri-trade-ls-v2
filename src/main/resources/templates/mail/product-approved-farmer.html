@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Sản phẩm đã được duyệt</title>
+    <style>
+        /* CSS cơ bản */
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 th:text="${appName}">AgriTradeLS</h1>
+    <p>Xin chào,</p>
+    <p>Sản phẩm <strong th:text="${productName}">Tên sản phẩm</strong> của bạn đã được duyệt thành công.</p>
+    <p>Bạn có thể xem chi tiết sản phẩm tại: <a th:href="${productUrl}" th:text="${productUrl}"></a></p>
+    <p>Trân trọng,<br/>Đội ngũ <span th:text="${appName}">AgriTradeLS</span></p>
+</div>
+</body>
+</html>

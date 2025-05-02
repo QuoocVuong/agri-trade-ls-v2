@@ -1,5 +1,6 @@
 package com.yourcompany.agritrade.notification.service;
 
+import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.ordering.domain.Order; // Import Order
 import com.yourcompany.agritrade.ordering.domain.OrderStatus; // Import OrderStatus
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -28,4 +29,6 @@ public interface EmailService {
     // void sendProductRejectedEmailToFarmer(Product product, String reason);
     // void sendFarmerProfileApprovedEmail(FarmerProfile profile);
     // void sendFarmerProfileRejectedEmail(FarmerProfile profile, String reason);
+    void sendProductApprovedEmailToFarmer(Product product, User farmer);
+    void sendProductRejectedEmailToFarmer(Product product, String reason,  User farmer);
 }

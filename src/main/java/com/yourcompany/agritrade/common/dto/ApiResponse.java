@@ -3,13 +3,17 @@ package com.yourcompany.agritrade.common.dto;
 import com.fasterxml.jackson.annotation.JsonInclude; // Chỉ include các field không null
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus; // Import HttpStatus
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Getter
 @Setter
 @JsonInclude(JsonInclude.Include.NON_NULL) // Không trả về các field null trong JSON
+@Slf4j
 public class ApiResponse<T> {
 
     private boolean success;
@@ -54,9 +58,11 @@ public class ApiResponse<T> {
     }
 
     // Response lỗi chung
-    public static <T> ApiResponse<T> error(String message, HttpStatus status) {
-        return new ApiResponse<>(false, message, null, status);
-    }
+//    public static <T> ApiResponse<T> error(String message, HttpStatus status) {
+//        return new ApiResponse<>(false, message, null, status);
+//    }
+
+
 
     // Response lỗi cụ thể hơn (ví dụ: Bad Request)
     public static <T> ApiResponse<T> badRequest(String message) {
@@ -81,5 +87,54 @@ public class ApiResponse<T> {
     // Response lỗi Server Internal Error
     public static <T> ApiResponse<T> internalError(String message) {
         return error(message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private Map<String, Object> details; // Thêm trường details
+
+    // Constructor mới hoặc sửa constructor cũ để nhận details
+    private ApiResponse(boolean success, String message, T data, HttpStatus status, Map<String, Object> details) {
+        this.success = success;
+        this.message = message;
+        this.data = data;
+        this.status = status.value();
+        this.timestamp = LocalDateTime.now();
+        this.details = details; // Gán details
+    }
+
+    // Factory method mới cho lỗi với details
+    public static <T> ApiResponse<T> error(int statusCode, String message, Object details) {
+        HttpStatus status = HttpStatus.resolve(statusCode);
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR; // Default nếu status code không hợp lệ
+        }
+        Map<String, Object> detailMap = null;
+        if (details != null) {
+            if (details instanceof Map) {
+                // Ép kiểu an toàn nếu là Map
+                try {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> castedDetails = (Map<String, Object>) details;
+                    detailMap = castedDetails;
+                } catch (ClassCastException e) {
+                    log.warn("Could not cast details to Map<String, Object>. Storing as single entry.");
+                    detailMap = new HashMap<>();
+                    detailMap.put("errorInfo", details);
+                }
+
+            } else {
+                // Nếu không phải Map, tạo map mới chứa nó
+                detailMap = new HashMap<>();
+                detailMap.put("errorInfo", details);
+            }
+        }
+        return new ApiResponse<>(false, message, null, status, detailMap);
+    }
+
+    // Overload factory method cũ để gọi factory method mới với details là null
+    public static <T> ApiResponse<T> error(String message, HttpStatus status) {
+        return error(status.value(), message, null);
+    }
+    public static <T> ApiResponse<T> error(int statusCode, String message) {
+        return error(statusCode, message, null);
     }
 }

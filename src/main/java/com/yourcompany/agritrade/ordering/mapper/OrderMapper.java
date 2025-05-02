@@ -5,7 +5,9 @@ import com.yourcompany.agritrade.catalog.mapper.FarmerInfoMapper; // Import Farm
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
+import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User; // Import User
+import com.yourcompany.agritrade.usermanagement.dto.response.UserResponse;
 import com.yourcompany.agritrade.usermanagement.mapper.UserMapper; // Import UserMapper
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -35,15 +37,15 @@ public abstract class OrderMapper { // Đổi thành abstract class
 
     // Map sang OrderResponse (chi tiết)
     // MapStruct sẽ dùng các mapper trong 'uses' cho các trường tương ứng
-    @Mapping(target = "buyer", source = "buyer", qualifiedByName = "toUserResponse") // *** Chỉ định tên ***
-    @Mapping(target = "farmer", source = "farmer", qualifiedByName = "mapUserToFarmerInfo") // Dùng FarmerInfoMapper thông qua helper
+    @Mapping(target = "buyer", source = "buyer") // *** Chỉ định tên ***
+    @Mapping(target = "farmer", source = "farmer", qualifiedByName = "mapUserAndProfileToFarmerInfo") // Dùng FarmerInfoMapper thông qua helper
     @Mapping(target = "orderItems", source = "orderItems") // Dùng OrderItemMapper
     @Mapping(target = "payments", source = "payments") // Dùng PaymentMapper
     public abstract OrderResponse toOrderResponse(Order order);
 
     // Map sang OrderSummaryResponse (tóm tắt)
     @Mapping(target = "buyerName", source = "buyer.fullName") // Lấy tên trực tiếp
-    @Mapping(target = "farmerName", source = "farmer", qualifiedByName = "mapFarmerToFarmName") // Helper lấy tên farm
+    @Mapping(target = "farmerName", source = "farmer", qualifiedByName = "mapUserToBestFarmerName") // Helper lấy tên farm
     public abstract OrderSummaryResponse toOrderSummaryResponse(Order order);
 
     // Map Page<Order> sang Page<OrderSummaryResponse>
@@ -56,19 +58,42 @@ public abstract class OrderMapper { // Đổi thành abstract class
 
 
     // Helper method để gọi FarmerInfoMapper (vì nguồn là User)
-    @Named("mapUserToFarmerInfo")
-    protected FarmerInfoResponse mapUserToFarmerInfo(User farmer) {
+    @Named("mapUserAndProfileToFarmerInfo") // Đổi tên cho rõ ràng
+    protected FarmerInfoResponse mapUserAndProfileToFarmerInfo(User farmer) {
         if (farmer == null) return null;
-        // Cần lấy FarmerProfile nếu FarmerInfoMapper yêu cầu
-        // Hoặc dùng mapper đơn giản chỉ lấy thông tin từ User
-        return farmerInfoMapper.userToFarmerInfoResponse(farmer);
+        // Quan trọng: Dòng này yêu cầu FarmerProfile phải được load sẵn (do JOIN FETCH trong Service/Repo)
+        FarmerProfile profile = farmer.getFarmerProfile();
+        // Gọi phương thức của FarmerInfoMapper nhận cả User và Profile
+        FarmerInfoResponse info = farmerInfoMapper.toFarmerInfoResponse(farmer, profile);
+
+        // Fallback logic nếu cần (ví dụ: nếu profile null hoặc farmName trong profile là null)
+        if (info != null && (info.getFarmName() == null || info.getFarmName().isEmpty()) && farmer.getFullName() != null) {
+            info.setFarmName(farmer.getFullName()); // Dùng fullName của User làm dự phòng nếu farmName trống
+        }
+        // Đảm bảo fullName luôn được map vào FarmerInfoResponse (nếu chưa có trong toFarmerInfoResponse)
+        if (info != null && info.getFullName() == null && farmer.getFullName() != null) {
+            info.setFullName(farmer.getFullName());
+        }
+
+        return info;
     }
 
     // Helper method để lấy tên farm (ví dụ)
-    @Named("mapFarmerToFarmName")
-    protected String mapFarmerToFarmName(User farmer) {
-        // Cần logic để lấy FarmerProfile và tên farm từ farmer.getId()
-        // Ví dụ: return farmerProfileRepository.findById(farmer.getId()).map(FarmerProfile::getFarmName).orElse(farmer.getFullName());
-        return farmer != null ? farmer.getFullName() : null; // Tạm thời lấy tên user
+    @Named("mapUserToBestFarmerName")
+    protected String mapUserToBestFarmerName(User farmer) {
+        if (farmer == null) return null;
+        // Quan trọng: Dòng này yêu cầu FarmerProfile phải được load sẵn
+        FarmerProfile profile = farmer.getFarmerProfile();
+        if (profile != null && profile.getFarmName() != null && !profile.getFarmName().isEmpty()) {
+            return profile.getFarmName(); // Ưu tiên farmName
+        }
+        return farmer.getFullName(); // Fallback sang fullName
+    }
+
+    // Helper method để map User sang UserResponse (nếu UserMapper không có sẵn)
+    @Named("toUserResponse")
+    protected UserResponse toUserResponse(User user) {
+        if (user == null) return null;
+        return userMapper.toUserResponse(user); // Gọi UserMapper đã inject
     }
 }

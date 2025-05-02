@@ -30,7 +30,7 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryMapper categoryMapper;
     private final Slugify slugify = Slugify.builder().build(); // Khởi tạo slugify
 
-
+    
 
     @Override
     @Transactional(readOnly = true)
@@ -45,6 +45,7 @@ public class CategoryServiceImpl implements CategoryService {
         // Cân nhắc tạo CategoryDropdownDto riêng nếu cần tối ưu.
         return categoryMapper.toCategoryResponseList(categories); // Sử dụng MapStruct mapper
     }
+
 
     @Override
     @Transactional(readOnly = true)

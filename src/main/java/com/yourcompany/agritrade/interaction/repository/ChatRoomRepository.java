@@ -32,10 +32,10 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             "LEFT JOIN FETCH cr.lastMessage lm " + // Fetch tin nhắn cuối
             "LEFT JOIN FETCH lm.sender " + // Fetch người gửi tin nhắn cuối
             "WHERE cr.user1.id = :userId OR cr.user2.id = :userId " +
-            "ORDER BY cr.lastMessageTime DESC NULLS LAST") // Ưu tiên phòng có tin nhắn mới, phòng chưa có tin nhắn xuống cuối
+            "ORDER BY cr.lastMessageTime DESC NULLS LAST, cr.updatedAt DESC") // Ưu tiên phòng có tin nhắn mới, phòng chưa có tin nhắn xuống cuối
     List<ChatRoom> findRoomsByUser(@Param("userId") Long userId);
 
-    // Có thể thêm các phương thức khác như đếm tổng số tin nhắn chưa đọc của user
+    // Đếm tổng số tin nhắn chưa đọc của user
     @Query("SELECT SUM(CASE WHEN cr.user1.id = :userId THEN cr.user1UnreadCount ELSE cr.user2UnreadCount END) " +
             "FROM ChatRoom cr WHERE cr.user1.id = :userId OR cr.user2.id = :userId")
     Optional<Integer> getTotalUnreadCountForUser(@Param("userId") Long userId);
