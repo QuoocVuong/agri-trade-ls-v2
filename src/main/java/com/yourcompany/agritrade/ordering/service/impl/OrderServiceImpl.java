@@ -12,7 +12,9 @@ import com.yourcompany.agritrade.notification.service.EmailService; // Import Em
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
+import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
+import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.ordering.mapper.OrderMapper;
@@ -73,10 +75,10 @@ public class OrderServiceImpl implements OrderService {
     private static final String LANG_SON_PROVINCE_CODE = "20";
 
 
-
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED) // Đảm bảo đọc dữ liệu đã commit
-    @Retryable(retryFor = {OptimisticLockingFailureException.class, ObjectOptimisticLockingFailureException.class}, maxAttempts = 3, backoff = @Backoff(delay = 100)) // Thử lại nếu có xung đột optimistic lock
+    @Retryable(retryFor = {OptimisticLockingFailureException.class, ObjectOptimisticLockingFailureException.class}, maxAttempts = 3, backoff = @Backoff(delay = 100))
+    // Thử lại nếu có xung đột optimistic lock
     public List<OrderResponse> checkout(Authentication authentication, CheckoutRequest request) {
         User buyer = getUserFromAuthentication(authentication);
         Address shippingAddress = addressRepository.findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
@@ -146,7 +148,6 @@ public class OrderServiceImpl implements OrderService {
 
                     );
                 }
-
 
 
                 // Trừ kho
@@ -395,7 +396,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         // Cập nhật trạng thái thanh toán
-        if(order.getPaymentStatus() == PaymentStatus.PAID) {
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
             order.setPaymentStatus(PaymentStatus.REFUNDED);
             // TODO: Xử lý hoàn tiền thực tế
             log.info("Order {} cancelled, payment status set to REFUNDED. Manual refund may be required.", orderId);
@@ -506,7 +507,7 @@ public class OrderServiceImpl implements OrderService {
         return product.getUnit();
     }
 
-    private BigDecimal calculateShippingFee(Address shippingAddress, FarmerProfile farmerProfile, List<CartItem> items, OrderType orderType){
+    private BigDecimal calculateShippingFee(Address shippingAddress, FarmerProfile farmerProfile, List<CartItem> items, OrderType orderType) {
         if (items == null || items.isEmpty() || shippingAddress == null || farmerProfile == null) {
             log.warn("Cannot calculate shipping fee due to missing input: shippingAddress={}, farmerProfile={}, itemsEmpty={}",
                     shippingAddress == null, farmerProfile == null, items == null || items.isEmpty());
@@ -529,8 +530,8 @@ public class OrderServiceImpl implements OrderService {
         final BigDecimal INTRA_PROVINCE_FEE = new BigDecimal("15000.00"); // Phí giao nội tỉnh (B2C & B2B)
         final BigDecimal INTER_PROVINCE_FEE = new BigDecimal("30000.00"); // Phí giao ngoại tỉnh (Chỉ B2C)
         // (Tùy chọn) Có thể thêm phí theo trọng lượng/kích thước nếu cần
-         final BigDecimal FEE_PER_KG_INTRA = new BigDecimal("3000.00");
-         final BigDecimal FEE_PER_KG_INTER = new BigDecimal("5000.00");
+        final BigDecimal FEE_PER_KG_INTRA = new BigDecimal("3000.00");
+        final BigDecimal FEE_PER_KG_INTER = new BigDecimal("5000.00");
 
 
         // --- Xử lý B2B ---
@@ -584,7 +585,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal subTotal = BigDecimal.ZERO;
         for (CartItem cartItem : items) {
             Product product = cartItem.getProduct(); // Cần đảm bảo product được load
-            if(product == null) continue; // Bỏ qua nếu product null
+            if (product == null) continue; // Bỏ qua nếu product null
             int requestedQuantity = cartItem.getQuantity();
             BigDecimal pricePerUnit = determinePrice(product, requestedQuantity, orderType);
             BigDecimal itemTotalPrice = pricePerUnit.multiply(BigDecimal.valueOf(requestedQuantity));
@@ -592,8 +593,6 @@ public class OrderServiceImpl implements OrderService {
         }
         return subTotal;
     }
-
-
 
 
     private BigDecimal calculateDiscount(User buyer, BigDecimal subTotal /*, String voucherCode - nếu dùng */) { // Chữ ký mới
@@ -698,7 +697,7 @@ public class OrderServiceImpl implements OrderService {
     private boolean isValidStatusTransition(OrderStatus current, OrderStatus next, boolean isAdmin, boolean isFarmer) {
         if (current == next) return false; // Không được cập nhật thành chính nó
         if (current == OrderStatus.DELIVERED || current == OrderStatus.CANCELLED || current == OrderStatus.RETURNED) {
-             // Không đổi trạng thái từ các trạng thái cuối cùng
+            // Không đổi trạng thái từ các trạng thái cuối cùng
             log.warn("Attempt to change status from final state: {} to {}", current, next);
             return false;
         }
@@ -707,11 +706,11 @@ public class OrderServiceImpl implements OrderService {
             case PENDING:
                 // Từ PENDING: Admin/Farmer có thể CONFIRMED, Admin/Buyer có thể CANCELLED (Buyer gọi API riêng)
                 return next == OrderStatus.CONFIRMED && (isAdmin || isFarmer);
-                // Việc cancel sẽ xử lý ở API cancelOrder
+            // Việc cancel sẽ xử lý ở API cancelOrder
             case CONFIRMED:
                 // Từ CONFIRMED: Farmer có thể PROCESSING, Admin/Buyer có thể CANCELLED
                 return (next == OrderStatus.PROCESSING && (isAdmin || isFarmer));
-                // Việc cancel sẽ xử lý ở API cancelOrder
+            // Việc cancel sẽ xử lý ở API cancelOrder
             case PROCESSING:
                 // Từ PROCESSING: Farmer/Admin có thể SHIPPING
                 return next == OrderStatus.SHIPPING && (isAdmin || isFarmer);
@@ -741,15 +740,102 @@ public class OrderServiceImpl implements OrderService {
         initialPayment.setOrder(order);
         initialPayment.setAmount(order.getTotalAmount());
         initialPayment.setPaymentGateway(order.getPaymentMethod().name());
-        // Đặt trạng thái ban đầu phù hợp
-        if (order.getPaymentMethod() == PaymentMethod.COD) {
-            initialPayment.setStatus(PaymentTransactionStatus.PENDING); // Chờ thanh toán khi nhận hàng
-        } else if (order.getPaymentMethod() == PaymentMethod.BANK_TRANSFER || order.getPaymentMethod() == PaymentMethod.INVOICE) {
-            initialPayment.setStatus(PaymentTransactionStatus.PENDING); // Chờ xác nhận chuyển khoản/thanh toán công nợ
-            // Có thể set paymentStatus của Order là AWAITING_PAYMENT_TERM cho INVOICE
-        } else { // Các cổng online khác
-            initialPayment.setStatus(PaymentTransactionStatus.PENDING); // Chờ callback từ cổng thanh toán
+        // ****** ĐẶT TRẠNG THÁI THANH TOÁN BAN ĐẦU ******
+        PaymentTransactionStatus initialStatus;
+        PaymentStatus orderPaymentStatus = PaymentStatus.PENDING; // Mặc định
+
+        switch (order.getPaymentMethod()) {
+            case COD:
+            case BANK_TRANSFER: // Chuyển khoản cũng cần xác nhận nên là PENDING ban đầu
+                initialStatus = PaymentTransactionStatus.PENDING;
+                orderPaymentStatus = PaymentStatus.PENDING;
+                break;
+            case INVOICE: // Nếu dùng công nợ
+                initialStatus = PaymentTransactionStatus.PENDING; // Giao dịch payment có thể vẫn là pending
+                orderPaymentStatus = PaymentStatus.AWAITING_PAYMENT_TERM; // Nhưng trạng thái đơn hàng là chờ công nợ
+                break;
+            case VNPAY:
+            case MOMO:
+            case ZALOPAY:
+                initialStatus = PaymentTransactionStatus.PENDING; // Chờ callback từ cổng thanh toán
+                orderPaymentStatus = PaymentStatus.PENDING;
+                break;
+            default:
+                initialStatus = PaymentTransactionStatus.PENDING;
+                orderPaymentStatus = PaymentStatus.PENDING;
         }
+        initialPayment.setStatus(initialStatus);
+        order.setPaymentStatus(orderPaymentStatus); // <<< CẬP NHẬT TRẠNG THÁI THANH TOÁN CỦA ORDER
+        // ***********************************************
+
         paymentRepository.save(initialPayment);
+    }
+
+    @Override
+    @Transactional(readOnly = true) // Chỉ đọc, không thay đổi dữ liệu
+    public OrderCalculationResponse calculateOrderTotals(Authentication authentication, OrderCalculationRequest request) {
+        User buyer = getUserFromAuthentication(authentication);
+        List<CartItem> cartItems = cartItemRepository.findByUserId(buyer.getId());
+        if (cartItems.isEmpty()) {
+            // Trả về giá trị 0 nếu giỏ hàng trống
+            return new OrderCalculationResponse(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, OrderType.B2C);
+        }
+
+        Address shippingAddress = null;
+        if (request != null && request.getShippingAddressId() != null) {
+            shippingAddress = addressRepository.findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
+                    .orElse(null); // Lấy địa chỉ nếu có ID, không thì bỏ qua (phí ship sẽ là mặc định)
+        }
+        // Nếu không có addressId, có thể lấy địa chỉ mặc định của user
+        if (shippingAddress == null) {
+            shippingAddress = addressRepository.findByUserIdAndIsDefaultTrue(buyer.getId()).orElse(null);
+        }
+
+
+        // Phân nhóm theo farmer (cần farmer profile để tính ship)
+        Map<Long, List<CartItem>> itemsByFarmer = cartItems.stream()
+                .collect(Collectors.groupingBy(item -> item.getProduct().getFarmer().getId()));
+
+        BigDecimal totalSubTotal = BigDecimal.ZERO;
+        BigDecimal totalShippingFee = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+        OrderType finalOrderType = OrderType.B2C; // Mặc định là B2C
+
+        for (Map.Entry<Long, List<CartItem>> entry : itemsByFarmer.entrySet()) {
+            Long farmerId = entry.getKey();
+            List<CartItem> farmerCartItems = entry.getValue();
+            FarmerProfile farmerProfile = farmerProfileRepository.findById(farmerId).orElse(null); // Lấy profile
+
+            // Xác định OrderType (chỉ cần làm 1 lần dựa trên buyer)
+            finalOrderType = determineOrderType(buyer, farmerCartItems); // Giả sử hàm này chỉ dựa vào buyer
+
+            BigDecimal farmerSubTotal = BigDecimal.ZERO;
+            for (CartItem cartItem : farmerCartItems) {
+                Product product = cartItem.getProduct(); // Giả sử đã được fetch EAGER hoặc LAZY load ok
+                if (product == null) continue;
+                int quantity = cartItem.getQuantity();
+                BigDecimal price = determinePrice(product, quantity, finalOrderType);
+                farmerSubTotal = farmerSubTotal.add(price.multiply(BigDecimal.valueOf(quantity)));
+            }
+
+            // Tính phí ship cho farmer này (cần địa chỉ người nhận và profile farmer)
+            BigDecimal farmerShippingFee = BigDecimal.ZERO;
+            if (shippingAddress != null && farmerProfile != null) {
+                farmerShippingFee = calculateShippingFee(shippingAddress, farmerProfile, farmerCartItems, finalOrderType);
+            } else {
+                log.warn("Cannot calculate shipping fee for farmer {} due to missing address or profile", farmerId);
+                // Có thể đặt phí mặc định hoặc báo lỗi tùy logic
+            }
+
+
+            totalSubTotal = totalSubTotal.add(farmerSubTotal);
+            totalShippingFee = totalShippingFee.add(farmerShippingFee);
+        }
+
+        // Tính discount tổng dựa trên tổng subTotal và buyer
+        totalDiscount = calculateDiscount(buyer, totalSubTotal /*, request.getVoucherCode() */);
+        BigDecimal totalAmount = totalSubTotal.add(totalShippingFee).subtract(totalDiscount);
+
+        return new OrderCalculationResponse(totalSubTotal, totalShippingFee, totalDiscount, totalAmount, finalOrderType);
     }
 }

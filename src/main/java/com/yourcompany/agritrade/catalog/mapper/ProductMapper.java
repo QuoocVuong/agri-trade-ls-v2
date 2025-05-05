@@ -11,6 +11,8 @@ import com.yourcompany.agritrade.usermanagement.domain.User; // Import User
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator; // Import Comparator
 import java.util.List; // Import List
 import java.util.Optional; // Import Optional
@@ -39,8 +41,21 @@ public abstract class   ProductMapper {
 
     @Mapping(target = "b2bUnit", source = "b2bUnit")
     @Mapping(target = "b2bBasePrice", source = "b2bBasePrice")
+    @Mapping(target = "minB2bQuantity", source = "minB2bQuantity")
+    @Mapping(target = "pricingTiers", source = "pricingTiers") // MapStruct sẽ dùng ProductPricingTierMapper
+    //@Mapping(target = "new", ignore = true) // Ignore map tự động
     // ***************************************
     public abstract ProductSummaryResponse toProductSummaryResponse(Product product);
+    @AfterMapping
+    protected void setIsNewFlag(@MappingTarget ProductSummaryResponse dto, Product product) {
+        if (product.getCreatedAt() != null) {
+            // Ví dụ: Sản phẩm tạo trong vòng 7 ngày gần nhất được coi là mới
+            long daysSinceCreation = ChronoUnit.DAYS.between(product.getCreatedAt(), LocalDateTime.now());
+            dto.setNew(daysSinceCreation <= 7);
+        } else {
+            dto.setNew(false); // Hoặc true nếu muốn coi sp không có ngày tạo là mới?
+        }
+    }
 
     public abstract List<ProductSummaryResponse> toProductSummaryResponseList(List<Product> products);
 

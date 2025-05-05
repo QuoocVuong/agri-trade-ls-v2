@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 // DTO rút gọn cho trang danh sách
 @Data
@@ -25,4 +26,7 @@ public class ProductSummaryResponse {
     private boolean b2bEnabled;
     private String b2bUnit;          // Thêm đơn vị B2B
     private BigDecimal b2bBasePrice; // Thêm giá B2B cơ bản
+    private Integer minB2bQuantity; // Thêm nếu cần ở Cart
+    private List<ProductPricingTierResponse> pricingTiers; // Dùng List
+    private boolean isNew;
 }

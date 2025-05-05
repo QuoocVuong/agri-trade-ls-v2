@@ -2,6 +2,8 @@ package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
+import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
+import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.ordering.service.OrderService;
@@ -74,5 +76,16 @@ public class OrderController {
             @PathVariable Long orderId) {
         OrderResponse cancelledOrder = orderService.cancelOrder(authentication, orderId); // Service kiểm tra quyền và trạng thái
         return ResponseEntity.ok(ApiResponse.success(cancelledOrder, "Order cancelled successfully"));
+    }
+
+    @PostMapping("/calculate-totals")
+    @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')")
+    public ResponseEntity<ApiResponse<OrderCalculationResponse>> calculateOrderTotals(
+            Authentication authentication,
+            @RequestBody(required = false) OrderCalculationRequest request // DTO chứa thông tin cần thiết (vd: addressId, voucher)
+    ) {
+        // Nếu request null, có thể lấy thông tin từ giỏ hàng mặc định
+        OrderCalculationResponse totals = orderService.calculateOrderTotals(authentication, request);
+        return ResponseEntity.ok(ApiResponse.success(totals));
     }
 }

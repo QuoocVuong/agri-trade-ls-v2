@@ -2,7 +2,9 @@ package com.yourcompany.agritrade.ordering.service;
 
 import com.yourcompany.agritrade.ordering.domain.OrderStatus; // Import Enum
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
+import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest; // Import DTO
+import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import org.springframework.data.domain.Page;
@@ -38,5 +40,7 @@ public interface OrderService {
 
     /** Hủy đơn hàng (cho Buyer hoặc Admin, tùy trạng thái) */
     OrderResponse cancelOrder(Authentication authentication, Long orderId);
+
+    OrderCalculationResponse calculateOrderTotals(Authentication authentication, OrderCalculationRequest request);
 
 }
