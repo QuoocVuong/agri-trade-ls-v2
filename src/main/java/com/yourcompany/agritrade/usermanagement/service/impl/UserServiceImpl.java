@@ -1,9 +1,14 @@
 package com.yourcompany.agritrade.usermanagement.service.impl;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.config.security.JwtTokenProvider;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
@@ -36,13 +41,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -62,10 +72,14 @@ public class UserServiceImpl implements UserService {
     private final BusinessProfileMapper businessProfileMapper; // Inject trực tiếp
     private final EmailService emailService;
     private final FarmerSummaryMapper farmerSummaryMapper;
+    private final JwtTokenProvider jwtTokenProvider; // Inject JWT provider
 
     private final NotificationService notificationService;
     @Value("${app.frontend.url:http://localhost:4200}") // Lấy URL frontend
     private String frontendUrl;
+
+    @Value("${google.auth.client-id}")
+    private String googleClientId;
 
     private static final int TOKEN_EXPIRY_HOURS = 24; // Thời gian hết hạn token (giờ)
 
@@ -471,6 +485,117 @@ public class UserServiceImpl implements UserService {
             return cb.equal(root.get("provinceCode"), provinceCode);
         };
     }
+
+
+    @Override
+    @Transactional
+    public String processGoogleLogin(String googleIdTokenString) throws GeneralSecurityException, IOException {
+        // 1. Xác thực Google ID Token
+        GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                .setAudience(Collections.singletonList(googleClientId))
+                // Hoặc nếu bạn có nhiều client ID: .setAudience(Arrays.asList(CLIENT_ID_1, CLIENT_ID_2, ...))
+                // .setIssuer("https://accounts.google.com") // Có thể chỉ định issuer
+                .build();
+
+        GoogleIdToken idToken = verifier.verify(googleIdTokenString);
+        if (idToken == null) {
+            throw new BadRequestException("Invalid Google ID Token.");
+        }
+
+        // 2. Lấy thông tin user từ Payload
+        GoogleIdToken.Payload payload = idToken.getPayload();
+        String userId = payload.getSubject(); // Google User ID (providerId)
+        String email = payload.getEmail();
+        boolean emailVerified = payload.getEmailVerified();
+        String name = (String) payload.get("name");
+        String pictureUrl = (String) payload.get("picture");
+        // String locale = (String) payload.get("locale");
+        // String familyName = (String) payload.get("family_name");
+        // String givenName = (String) payload.get("given_name");
+
+        if (!emailVerified) {
+            throw new BadRequestException("Google account email is not verified.");
+        }
+        if (email == null) {
+            throw new BadRequestException("Could not retrieve email from Google token.");
+        }
+
+        // 3. Tìm hoặc tạo User trong DB
+        User user = findOrCreateUserForOAuth2(email, name, pictureUrl, "GOOGLE", userId);
+
+        // 4. Tạo JWT cho user của bạn
+        // Cần tạo đối tượng Authentication thủ công để generateToken
+        // Lấy authorities từ user đã tìm/tạo
+        Collection<? extends GrantedAuthority> authorities = mapRolesToAuthorities(user.getRoles()); // Giả sử có hàm này
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                user.getEmail(),
+                null,
+                authorities);
+
+        String jwt = jwtTokenProvider.generateToken(authentication);
+
+        return jwt; // Trả về JWT
+    }
+
+    // Hàm helper tìm hoặc tạo user
+    private User findOrCreateUserForOAuth2(String email, String fullName, String avatarUrl, String provider, String providerId) {
+        Optional<User> userOptional = userRepository.findByEmail(email); // Tìm theo email
+
+        if (userOptional.isPresent()) {
+            User existingUser = userOptional.get();
+            // Kiểm tra xem user này có phải từ Google không
+            if (!provider.equals(existingUser.getProvider())) {
+                // User đã tồn tại với provider khác (ví dụ: LOCAL)
+                // -> Có thể link tài khoản hoặc báo lỗi yêu cầu đăng nhập bằng cách cũ
+                log.warn("User with email {} already exists with provider {}. Cannot link Google account automatically.", email, existingUser.getProvider());
+                throw new BadRequestException("Tài khoản với email này đã tồn tại. Vui lòng đăng nhập bằng phương thức ban đầu.");
+            }
+            // Cập nhật thông tin nếu cần (tên, avatar)
+            boolean updated = false;
+            if (fullName != null && !fullName.equals(existingUser.getFullName())) {
+                existingUser.setFullName(fullName);
+                updated = true;
+            }
+            if (avatarUrl != null && !avatarUrl.equals(existingUser.getAvatarUrl())) {
+                existingUser.setAvatarUrl(avatarUrl);
+                updated = true;
+            }
+            if (providerId != null && !providerId.equals(existingUser.getProviderId())) {
+                existingUser.setProviderId(providerId); // Lưu providerId nếu chưa có
+                updated = true;
+            }
+            if (updated) {
+                userRepository.save(existingUser);
+            }
+            return existingUser; // Trả về user đã tồn tại
+        } else {
+            // Tạo user mới
+            User newUser = new User();
+            newUser.setEmail(email);
+            newUser.setFullName(fullName != null ? fullName : "Người dùng Google"); // Tên mặc định
+            newUser.setAvatarUrl(avatarUrl);
+            newUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString())); // Tạo mật khẩu ngẫu nhiên, không dùng được
+            newUser.setActive(true); // Email đã được Google xác thực
+            newUser.setProvider(provider); // Đặt provider là GOOGLE
+            newUser.setProviderId(providerId); // Lưu Google User ID
+
+            // Gán vai trò mặc định
+            Role defaultRole = roleRepository.findByName(RoleType.ROLE_CONSUMER)
+                    .orElseThrow(() -> new ResourceNotFoundException("Role", "name", RoleType.ROLE_CONSUMER.name()));
+            newUser.setRoles(Collections.singleton(defaultRole));
+
+            log.info("Creating new user from Google login: {}", email);
+            return userRepository.save(newUser);
+        }
+    }
+
+    // Hàm helper map roles (cần có trong class này hoặc UserDetailsServiceImpl)
+    private Collection<? extends GrantedAuthority> mapRolesToAuthorities(Set<Role> roles) {
+        return roles.stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName().name()))
+                .collect(Collectors.toList());
+    }
+
 
 
 

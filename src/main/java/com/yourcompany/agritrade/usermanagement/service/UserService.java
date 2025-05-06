@@ -12,6 +12,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Set;
 
@@ -82,4 +84,15 @@ public interface UserService {
      */
     Page<FarmerSummaryResponse> searchPublicFarmers(String keyword, String provinceCode, Pageable pageable);
     // ===========================
+
+    // ****** THÊM PHƯƠNG THỨC NÀY ******
+    /**
+     * Xử lý đăng nhập bằng Google ID Token.
+     * Xác thực token, tìm hoặc tạo người dùng, và trả về JWT của ứng dụng.
+     * @param idTokenString Google ID Token nhận được từ Frontend.
+     * @return JWT của ứng dụng AgriTradeLS cho người dùng đã xác thực.
+
+     */
+    String processGoogleLogin(String idTokenString) throws GeneralSecurityException, IOException;
+    // **********************************
 }

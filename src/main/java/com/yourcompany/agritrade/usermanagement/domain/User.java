@@ -68,6 +68,12 @@ public class User {
             orphanRemoval = true     // Xóa Profile nếu nó không còn được tham chiếu bởi User nào
     )
     private FarmerProfile farmerProfile; // Tên trường để truy cập profile từ User
+
+    @Column(length = 20) // Độ dài đủ cho "GOOGLE", "LOCAL", etc.
+    private String provider; // Lưu nguồn gốc tài khoản: "LOCAL", "GOOGLE", "FACEBOOK"...
+
+    @Column(length = 255) // Lưu ID từ nhà cung cấp OAuth2
+    private String providerId;
     // ****************************
 
     @CreationTimestamp

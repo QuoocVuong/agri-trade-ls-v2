@@ -95,3 +95,8 @@ storage:
   location: upload-dir # Tên thư mục gốc để lưu file (sẽ tạo trong thư mục chạy ứng dụng)
   base-url: /api/files/download # Đường dẫn cơ sở để truy cập file qua API
 
+google:
+  auth:
+    client-id: 1078646222149-c5k0i6kq80cm24ttoq2rjt4er44ao1if.apps.googleusercontent.com # Thay bằng Client ID của bạn
+    # issuer: https://accounts.google.com # Issuer mặc định
+

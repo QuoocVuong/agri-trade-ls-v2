@@ -32,7 +32,21 @@ public class JwtTokenProvider {
 
     // Tạo JWT từ thông tin Authentication
     public String generateToken(Authentication authentication) {
-        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+//        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        String username; // Dùng String thay vì UserDetails
+
+        // ****** SỬA LOGIC LẤY USERNAME ******
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetails) {
+            username = ((UserDetails) principal).getUsername();
+        } else if (principal instanceof String) {
+            username = (String) principal; // Lấy trực tiếp nếu là String
+        } else {
+            // Xử lý trường hợp principal không xác định được
+            log.error("Cannot generate token: Unknown principal type {}", principal.getClass());
+            throw new IllegalArgumentException("Cannot determine username from principal");
+        }
+        // ************************************
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
@@ -42,7 +56,7 @@ public class JwtTokenProvider {
                 .collect(Collectors.toList()); // Thu thập thành List
 
         return Jwts.builder()
-                .setSubject(userPrincipal.getUsername())
+                .setSubject(username)
                 .claim(AUTHORITIES_KEY, authorities) // Đưa List authorities vào claim
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
