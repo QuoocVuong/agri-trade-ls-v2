@@ -100,3 +100,11 @@ google:
     client-id: 1078646222149-c5k0i6kq80cm24ttoq2rjt4er44ao1if.apps.googleusercontent.com # Thay bằng Client ID của bạn
     # issuer: https://accounts.google.com # Issuer mặc định
 
+
+firebase:
+  storage:
+    bucket-name: agritrade-5eb84.firebasestorage.app # <<< THAY BẰNG TÊN BUCKET CỦA BẠN
+    service-account-key-path: classpath:firebase-service-account-key.json # Đường dẫn tới file key
+    # (Tùy chọn) Base URL công khai nếu bucket của bạn public hoặc bạn muốn tạo URL không cần ký
+    # public-base-url: https://storage.googleapis.com/your-project-id.appspot.com
+

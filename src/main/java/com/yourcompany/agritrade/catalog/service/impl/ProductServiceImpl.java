@@ -26,6 +26,7 @@ import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileReposito
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -38,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -64,6 +66,11 @@ public class ProductServiceImpl implements ProductService {
 
     private final NotificationService notificationService;
     private final EmailService emailService;
+
+    // ****** KHAI BÁO VÀ INJECT publicBaseUrl ******
+    @Value("${firebase.storage.public-base-url:#{null}}") // Inject giá trị từ application.yml
+    private String publicBaseUrl;
+    // ********************************************
 
 
     // --- Farmer Methods ---
@@ -642,53 +649,164 @@ public class ProductServiceImpl implements ProductService {
         Set<Long> requestImageIds = new HashSet<>();
         boolean hasDefault = false;
 
-        // Duyệt qua danh sách ảnh từ request
-        for (ProductImageRequest imgReq : imageRequests) {
-            ProductImage image;
-            if (imgReq.getId() != null && existingImagesMap.containsKey(imgReq.getId())) {
-                // Nếu là ảnh đã có -> cập nhật thông tin (order, isDefault)
-                image = existingImagesMap.get(imgReq.getId());
-                productImageMapper.updateProductImageFromRequest(imgReq, image);
-                requestImageIds.add(imgReq.getId()); // Đánh dấu ID đã xử lý
-            } else {
-                // Nếu là ảnh mới (không có ID hoặc ID không tồn tại) -> tạo mới
-                // Cần URL thực tế từ FileStorageService nếu dùng upload
-                image = productImageMapper.requestToProductImage(imgReq);
-                image.setProduct(product); // Gán product
-            }
-            // Đảm bảo chỉ có 1 ảnh default
-            if (imgReq.getIsDefault() != null && imgReq.getIsDefault()) {
-                if (hasDefault) {
-                    image.setDefault(false); // Chỉ cho phép 1 default
-                } else {
-                    image.setDefault(true);
-                    hasDefault = true;
-                }
-            } else if (!hasDefault && imageRequests.indexOf(imgReq) == imageRequests.size() - 1) {
-                // Nếu duyệt hết mà chưa có default -> set cái cuối cùng là default (hoặc cái đầu tiên)
-                image.setDefault(true);
-            } else {
-                image.setDefault(false); // Các trường hợp còn lại không phải default
-            }
 
-            updatedImages.add(image);
+        int order = 0;
+
+            // Duyệt qua danh sách ảnh từ request
+            for (ProductImageRequest imgReq : imageRequests) {
+                ProductImage image;
+                if (imgReq.getId() != null && existingImagesMap.containsKey(imgReq.getId())) {
+                    // Nếu là ảnh đã có -> cập nhật thông tin (order, isDefault)
+                    image = existingImagesMap.get(imgReq.getId());
+                    // Chỉ cập nhật isDefault và displayOrder cho ảnh đã có
+                    image.setDefault(imgReq.getIsDefault() != null && imgReq.getIsDefault());
+                    image.setDisplayOrder(imgReq.getDisplayOrder() != null ? imgReq.getDisplayOrder() : order);
+                    requestImageIds.add(imgReq.getId());
+                } else { // Ảnh mới
+                    image = new ProductImage();
+                    image.setProduct(product);
+
+                    // Giả định imgReq.getImageUrl() chứa blobPath từ Frontend
+                    String blobPath = imgReq.getBlobPath(); // <<< LẤY TỪ TRƯỜNG blobPath CỦA REQUEST
+
+                    if (StringUtils.hasText(blobPath)) {
+                        image.setBlobPath(blobPath); // <<< LƯU BLOB PATH VÀO ENTITY
+                        String fileUrl = fileStorageService.getFileUrl(blobPath); // Lấy Signed URL
+                        image.setImageUrl(fileUrl); // Lưu Signed URL vào entity
+                        log.info("Processing new image. BlobPath: {}, Generated URL: {}", blobPath, fileUrl); // Thêm log
+                    } else {
+                        // Nếu blobPath rỗng trong request -> Lỗi nghiêm trọng
+                        log.error("blobPath is missing in ProductImageRequest for new image during update. Request data: {}", imgReq);
+                        continue; // Bỏ qua ảnh này
+                    }
+                    image.setDisplayOrder(order); // Gán displayOrder
+                    image.setDefault(imgReq.getIsDefault() != null && imgReq.getIsDefault());
+                }
+                order++; // Luôn tăng order
+//                if (imgReq.getIsDefault() != null && imgReq.getIsDefault()) {
+//                    if (hasDefault) {
+//                        image.setDefault(false); // Chỉ cho phép 1 default
+//                    } else {
+//                        image.setDefault(true);
+//                        hasDefault = true;
+//                    }
+//                } else if (!hasDefault && imageRequests.indexOf(imgReq) == imageRequests.size() - 1) {
+//                    // Nếu duyệt hết mà chưa có default -> set cái cuối cùng là default (hoặc cái đầu tiên)
+//                    image.setDefault(true);
+//                } else {
+//                    image.setDefault(false); // Các trường hợp còn lại không phải default
+//                }
+                if (image.isDefault()) {
+                    if (hasDefault) image.setDefault(false);
+                    else hasDefault = true;
+                }
+
+                updatedImages.add(image);
+            }
+        // Đảm bảo có ảnh default nếu list không rỗng và chưa có default nào được set từ request
+        if (!updatedImages.isEmpty() && !hasDefault) {
+            updatedImages.stream().min(Comparator.comparingInt(ProductImage::getDisplayOrder))
+                    .ifPresent(img -> img.setDefault(true));
         }
+
 
         // Xóa những ảnh cũ không có trong request mới
-        List<ProductImage> imagesToDelete = existingImagesMap.entrySet().stream()
-                .filter(entry -> !requestImageIds.contains(entry.getKey()))
-                .map(Map.Entry::getValue)
-                .collect(Collectors.toList());
+        // Xóa ảnh cũ
+            List<ProductImage> imagesToDelete = existingImagesMap.entrySet().stream()
+                    .filter(entry -> !requestImageIds.contains(entry.getKey()))
+                    .map(Map.Entry::getValue)
+                    .collect(Collectors.toList());
 
-        if (!imagesToDelete.isEmpty()) {
-            productImageRepository.deleteAll(imagesToDelete);
-            // Xóa file vật lý nếu cần: imagesToDelete.forEach(img -> fileStorageService.delete(...));
-            log.debug("Deleted {} images for product {}", imagesToDelete.size(), product.getId());
+            if (!imagesToDelete.isEmpty()) {
+                // ****** SỬA LOGIC XÓA FILE ******
+                for (ProductImage imgToDelete : imagesToDelete) {
+                    // ****** LẤY blobPath ĐÃ LƯU ĐỂ XÓA ******
+                    String blobPathToDelete = imgToDelete.getBlobPath();
+
+                    if (StringUtils.hasText(blobPathToDelete)) {
+
+                        try {
+                            // ****** GỌI DELETE VỚI 1 THAM SỐ ******
+                            fileStorageService.delete(blobPathToDelete);
+                            // ************************************
+                        } catch (Exception e) {
+                            log.error("Failed to delete image file from storage: {}", blobPathToDelete, e);
+                        }
+                    } else {
+                        log.warn("blobPath is missing for image entity id: {}, cannot delete from storage.", imgToDelete.getId());
+                    }
+                }
+                productImageRepository.deleteAll(imagesToDelete); // Xóa entity
+                log.debug("Deleted {} image entities for product {}", imagesToDelete.size(), product.getId());
+                // ******************************
+            }
+
+            // Cập nhật lại collection trong product entity
+            product.getImages().clear();
+            product.getImages().addAll(updatedImages);
+
+
+
+
+
+    }
+
+    // ****** HÀM HELPER TRÍCH XUẤT SUBFOLDER TỪ BLOBPATH ******
+    // Giả định blobPath có dạng "subFolder/filename.ext"
+    private String extractSubFolderFromBlobPath(String blobPath) {
+        if (blobPath == null) return null;
+        int lastSlash = blobPath.lastIndexOf('/');
+        if (lastSlash > 0) { // Nếu có dấu / và không phải ở đầu
+            return blobPath.substring(0, lastSlash);
+        } else if (lastSlash == -1 && StringUtils.hasText(StringUtils.getFilename(blobPath))) {
+            // Nếu không có dấu / nhưng có tên file -> nằm ở thư mục gốc (subFolder là "")
+            return "";
         }
+        // Trường hợp khác (vd: chỉ có tên thư mục, hoặc path không hợp lệ)
+        log.warn("Could not determine subfolder from blobPath: {}", blobPath);
+        return null; // Hoặc trả về thư mục mặc định nếu muốn
+    }
+    // ******************************************************
+    // Hàm helper đảm bảo có default image
+    private void checkAndSetDefaultImage(Set<ProductImage> images) {
+        if (!images.isEmpty() && images.stream().noneMatch(ProductImage::isDefault)) {
+            images.stream().min(Comparator.comparingInt(ProductImage::getDisplayOrder))
+                    .ifPresent(img -> img.setDefault(true));
+        }
+    }
 
-        // Cập nhật lại collection trong product entity
-        product.getImages().clear();
-        product.getImages().addAll(updatedImages);
+
+    private String extractBlobPathFromUrl(String imageUrl) {
+        if (publicBaseUrl != null && imageUrl != null && imageUrl.startsWith(publicBaseUrl)) {
+            try {
+                String pathPart = imageUrl.substring(publicBaseUrl.length());
+                if (pathPart.startsWith("/")) {
+                    pathPart = pathPart.substring(1);
+                }
+                // Decode URL encoding
+                return java.net.URLDecoder.decode(pathPart, StandardCharsets.UTF_8.toString());
+            } catch (Exception e) {
+                log.error("Could not decode blob path from public URL: {}", imageUrl, e);
+            }
+        }
+        // Nếu không phải public URL hoặc có lỗi, trả về null
+        log.warn("Could not extract blob path from URL (might be signed URL or invalid): {}", imageUrl);
+        return null;
+    }
+
+    // ****** HÀM HELPER TRÍCH XUẤT SUBFOLDER (VÍ DỤ) ******
+    private String extractSubFolderFromUrl(String imageUrl) {
+        // Logic này cần dựa trên cấu trúc URL của bạn
+        // Ví dụ: Nếu URL là /api/files/download/product_images/abc.jpg
+        String downloadPrefix = "/api/files/download/";
+        if (imageUrl != null && imageUrl.contains(downloadPrefix)) {
+            String pathPart = imageUrl.substring(imageUrl.indexOf(downloadPrefix) + downloadPrefix.length());
+            int lastSlash = pathPart.lastIndexOf('/');
+            if (lastSlash > 0) { // Đảm bảo có thư mục con
+                return pathPart.substring(0, lastSlash);
+            }
+        }
+        return null; // Hoặc trả về thư mục mặc định nếu không trích xuất được
     }
 
 
