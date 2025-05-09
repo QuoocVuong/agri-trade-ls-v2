@@ -5,6 +5,7 @@ import com.yourcompany.agritrade.ordering.dto.request.CartItemRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.CartItemResponse;
 import com.yourcompany.agritrade.ordering.dto.response.CartResponse;
+import com.yourcompany.agritrade.ordering.dto.response.CartValidationResponse;
 import com.yourcompany.agritrade.ordering.service.CartService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -59,5 +60,11 @@ public class CartController {
     public ResponseEntity<ApiResponse<Void>> clearMyCart(Authentication authentication) {
         cartService.clearCart(authentication);
         return ResponseEntity.ok(ApiResponse.success("Cart cleared successfully"));
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<ApiResponse<CartValidationResponse>> validateCart(Authentication authentication) {
+        CartValidationResponse validationResponse = cartService.validateCartForCheckout(authentication);
+        return ResponseEntity.ok(ApiResponse.success(validationResponse));
     }
 }

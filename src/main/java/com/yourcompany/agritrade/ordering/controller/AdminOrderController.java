@@ -16,6 +16,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication; // Import Authentication nếu cần lấy thông tin admin
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/admin/orders") // Base path cho Admin
 @RequiredArgsConstructor
@@ -60,5 +62,15 @@ public class AdminOrderController {
             @PathVariable Long orderId) {
         OrderResponse cancelledOrder = orderService.cancelOrder(authentication, orderId);
         return ResponseEntity.ok(ApiResponse.success(cancelledOrder, "Order cancelled successfully by admin"));
+    }
+
+    @PostMapping("/{orderId}/confirm-bank-transfer")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> confirmBankTransfer(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) Map<String, String> payload) { // Có thể nhận mã giao dịch ngân hàng nếu cần
+        String bankTransactionCode = payload != null ? payload.get("bankTransactionCode") : null;
+        OrderResponse updatedOrder = orderService.confirmBankTransferPayment(orderId, bankTransactionCode);
+        return ResponseEntity.ok(ApiResponse.success(updatedOrder, "Bank transfer confirmed."));
     }
 }

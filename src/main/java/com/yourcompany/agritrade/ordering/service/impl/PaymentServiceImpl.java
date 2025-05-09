@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -117,8 +118,17 @@ public class PaymentServiceImpl implements PaymentService {
         // Controller cần trả về mã 200 OK hoặc theo yêu cầu của cổng thanh toán.
     }
 
-    // private boolean validateCallback(String gateway, PaymentCallbackRequest data) {
-    //     // TODO: Implement validation logic for each payment gateway
-    //     return true;
-    // }
+    private boolean validateCallback(String gateway, PaymentCallbackRequest callbackData, Map<String, ?> rawParams) {
+        if ("VNPAY".equalsIgnoreCase(gateway)) {
+            // Lấy vnp_SecureHash từ rawParams
+            // Tạo lại chuỗi hash data từ các tham số khác (trừ vnp_SecureHash) theo đúng thứ tự
+            // So sánh hash tự tạo với vnp_SecureHash nhận được
+            // return calculatedHash.equals(receivedHash);
+            return true; // Tạm thời, PHẢI IMPLEMENT THẬT
+        } else if ("MOMO".equalsIgnoreCase(gateway)) {
+            // Logic xác thực chữ ký của MoMo
+            return true; // Tạm thời, PHẢI IMPLEMENT THẬT
+        }
+        return false;
+    }
 }

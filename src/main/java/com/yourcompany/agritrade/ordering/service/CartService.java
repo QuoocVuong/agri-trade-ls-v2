@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.ordering.dto.request.CartItemRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemUpdateRequest; // DTO mới cho update
 import com.yourcompany.agritrade.ordering.dto.response.CartItemResponse;
 import com.yourcompany.agritrade.ordering.dto.response.CartResponse;
+import com.yourcompany.agritrade.ordering.dto.response.CartValidationResponse;
 import org.springframework.security.core.Authentication;
 
 public interface CartService {
@@ -22,4 +23,7 @@ public interface CartService {
 
     /** Xóa toàn bộ giỏ hàng của user */
     void clearCart(Authentication authentication);
+
+    // ...
+    CartValidationResponse validateCartForCheckout(Authentication authentication);
 }

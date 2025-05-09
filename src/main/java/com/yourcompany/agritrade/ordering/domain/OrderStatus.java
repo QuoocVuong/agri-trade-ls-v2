@@ -1,2 +1,2 @@
 package com.yourcompany.agritrade.ordering.domain;
-public enum OrderStatus { PENDING, CONFIRMED, PROCESSING, SHIPPING, DELIVERED, CANCELLED, RETURNED }
+public enum OrderStatus { PENDING, CONFIRMED, PROCESSING, SHIPPING, DELIVERED, CANCELLED, RETURNED, AWAITING_PAYMENT }

@@ -84,11 +84,11 @@ logging:
 # --- Cấu hình cho môi trường production ---
 # Tạo file application-prod.yaml nếu cần cấu hình riêng cho prod
 
-app:
-  admin:
-    email: admin@agritradels.com
-    password: 123456
-    fullname: Quản Trị Viên
+#app:
+#  admin:
+#    email: admin@agritradels.com
+#    password: 123456
+#    fullname: Quản Trị Viên
 
 # File Storage Configuration
 storage:
@@ -107,4 +107,36 @@ firebase:
     service-account-key-path: classpath:firebase-service-account-key.json # Đường dẫn tới file key
     # (Tùy chọn) Base URL công khai nếu bucket của bạn public hoặc bạn muốn tạo URL không cần ký
     # public-base-url: https://storage.googleapis.com/your-project-id.appspot.com
+
+payment:
+  vnpay:
+    version: "2.1.0"
+    tmnCode: "YOUR_VNPAY_TMNCODE" # Lấy từ VNPay Portal
+    hashSecret: "YOUR_VNPAY_HASH_SECRET" # Lấy từ VNPay Portal
+    url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html" # URL cổng thanh toán TEST
+    apiUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction" # URL API truy vấn (nếu cần)
+  momo:
+    partnerCode: YOUR_MOMO_PARTNER_CODE
+    accessKey: YOUR_MOMO_ACCESS_KEY
+    secretKey: YOUR_MOMO_SECRET_KEY
+    endpoint: https://test-payment.momo.vn/v2/gateway/api/create
+    queryUrl: https://test-payment.momo.vn/v2/gateway/api/query
+
+app:
+  frontend:
+    url: "http://localhost:4200" # hoặc domain FE thật của bạn
+    vnpayReturnUrl: "${app.frontend.url}/payment/vnpay/result"
+    momoReturnUrl: ${app.frontend.url}/payment/momo/result
+
+  admin:
+    email: admin@gmail.com
+    password: 123456
+    fullname: Quản Trị Viên
+
+  backend:
+    url: "http://localhost:8080" # hoặc domain BE thật của bạn
+    vnpayIpnUrl: "${app.backend.url}/api/payments/callback/vnpay/ipn"
+    momoIpnUrl: ${app.backend.url}/api/payments/callback/momo/ipn
+
+
 

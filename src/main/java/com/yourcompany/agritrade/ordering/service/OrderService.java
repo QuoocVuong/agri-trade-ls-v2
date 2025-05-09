@@ -43,4 +43,6 @@ public interface OrderService {
 
     OrderCalculationResponse calculateOrderTotals(Authentication authentication, OrderCalculationRequest request);
 
+    OrderResponse confirmBankTransferPayment(Long orderId, String bankTransactionCode);
+
 }

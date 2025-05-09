@@ -888,4 +888,40 @@ public class OrderServiceImpl implements OrderService {
 
         return new OrderCalculationResponse(totalSubTotal, totalShippingFee, totalDiscount, totalAmount, finalOrderType);
     }
+
+    @Override
+    @Transactional
+    public OrderResponse confirmBankTransferPayment(Long orderId, String bankTransactionCode) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        if (order.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
+            throw new BadRequestException("Order was not placed with Bank Transfer method.");
+        }
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Order has already been paid.");
+        }
+
+        order.setPaymentStatus(PaymentStatus.PAID);
+        if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.AWAITING_PAYMENT) { // Giả sử có AWAITING_PAYMENT
+            order.setStatus(OrderStatus.CONFIRMED); // Hoặc PROCESSING
+        }
+
+        // Tạo bản ghi Payment
+        Payment payment = new Payment();
+        payment.setOrder(order);
+        payment.setAmount(order.getTotalAmount());
+        payment.setPaymentGateway(PaymentMethod.BANK_TRANSFER.name());
+        payment.setStatus(PaymentTransactionStatus.SUCCESS);
+        payment.setPaymentTime(LocalDateTime.now());
+        payment.setTransactionCode(bankTransactionCode); // Lưu mã giao dịch ngân hàng nếu có
+        payment.setGatewayMessage("Payment confirmed manually by admin.");
+        paymentRepository.save(payment);
+
+        Order savedOrder = orderRepository.save(order);
+        log.info("Bank transfer payment confirmed for order {}", order.getOrderCode());
+        notificationService.sendPaymentSuccessNotification(savedOrder); // Thông báo cho buyer
+        return orderMapper.toOrderResponse(savedOrder);
+    }
+
 }

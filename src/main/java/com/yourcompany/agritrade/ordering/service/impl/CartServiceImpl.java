@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.ordering.service.impl;
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
+import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
@@ -12,6 +13,7 @@ import com.yourcompany.agritrade.ordering.dto.request.CartItemUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.CartAdjustmentInfo;
 import com.yourcompany.agritrade.ordering.dto.response.CartItemResponse;
 import com.yourcompany.agritrade.ordering.dto.response.CartResponse;
+import com.yourcompany.agritrade.ordering.dto.response.CartValidationResponse;
 import com.yourcompany.agritrade.ordering.mapper.CartItemMapper;
 import com.yourcompany.agritrade.ordering.repository.CartItemRepository;
 import com.yourcompany.agritrade.ordering.service.CartService;
@@ -27,10 +29,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
+
+
 
 @Service
 @RequiredArgsConstructor
@@ -53,51 +55,83 @@ public class CartServiceImpl implements CartService {
         List<CartAdjustmentInfo> adjustments = new ArrayList<>(); // Lưu thông tin điều chỉnh
 
 
-        for (Iterator<CartItem> iterator = cartItemsFromDb.iterator(); iterator.hasNext();) {
-            CartItem cartItem = iterator.next();
+        for (CartItem cartItem : cartItemsFromDb) { // Không dùng iterator nữa để có thể modify list
             Product product = null;
-            boolean removeThisCartItem = false;
+            boolean markForRemoval = false;
+            String adjustmentMessage = null;
+            String adjustmentType = null;
+            String productNameForMessage = "Sản phẩm không xác định"; // Tên mặc định
+
+            if (cartItem.getProduct() != null) {
+                productNameForMessage = cartItem.getProduct().getName(); // Lấy tên trước khi product có thể bị null
+            }
 
             if (cartItem.getProduct() == null) {
-                // Trường hợp 1: Product đã là null khi CartItem được load (do @Where trên Product)
-                log.warn("CartItem ID {} for user {} references a product that is null (likely soft-deleted or non-existent). Marking for removal.", cartItem.getId(), user.getId());
-                removeThisCartItem = true;
+                log.warn("CartItem ID {} for user {} references a product that is null. Marking for removal.", cartItem.getId(), user.getId());
+                markForRemoval = true;
+                adjustmentMessage = "Một sản phẩm (" + productNameForMessage + ") không còn tồn tại và đã được xóa khỏi giỏ.";
+                adjustmentType = "REMOVED";
             } else {
-                try {
-                    // Trường hợp 2: Cố gắng load lại product từ DB để chắc chắn
-                    // findById sẽ trả về empty nếu product bị xóa mềm (do @Where) hoặc không tồn tại
-                    Optional<Product> productOpt = productRepository.findById(cartItem.getProduct().getId());
-                    if (productOpt.isEmpty()) {
-                        log.warn("Product ID {} for CartItem ID {} (user {}) not found or soft-deleted. Marking for removal.", cartItem.getProduct().getId(), cartItem.getId(), user.getId());
-                        removeThisCartItem = true;
+                Optional<Product> productOpt = productRepository.findById(cartItem.getProduct().getId());
+                if (productOpt.isEmpty()) {
+                    log.warn("Product ID {} for CartItem ID {} (user {}) not found or soft-deleted. Marking for removal.", cartItem.getProduct().getId(), cartItem.getId(), user.getId());
+                    markForRemoval = true;
+                    adjustmentMessage = "Sản phẩm '" + productNameForMessage + "' không còn tồn tại và đã được xóa khỏi giỏ.";
+                    adjustmentType = "REMOVED";
+                } else {
+                    product = productOpt.get();
+                    if (product.getStatus() != ProductStatus.PUBLISHED || product.isDeleted()) {
+                        log.warn("GET_CART: Product ID {} (CartItem ID {}) is not PUBLISHED or is deleted. Marking for removal.", product.getId(), cartItem.getId());
+                        markForRemoval = true;
+                        adjustmentMessage = "Sản phẩm '" + product.getName() + "' không còn được bán và đã được xóa khỏi giỏ.";
+                        adjustmentType = "REMOVED";
                     } else {
-                        product = productOpt.get();
-                        // Kiểm tra thêm trạng thái PUBLISHED
-                        if (product.getStatus() != ProductStatus.PUBLISHED) {
-                            log.warn("Product ID {} for CartItem ID {} (user {}) is not PUBLISHED (status: {}). Marking for removal.", product.getId(), cartItem.getId(), user.getId(), product.getStatus());
-                            removeThisCartItem = true;
+                        // *** KIỂM TRA VÀ ĐIỀU CHỈNH SỐ LƯỢNG ***
+                        int currentStock = product.getStockQuantity();
+                        int quantityInCart = cartItem.getQuantity();
+
+                        if (currentStock <= 0) { // Hết hàng
+                            log.warn("Product ID {} (CartItem ID {}) is out of stock. Marking for removal.", product.getId(), cartItem.getId());
+                            markForRemoval = true;
+                            adjustmentMessage = "Sản phẩm '" + product.getName() + "' đã hết hàng và được xóa khỏi giỏ.";
+                            adjustmentType = "REMOVED";
+                        } else if (quantityInCart > currentStock) { // Số lượng trong giỏ > tồn kho
+                            log.warn("Quantity for Product ID {} (CartItem ID {}) in cart ({}) exceeds stock ({}). Adjusting quantity.",
+                                    product.getId(), cartItem.getId(), quantityInCart, currentStock);
+                            cartItem.setQuantity(currentStock); // Điều chỉnh số lượng
+                            itemsToUpdateInDb.add(cartItem); // Thêm vào danh sách cần cập nhật DB
+                            adjustmentMessage = "Số lượng sản phẩm '" + product.getName() + "' đã được cập nhật thành " + currentStock + " do thay đổi tồn kho.";
+                            adjustmentType = "ADJUSTED";
                         }
+                        // *************************************
                     }
-                } catch (EntityNotFoundException e) {
-                    // Bắt lỗi nếu có vấn đề khi truy cập product (dù ít xảy ra nếu @Where hoạt động)
-                    log.warn("EntityNotFoundException for product in CartItem ID {} (user {}). Marking for removal. Error: {}", cartItem.getId(), user.getId(), e.getMessage());
-                    removeThisCartItem = true;
                 }
             }
 
-            if (removeThisCartItem) {
-                itemsToRemoveFromDb.add(cartItem.getId()); // Thêm vào danh sách cần xóa
-            } else if (product != null) { // Chỉ map nếu product hợp lệ
-                // Gán lại product đã load (nếu có) vào cartItem để mapper sử dụng đúng đối tượng
-                cartItem.setProduct(product);
+            if (markForRemoval) {
+                itemsToRemoveFromDb.add(cartItem.getId());
+                if (adjustmentMessage != null) {
+                    adjustments.add(new CartAdjustmentInfo(cartItem.getProduct() != null ? cartItem.getProduct().getId() : null,
+                            cartItem.getProduct() != null ? cartItem.getProduct().getName() : "Sản phẩm không xác định",
+                            adjustmentMessage, "REMOVED"));
+                }
+            } else if (product != null) {
+                cartItem.setProduct(product); // Đảm bảo product được gán lại
                 validItemResponses.add(cartItemMapper.toCartItemResponse(cartItem));
+                if (adjustmentMessage != null) {
+                    adjustments.add(new CartAdjustmentInfo(product.getId(), product.getName(), adjustmentMessage, adjustmentType));
+                }
             }
         }
-
+        // Thực hiện cập nhật và xóa DB
+        if (!itemsToUpdateInDb.isEmpty()) {
+            log.info("Updating quantities for {} cart items for user {}.", itemsToUpdateInDb.size(), user.getId());
+            cartItemRepository.saveAll(itemsToUpdateInDb); // Lưu các thay đổi số lượng
+        }
         // Xóa các CartItem không hợp lệ khỏi CSDL
         if (!itemsToRemoveFromDb.isEmpty()) {
-            log.info("Removing {} invalid cart items for user {}: {}", itemsToRemoveFromDb.size(), user.getId(), itemsToRemoveFromDb);
-            cartItemRepository.deleteAllByIdInBatch(itemsToRemoveFromDb); // Xóa theo batch hiệu quả hơn
+            log.info("Removing {} invalid/out-of-stock cart items for user {}: {}", itemsToRemoveFromDb.size(), user.getId(), itemsToRemoveFromDb);
+            cartItemRepository.deleteAllByIdInBatch(itemsToRemoveFromDb);
         }
 
 
@@ -109,13 +143,11 @@ public class CartServiceImpl implements CartService {
 
         int totalItems = validItemResponses.stream().mapToInt(CartItemResponse::getQuantity).sum();
 
-        if (!itemsToRemoveFromDb.isEmpty()) {
-            log.warn("User {}'s cart had {} items removed because their products were no longer available.", user.getId(), itemsToRemoveFromDb.size());
-            // Có thể thêm thông báo vào CartResponse nếu muốn báo cho user
+        CartResponse cartResponse = new CartResponse(validItemResponses, subTotal, totalItems, adjustments);
+        if (!adjustments.isEmpty()) {
+            cartResponse.setAdjustments(adjustments); // Thêm thông tin điều chỉnh vào response
         }
-
-
-        return new CartResponse(validItemResponses, subTotal, totalItems);
+        return cartResponse;
     }
 
     @Override
@@ -268,5 +300,109 @@ public class CartServiceImpl implements CartService {
             throw new BadRequestException("Product is not available: " + product.getName());
         }
         return product;
+    }
+
+    @Override
+    @Transactional
+    public CartValidationResponse validateCartForCheckout(Authentication authentication) {
+        User user = getUserFromAuthentication(authentication);
+        List<CartItem> cartItemsFromDb = cartItemRepository.findByUserId(user.getId());
+
+        if (cartItemsFromDb.isEmpty()) {
+            return new CartValidationResponse(true, Collections.singletonList("Giỏ hàng của bạn đang trống. Không thể thanh toán."), Collections.emptyList());
+        }
+
+        boolean isCartGloballyValidForCheckout = true; // Cờ này sẽ là false nếu có BẤT KỲ thay đổi nào
+        List<CartAdjustmentInfo> adjustments = new ArrayList<>();
+        List<Long> itemsToRemoveFromDbById = new ArrayList<>();
+        List<CartItem> itemsToUpdateInDb = new ArrayList<>();
+
+        for (CartItem cartItem : cartItemsFromDb) {
+            Product product = null;
+            boolean currentItemInvalidated = false;
+            String adjustmentMessage = null;
+            String adjustmentType = null;
+            String productNameForMessage = "Sản phẩm không xác định";
+
+            if (cartItem.getProduct() != null) {
+                productNameForMessage = cartItem.getProduct().getName();
+            }
+
+            if (cartItem.getProduct() == null) {
+                log.warn("VALIDATE_CART: CartItem ID {} for user {} references a product that is null. Marking for removal.", cartItem.getId(), user.getId());
+                itemsToRemoveFromDbById.add(cartItem.getId());
+                adjustmentMessage = "Một sản phẩm (" + productNameForMessage + ") không còn tồn tại và sẽ được xóa khỏi giỏ.";
+                adjustmentType = "REMOVED";
+                currentItemInvalidated = true;
+            } else {
+                Optional<Product> productOpt = productRepository.findById(cartItem.getProduct().getId());
+                if (productOpt.isEmpty()) {
+                    log.warn("VALIDATE_CART: Product ID {} for CartItem ID {} (user {}) not found or soft-deleted. Marking for removal.", cartItem.getProduct().getId(), cartItem.getId(), user.getId());
+                    itemsToRemoveFromDbById.add(cartItem.getId());
+                    adjustmentMessage = "Sản phẩm '" + productNameForMessage + "' không còn tồn tại và sẽ được xóa khỏi giỏ.";
+                    adjustmentType = "REMOVED";
+                    currentItemInvalidated = true;
+                } else {
+                    product = productOpt.get();
+                    if (product.getStatus() != ProductStatus.PUBLISHED || product.isDeleted()) {
+                        log.warn("VALIDATE_CART: Product ID {} (CartItem ID {}) is not PUBLISHED or is deleted. Marking for removal.", product.getId(), cartItem.getId());
+                        itemsToRemoveFromDbById.add(cartItem.getId());
+                        adjustmentMessage = "Sản phẩm '" + product.getName() + "' không còn được bán và sẽ được xóa khỏi giỏ.";
+                        adjustmentType = "REMOVED";
+                        currentItemInvalidated = true;
+                    } else {
+                        int currentStock = product.getStockQuantity();
+                        int quantityInCart = cartItem.getQuantity();
+                        productNameForMessage = product.getName();
+
+                        if (currentStock <= 0) {
+                            log.warn("VALIDATE_CART: Product ID {} (CartItem ID {}) is out of stock. Marking for removal.", product.getId(), cartItem.getId());
+                            itemsToRemoveFromDbById.add(cartItem.getId());
+                            adjustmentMessage = "Sản phẩm '" + product.getName() + "' đã hết hàng và sẽ được xóa khỏi giỏ.";
+                            adjustmentType = "REMOVED";
+                            currentItemInvalidated = true;
+                        } else if (quantityInCart > currentStock) {
+                            log.warn("VALIDATE_CART: Quantity for Product ID {} (CartItem ID {}) in cart ({}) exceeds stock ({}). Adjusting quantity.",
+                                    product.getId(), cartItem.getId(), quantityInCart, currentStock);
+                            cartItem.setQuantity(currentStock);
+                            itemsToUpdateInDb.add(cartItem);
+                            adjustmentMessage = "Số lượng sản phẩm '" + product.getName() + "' đã được cập nhật thành " + currentStock + " do thay đổi tồn kho.";
+                            adjustmentType = "ADJUSTED";
+                            currentItemInvalidated = true; // Đánh dấu có thay đổi, cần user review
+                        }
+                    }
+                }
+            }
+
+            if (currentItemInvalidated) {
+                isCartGloballyValidForCheckout = false; // Nếu có bất kỳ item nào bị xóa hoặc điều chỉnh, giỏ hàng không còn "hoàn toàn hợp lệ" để checkout ngay
+                if (adjustmentMessage != null) {
+                    adjustments.add(new CartAdjustmentInfo(
+                            cartItem.getProduct() != null ? cartItem.getProduct().getId() : null,
+                            productNameForMessage,
+                            adjustmentMessage,
+                            adjustmentType
+                    ));
+                }
+            }
+        }
+
+        // Thực hiện cập nhật và xóa DB nếu có thay đổi
+        if (!itemsToUpdateInDb.isEmpty()) {
+            cartItemRepository.saveAllAndFlush(itemsToUpdateInDb);
+        }
+        if (!itemsToRemoveFromDbById.isEmpty()) {
+            cartItemRepository.deleteAllByIdInBatch(itemsToRemoveFromDbById);
+        }
+
+        List<String> messagesForUser = adjustments.stream()
+                .map(CartAdjustmentInfo::getMessage)
+                .collect(Collectors.toList());
+        // Nếu không có điều chỉnh nào và giỏ hàng vẫn hợp lệ từ đầu
+        if (messagesForUser.isEmpty() && isCartGloballyValidForCheckout) {
+            messagesForUser.add("Giỏ hàng của bạn hợp lệ để tiếp tục thanh toán.");
+        }
+
+        return new CartValidationResponse(isCartGloballyValidForCheckout, messagesForUser, adjustments);
     }
 }
