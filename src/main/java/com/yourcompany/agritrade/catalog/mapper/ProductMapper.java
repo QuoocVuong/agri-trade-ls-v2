@@ -5,7 +5,9 @@ import com.yourcompany.agritrade.catalog.domain.ProductImage; // Import
 import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.FarmerInfoResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
+import com.yourcompany.agritrade.catalog.dto.response.ProductInfoResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
+import com.yourcompany.agritrade.common.service.FileStorageService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User; // Import User
 import org.mapstruct.*;
@@ -30,6 +32,9 @@ public abstract class   ProductMapper {
 
     @Autowired
     protected FarmerInfoMapper farmerInfoMapper;
+
+    @Autowired
+    protected FileStorageService fileStorageService;
 
     // --- Response Mappers ---
 
@@ -117,22 +122,33 @@ public abstract class   ProductMapper {
     //@Mapping(target = "isDeleted", ignore = true)
     public abstract void updateProductFromRequest(ProductRequest request, @MappingTarget Product product);
 
+    // ****** THÊM PHƯƠNG THỨC NÀY ******
+    @Mapping(target = "thumbnailUrl", source = "images", qualifiedByName = "getDefaultImageUrl") // Lấy ảnh thumbnail
+    public abstract ProductInfoResponse toProductInfoResponse(Product product);
+    // **********************************
+
     // --- Helper Methods ---
     @Named("getDefaultImageUrl")
-     String getDefaultImageUrl(Set<ProductImage> images) {
+    String getDefaultImageUrl(Set<ProductImage> images) {
         if (images == null || images.isEmpty()) {
-            return null; // Hoặc trả về URL ảnh placeholder
+            // return null; // Hoặc placeholder
+            return "assets/images/placeholder-image.png"; // Trả về placeholder nếu không có ảnh
         }
-        // Ưu tiên ảnh có isDefault = true
-        Optional<ProductImage> defaultImage = images.stream().filter(ProductImage::isDefault).findFirst();
-        if (defaultImage.isPresent()) {
-            return defaultImage.get().getImageUrl();
+        Optional<ProductImage> imageOpt = images.stream()
+                .filter(ProductImage::isDefault)
+                .findFirst()
+                .or(() -> images.stream().min(Comparator.comparingInt(ProductImage::getDisplayOrder)));
+
+        if (imageOpt.isPresent() && imageOpt.get().getBlobPath() != null) {
+            try {
+                // Gọi service để lấy URL mới nhất (Signed URL)
+                return fileStorageService.getFileUrl(imageOpt.get().getBlobPath()); // Đã đúng
+            } catch (Exception e) {
+                // log.error("Error generating default image URL for blobPath: {}", imageOpt.get().getBlobPath(), e);
+                return "assets/images/placeholder-image.png"; // Placeholder nếu lỗi
+            }
         }
-        // Nếu không có ảnh default, lấy ảnh đầu tiên (theo ID hoặc createdAt)
-        return images.stream()
-                .min(Comparator.comparing(ProductImage::getId)) // Ví dụ lấy theo ID nhỏ nhất
-                .map(ProductImage::getImageUrl)
-                .orElse(null); // Hoặc placeholder
+        return "assets/images/placeholder-image.png"; // Placeholder nếu không có blobPath
     }
 
     // Sử dụng FarmerInfoMapper đã inject (cần đổi ProductMapper thành abstract class)

@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal; // Import BigDecimal
 import java.math.RoundingMode; // Import RoundingMode
+import java.util.Arrays;
 import java.util.Optional; // Import Optional
 
 @Service
@@ -80,11 +81,19 @@ public class ReviewServiceImpl implements ReviewService {
                 // Có thể throw lỗi hoặc bỏ qua orderId
             }
         }
-        review.setStatus(ReviewStatus.PENDING); // Chờ duyệt
+        review.setStatus(ReviewStatus.APPROVED); // Đặt trạng thái là APPROVED ngay lập tức
 
         Review savedReview = reviewRepository.save(review);
         log.info("Review created with id {} for product {} by user {}", savedReview.getId(), product.getId(), consumer.getId());
-         //notificationService.sendReviewPendingNotification(savedReview);
+        // ****** THAY ĐỔI QUAN TRỌNG ******
+        // Cập nhật rating trung bình của sản phẩm ngay sau khi lưu review mới
+        updateProductAverageRating(product.getId());
+        // ********************************
+
+        // (Tùy chọn) Gửi thông báo review đã được đăng (thay vì pending)
+        // notificationService.sendReviewPendingNotification(savedReview); // Xóa hoặc comment dòng này
+        notificationService.sendReviewApprovedNotification(savedReview); // Có thể gọi hàm này nếu muốn thông báo
+
         return reviewMapper.toReviewResponse(savedReview);
     }
 
@@ -105,6 +114,31 @@ public class ReviewServiceImpl implements ReviewService {
         Page<Review> reviewPage = reviewRepository.findByConsumerId(consumer.getId(), pageable);
         return reviewMapper.toReviewResponsePage(reviewPage);
     }
+
+    // ****** IMPLEMENT PHƯƠNG THỨC NÀY ******
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getReviewsForFarmerProducts(Authentication authentication, Pageable pageable) {
+        User farmer = getUserFromAuthentication(authentication); // Lấy user farmer đang đăng nhập
+        // Kiểm tra xem có đúng là farmer không (tùy chọn, vì đã có @PreAuthorize ở controller)
+        // if (!farmer.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
+        //     throw new AccessDeniedException("User is not a farmer.");
+        // }
+        Page<Review> reviewPage = reviewRepository.findReviewsForFarmerProducts(farmer.getId(), pageable);
+        // Hoặc: Page<Review> reviewPage = reviewRepository.findByProduct_Farmer_Id(farmer.getId(), pageable);
+        return reviewMapper.toReviewResponsePage(reviewPage);
+    }
+
+    // (Tùy chọn) Implement phương thức lọc theo trạng thái
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getReviewsForFarmerProductsByStatus(Authentication authentication, ReviewStatus status, Pageable pageable) {
+        User farmer = getUserFromAuthentication(authentication);
+        Page<Review> reviewPage = reviewRepository.findReviewsForFarmerProductsByStatus(farmer.getId(), status, pageable);
+        // Hoặc: Page<Review> reviewPage = reviewRepository.findByProduct_Farmer_IdAndStatus(farmer.getId(), status, pageable);
+        return reviewMapper.toReviewResponsePage(reviewPage);
+    }
+    // *************************************
 
     // --- Admin Methods ---
 
@@ -199,26 +233,42 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     // Cập nhật rating trung bình và số lượng rating cho sản phẩm
+    // ReviewServiceImpl.java
     private void updateProductAverageRating(Long productId) {
+        log.info("Attempting to update average rating for product ID: {}", productId); // Log bắt đầu
         productRepository.findById(productId).ifPresent(product -> {
+            log.info("Found product: {}", product.getName()); // Log tên sản phẩm
             // Dùng query đã tạo trong ReviewRepository
             Optional<Object[]> result = reviewRepository.getAverageRatingAndCountByProductIdAndStatus(productId, ReviewStatus.APPROVED);
+            log.info("Query result for average rating and count: {}", result.map(Arrays::toString).orElse("EMPTY")); // Log kết quả query
+
             if (result.isPresent() && result.get().length == 2 && result.get()[0] != null) {
                 Double avgRatingDouble = (Double) result.get()[0];
                 Long ratingCountLong = (Long) result.get()[1];
+                log.info("Raw avgRating: {}, Raw ratingCount: {}", avgRatingDouble, ratingCountLong); // Log giá trị thô
 
-                // Làm tròn rating đến 1 chữ số thập phân
                 BigDecimal avgRating = BigDecimal.valueOf(avgRatingDouble).setScale(1, RoundingMode.HALF_UP);
+                int ratingCount = ratingCountLong.intValue(); // Chuyển sang int
+
+                log.info("Calculated avgRating: {}, Calculated ratingCount: {}", avgRating.floatValue(), ratingCount); // Log giá trị đã tính
 
                 product.setAverageRating(avgRating.floatValue());
-                product.setRatingCount(ratingCountLong.intValue());
+                product.setRatingCount(ratingCount);
             } else {
-                // Nếu không có review nào được duyệt
+                log.info("No approved reviews found or query failed, setting ratings to 0."); // Log trường hợp else
                 product.setAverageRating(0.0f);
                 product.setRatingCount(0);
             }
-            productRepository.save(product);
-            log.debug("Updated average rating for product {}: avg={}, count={}", productId, product.getAverageRating(), product.getRatingCount());
+            try {
+                log.info("Attempting to save product with updated ratings...");
+                productRepository.save(product); // Lưu sản phẩm
+                log.info("Successfully saved product with updated ratings for product ID: {}", productId); // Log thành công
+            } catch (Exception e) {
+                log.error("Error saving product with updated ratings for product ID: {}", productId, e); // Log lỗi nếu save thất bại
+            }
         });
+        if (productRepository.findById(productId).isEmpty()) { // Log nếu không tìm thấy product
+            log.warn("Product with ID {} not found when trying to update average rating.", productId);
+        }
     }
 }

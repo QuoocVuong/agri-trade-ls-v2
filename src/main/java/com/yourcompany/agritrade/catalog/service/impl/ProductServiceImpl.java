@@ -666,14 +666,12 @@ public class ProductServiceImpl implements ProductService {
                     image = new ProductImage();
                     image.setProduct(product);
 
-                    // Giả định imgReq.getImageUrl() chứa blobPath từ Frontend
-                    String blobPath = imgReq.getBlobPath(); // <<< LẤY TỪ TRƯỜNG blobPath CỦA REQUEST
+                    String blobPathFromRequest = imgReq.getBlobPath(); // Lấy blobPath từ request
 
-                    if (StringUtils.hasText(blobPath)) {
-                        image.setBlobPath(blobPath); // <<< LƯU BLOB PATH VÀO ENTITY
-                        String fileUrl = fileStorageService.getFileUrl(blobPath); // Lấy Signed URL
-                        image.setImageUrl(fileUrl); // Lưu Signed URL vào entity
-                        log.info("Processing new image. BlobPath: {}, Generated URL: {}", blobPath, fileUrl); // Thêm log
+                    if (StringUtils.hasText(blobPathFromRequest)) {
+                        image.setBlobPath(blobPathFromRequest); // <<<< Chỉ lưu BLOB PATH vào entity
+                        // KHÔNG CẦN: image.setImageUrl(fileStorageService.getFileUrl(blobPathFromRequest));
+                        log.info("Processing new image. BlobPath from request: {}", blobPathFromRequest);
                     } else {
                         // Nếu blobPath rỗng trong request -> Lỗi nghiêm trọng
                         log.error("blobPath is missing in ProductImageRequest for new image during update. Request data: {}", imgReq);

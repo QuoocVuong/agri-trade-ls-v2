@@ -10,6 +10,7 @@ import com.yourcompany.agritrade.catalog.repository.ProductRepository; // Inject
 import com.yourcompany.agritrade.catalog.service.CategoryService;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -29,6 +30,7 @@ public class CategoryServiceImpl implements CategoryService {
     private final ProductRepository productRepository; // Để kiểm tra khi xóa
     private final CategoryMapper categoryMapper;
     private final Slugify slugify = Slugify.builder().build(); // Khởi tạo slugify
+    private final FileStorageService fileStorageService;
 
     
 
@@ -86,6 +88,7 @@ public class CategoryServiceImpl implements CategoryService {
 
         Category category = categoryMapper.requestToCategory(request);
         category.setSlug(slug); // Set slug đã tạo
+        category.setBlobPath(request.getBlobPath());
 
         // Xử lý parent category
         if (request.getParentId() != null) {
@@ -105,6 +108,8 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
 
+        String oldBlobPath = category.getBlobPath(); // Lưu lại blobPath cũ
+
         // Cập nhật slug nếu name hoặc slug trong request thay đổi và khác slug hiện tại
         String newSlug = category.getSlug(); // Giữ slug cũ mặc định
         if (StringUtils.hasText(request.getSlug()) && !slugify.slugify(request.getSlug()).equals(category.getSlug())) {
@@ -123,6 +128,16 @@ public class CategoryServiceImpl implements CategoryService {
         categoryMapper.updateCategoryFromRequest(request, category);
         category.setSlug(newSlug); // Set slug mới
 
+        // Cập nhật blobPath nếu có trong request
+        // Nếu blobPath trong request khác blobPath cũ -> ảnh đã thay đổi
+        boolean imageChanged = request.getBlobPath() != null && !request.getBlobPath().equals(oldBlobPath);
+        // Nếu blobPath trong request là null nhưng trước đó có ảnh -> ảnh đã bị xóa
+        boolean imageRemoved = request.getBlobPath() == null && oldBlobPath != null;
+
+        if (imageChanged || imageRemoved) {
+            category.setBlobPath(request.getBlobPath()); // Cập nhật hoặc xóa blobPath
+        }
+
         // Cập nhật parent category
         if (request.getParentId() != null) {
             if (request.getParentId().equals(id)) { // Không cho phép tự làm cha của chính mình
@@ -136,7 +151,21 @@ public class CategoryServiceImpl implements CategoryService {
         }
 
         Category updatedCategory = categoryRepository.save(category);
+
+        // *** Xử lý xóa ảnh cũ trên storage SAU KHI đã lưu thành công ***
+        if ((imageChanged || imageRemoved) && StringUtils.hasText(oldBlobPath)) {
+            try {
+                log.info("Deleting old category image: {}", oldBlobPath);
+                fileStorageService.delete(oldBlobPath);
+            } catch (Exception e) {
+                log.error("Failed to delete old category image file from storage: {}", oldBlobPath, e);
+                // Không nên throw lỗi ở đây để tránh rollback transaction đã thành công
+            }
+        }
+
+
         log.info("Category updated with id: {}", updatedCategory.getId());
+        // Map lại để có imageUrl động
         return categoryMapper.toCategoryResponse(updatedCategory);
     }
 
@@ -158,8 +187,19 @@ public class CategoryServiceImpl implements CategoryService {
             // Hoặc xử lý chuyển các danh mục con lên cấp cha / xóa đệ quy tùy yêu cầu
         }
 
+        String blobPathToDelete = category.getBlobPath(); // Lấy blobPath trước khi xóa entity
 
         categoryRepository.delete(category);
         log.info("Category deleted with id: {}", id);
+
+        // Xóa ảnh trên storage nếu có
+        if (StringUtils.hasText(blobPathToDelete)) {
+            try {
+                log.info("Deleting category image after entity deletion: {}", blobPathToDelete);
+                fileStorageService.delete(blobPathToDelete);
+            } catch (Exception e) {
+                log.error("Failed to delete category image file from storage after entity deletion: {}", blobPathToDelete, e);
+            }
+        }
     }
 }

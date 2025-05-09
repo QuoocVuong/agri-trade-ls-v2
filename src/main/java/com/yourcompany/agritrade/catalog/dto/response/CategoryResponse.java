@@ -13,6 +13,7 @@ public class CategoryResponse {
     private String slug;
     private String description;
     private String imageUrl;
+    private String blobPath; // <<< Thêm blobPath
     private Integer parentId;
     private Set<CategoryResponse> children; // Cho cấu trúc cây
     private LocalDateTime createdAt;

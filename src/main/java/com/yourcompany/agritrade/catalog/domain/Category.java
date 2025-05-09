@@ -32,7 +32,11 @@ public class Category {
     @Lob
     private String description;
 
+    @Transient // <<< Đánh dấu Transient
     private String imageUrl;
+
+    @Column(length = 1024) // <<< Thêm cột blobPath, cho phép NULL
+    private String blobPath;
 
     @ManyToOne(fetch = FetchType.LAZY) // Quan hệ cha
     @JoinColumn(name = "parent_id")

@@ -48,4 +48,24 @@ public interface ReviewRepository extends JpaRepository<Review, Long>, JpaSpecif
 
     // Lấy các review mới nhất (pending)
     List<Review> findTopNByStatusOrderByCreatedAtDesc(ReviewStatus status, Pageable pageable);
+
+
+    // ****** THÊM PHƯƠNG THỨC NÀY ******
+    /**
+     * Tìm tất cả các review cho các sản phẩm thuộc về một Farmer cụ thể.
+     * Sắp xếp theo ngày tạo giảm dần (mới nhất trước).
+     * @param farmerId ID của Farmer
+     * @param pageable Thông tin phân trang và sắp xếp
+     * @return Trang các Review
+     */
+    @Query("SELECT r FROM Review r JOIN FETCH r.product p WHERE p.farmer.id = :farmerId") // JOIN FETCH product để tránh N+1 khi lấy productId
+    Page<Review> findReviewsForFarmerProducts(@Param("farmerId") Long farmerId, Pageable pageable);
+    // Hoặc dùng tên phương thức nếu mapping đúng:
+    // Page<Review> findByProduct_Farmer_Id(Long farmerId, Pageable pageable); // Thử cách này trước
+
+    // (Tùy chọn) Thêm phương thức lọc theo trạng thái cho Farmer
+    @Query("SELECT r FROM Review r JOIN FETCH r.product p WHERE p.farmer.id = :farmerId AND r.status = :status")
+    Page<Review> findReviewsForFarmerProductsByStatus(@Param("farmerId") Long farmerId, @Param("status") ReviewStatus status, Pageable pageable);
+    // Hoặc: Page<Review> findByProduct_Farmer_IdAndStatus(Long farmerId, ReviewStatus status, Pageable pageable);
+
 }

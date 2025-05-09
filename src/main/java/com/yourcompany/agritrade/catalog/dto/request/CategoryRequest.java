@@ -16,8 +16,13 @@ public class CategoryRequest {
 
     private String description;
 
-    @Size(max = 512)
+    // URL preview (Signed URL từ upload) - Có thể optional nếu không bắt buộc ảnh
+    @Size(max = 2048) // Tăng độ dài cho Signed URL
     private String imageUrl;
+
+    // Path trên storage (fileName từ FileUploadResponse) - Có thể optional
+    @Size(max = 1024)
+    private String blobPath;
 
     private Integer parentId; // ID của danh mục cha (null nếu là gốc)
 }

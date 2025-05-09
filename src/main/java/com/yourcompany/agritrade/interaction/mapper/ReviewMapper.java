@@ -1,5 +1,6 @@
 package com.yourcompany.agritrade.interaction.mapper;
 
+import com.yourcompany.agritrade.catalog.mapper.ProductMapper;
 import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.interaction.dto.request.ReviewRequest;
 import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
@@ -11,13 +12,14 @@ import org.springframework.data.domain.Page; // Import Page
 import java.util.List;
 
 // uses UserMapper để map thông tin consumer
-@Mapper(componentModel = "spring", uses = {UserMapper.class})
+@Mapper(componentModel = "spring", uses = {UserMapper.class, ProductMapper.class})
 public interface ReviewMapper {
 
     // Map Review entity sang ReviewResponse DTO
-    @Mapping(target = "productId", source = "product.id") // Lấy ID từ product entity lồng nhau
+    //@Mapping(target = "productId", source = "product.id") // Lấy ID từ product entity lồng nhau
     @Mapping(target = "orderId", source = "order.id")   // Lấy ID từ order entity lồng nhau
     @Mapping(target = "consumer", source = "consumer") // Dùng UserMapper map sang UserInfoSimpleResponse
+    @Mapping(target = "productInfo", source = "product") // <<< Map product entity sang productInfo DTO
     ReviewResponse toReviewResponse(Review review);
 
     List<ReviewResponse> toReviewResponseList(List<Review> reviews);

@@ -30,4 +30,11 @@ public interface ReviewService {
 
     /** Admin xóa review */
     void deleteReview(Long reviewId);
+
+    // ****** THÊM PHƯƠNG THỨC NÀY ******
+    /** Lấy danh sách review cho các sản phẩm của Farmer hiện tại (phân trang) */
+    Page<ReviewResponse> getReviewsForFarmerProducts(Authentication authentication, Pageable pageable);
+
+    // (Tùy chọn) Thêm phương thức lọc theo trạng thái
+    Page<ReviewResponse> getReviewsForFarmerProductsByStatus(Authentication authentication, ReviewStatus status, Pageable pageable);
 }

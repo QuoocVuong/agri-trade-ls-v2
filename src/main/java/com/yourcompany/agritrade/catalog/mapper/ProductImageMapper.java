@@ -17,24 +17,33 @@ public abstract class ProductImageMapper { // Đổi thành abstract class
 
     // Map sang DTO Response
 
-    @Mapping(target = "imageUrl", ignore = true) // Sẽ map trong @AfterMapping
+    @Mapping(target = "imageUrl", ignore = true) // Ignore vì sẽ tạo động
     public abstract ProductImageResponse toProductImageResponse(ProductImage image);
 
     public abstract List<ProductImageResponse> toProductImageResponseList(List<ProductImage> images); // Hoặc Set
-
     @AfterMapping
-    protected void afterToProductImageResponse(ProductImage image, @MappingTarget ProductImageResponse response) {
+    protected void populateImageUrl(ProductImage image, @MappingTarget ProductImageResponse response) {
         if (image != null && image.getBlobPath() != null) {
-            response.setImageUrl(fileStorageService.getFileUrl(image.getBlobPath())); // Tạo Signed URL
+            try {
+                response.setImageUrl(fileStorageService.getFileUrl(image.getBlobPath()));
+            } catch (Exception e) {
+                // Log lỗi và có thể gán một URL placeholder
+                // log.error("Error generating signed URL for blobPath: {}", image.getBlobPath(), e);
+                response.setImageUrl("assets/images/placeholder-image.png"); // Hoặc URL lỗi
+            }
+        } else {
+            response.setImageUrl("assets/images/placeholder-image.png"); // Placeholder nếu không có blobPath
         }
     }
+
 
 
     // Map từ request DTO sang Entity (bỏ qua các trường không cần thiết khi tạo)
     @Mapping(target = "id", ignore = true) // ID sẽ tự tạo
     @Mapping(target = "product", ignore = true) // Product sẽ được set trong service
     @Mapping(target = "createdAt", ignore = true)
-    // imageUrl và blobPath sẽ được set từ request
+    @Mapping(target = "imageUrl", ignore = true) // <<<< QUAN TRỌNG: Không map imageUrl từ request vào entity
+    // blobPath sẽ được map từ request
     public abstract ProductImage requestToProductImage(ProductImageRequest request);
 
     // Cập nhật Entity từ Request DTO (chỉ cập nhật isDefault và displayOrder)

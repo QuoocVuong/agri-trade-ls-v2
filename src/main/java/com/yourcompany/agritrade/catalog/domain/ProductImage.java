@@ -22,7 +22,7 @@ public class ProductImage {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(nullable = false, length = 2048)
+    @Transient // <<<< QUAN TRỌNG: Không lưu vào DB, sẽ được tạo động
     private String imageUrl;
 
     @Column(nullable = false)
@@ -39,8 +39,8 @@ public class ProductImage {
     private LocalDateTime createdAt;
 
     // Constructor cập nhật
-    public ProductImage(String imageUrl, String blobPath, boolean isDefault, int displayOrder) {
-        this.imageUrl = imageUrl;
+    public ProductImage( String blobPath, boolean isDefault, int displayOrder) {
+        //this.imageUrl = imageUrl;
         this.blobPath = blobPath;
         this.isDefault = isDefault;
         this.displayOrder = displayOrder;

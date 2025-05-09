@@ -9,6 +9,7 @@ import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.ordering.domain.CartItem;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemUpdateRequest;
+import com.yourcompany.agritrade.ordering.dto.response.CartAdjustmentInfo;
 import com.yourcompany.agritrade.ordering.dto.response.CartItemResponse;
 import com.yourcompany.agritrade.ordering.dto.response.CartResponse;
 import com.yourcompany.agritrade.ordering.mapper.CartItemMapper;
@@ -16,6 +17,7 @@ import com.yourcompany.agritrade.ordering.repository.CartItemRepository;
 import com.yourcompany.agritrade.ordering.service.CartService;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -25,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,27 +43,96 @@ public class CartServiceImpl implements CartService {
     private final CartItemMapper cartItemMapper;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CartResponse getCart(Authentication authentication) {
         User user = getUserFromAuthentication(authentication);
-        List<CartItem> items = cartItemRepository.findByUserId(user.getId());
-        List<CartItemResponse> itemResponses = cartItemMapper.toCartItemResponseList(items);
+        List<CartItem> cartItemsFromDb = cartItemRepository.findByUserId(user.getId());
+        List<CartItemResponse> validItemResponses = new ArrayList<>();
+        List<Long> itemsToRemoveFromDb = new ArrayList<>(); // Lưu ID của CartItem cần xóa
+        List<CartItem> itemsToUpdateInDb = new ArrayList<>(); // Lưu CartItem cần cập nhật số lượng
+        List<CartAdjustmentInfo> adjustments = new ArrayList<>(); // Lưu thông tin điều chỉnh
 
-        BigDecimal subTotal = itemResponses.stream()
+
+        for (Iterator<CartItem> iterator = cartItemsFromDb.iterator(); iterator.hasNext();) {
+            CartItem cartItem = iterator.next();
+            Product product = null;
+            boolean removeThisCartItem = false;
+
+            if (cartItem.getProduct() == null) {
+                // Trường hợp 1: Product đã là null khi CartItem được load (do @Where trên Product)
+                log.warn("CartItem ID {} for user {} references a product that is null (likely soft-deleted or non-existent). Marking for removal.", cartItem.getId(), user.getId());
+                removeThisCartItem = true;
+            } else {
+                try {
+                    // Trường hợp 2: Cố gắng load lại product từ DB để chắc chắn
+                    // findById sẽ trả về empty nếu product bị xóa mềm (do @Where) hoặc không tồn tại
+                    Optional<Product> productOpt = productRepository.findById(cartItem.getProduct().getId());
+                    if (productOpt.isEmpty()) {
+                        log.warn("Product ID {} for CartItem ID {} (user {}) not found or soft-deleted. Marking for removal.", cartItem.getProduct().getId(), cartItem.getId(), user.getId());
+                        removeThisCartItem = true;
+                    } else {
+                        product = productOpt.get();
+                        // Kiểm tra thêm trạng thái PUBLISHED
+                        if (product.getStatus() != ProductStatus.PUBLISHED) {
+                            log.warn("Product ID {} for CartItem ID {} (user {}) is not PUBLISHED (status: {}). Marking for removal.", product.getId(), cartItem.getId(), user.getId(), product.getStatus());
+                            removeThisCartItem = true;
+                        }
+                    }
+                } catch (EntityNotFoundException e) {
+                    // Bắt lỗi nếu có vấn đề khi truy cập product (dù ít xảy ra nếu @Where hoạt động)
+                    log.warn("EntityNotFoundException for product in CartItem ID {} (user {}). Marking for removal. Error: {}", cartItem.getId(), user.getId(), e.getMessage());
+                    removeThisCartItem = true;
+                }
+            }
+
+            if (removeThisCartItem) {
+                itemsToRemoveFromDb.add(cartItem.getId()); // Thêm vào danh sách cần xóa
+            } else if (product != null) { // Chỉ map nếu product hợp lệ
+                // Gán lại product đã load (nếu có) vào cartItem để mapper sử dụng đúng đối tượng
+                cartItem.setProduct(product);
+                validItemResponses.add(cartItemMapper.toCartItemResponse(cartItem));
+            }
+        }
+
+        // Xóa các CartItem không hợp lệ khỏi CSDL
+        if (!itemsToRemoveFromDb.isEmpty()) {
+            log.info("Removing {} invalid cart items for user {}: {}", itemsToRemoveFromDb.size(), user.getId(), itemsToRemoveFromDb);
+            cartItemRepository.deleteAllByIdInBatch(itemsToRemoveFromDb); // Xóa theo batch hiệu quả hơn
+        }
+
+
+        // Tính toán dựa trên validItemResponses
+        BigDecimal subTotal = validItemResponses.stream()
                 .map(CartItemResponse::getItemTotal)
                 .filter(java.util.Objects::nonNull) // Bỏ qua item không tính được total
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        int totalItems = itemResponses.stream().mapToInt(CartItemResponse::getQuantity).sum();
+        int totalItems = validItemResponses.stream().mapToInt(CartItemResponse::getQuantity).sum();
 
-        return new CartResponse(itemResponses, subTotal, totalItems);
+        if (!itemsToRemoveFromDb.isEmpty()) {
+            log.warn("User {}'s cart had {} items removed because their products were no longer available.", user.getId(), itemsToRemoveFromDb.size());
+            // Có thể thêm thông báo vào CartResponse nếu muốn báo cho user
+        }
+
+
+        return new CartResponse(validItemResponses, subTotal, totalItems);
     }
 
     @Override
     @Transactional
     public CartItemResponse addItem(Authentication authentication, CartItemRequest request) {
         User user = getUserFromAuthentication(authentication);
-        Product product = findAvailableProduct(request.getProductId()); // Helper kiểm tra tồn tại và status
+        Product product;
+        try {
+            // Gọi findAvailableProduct để kiểm tra tồn tại, status và is_deleted (nhờ @Where)
+            product = findAvailableProduct(request.getProductId());
+        } catch (ResourceNotFoundException e) {
+            // Nếu findById không tìm thấy (do không tồn tại hoặc is_deleted=true)
+            log.warn("Attempt to add non-existent or deleted product (ID: {}) to cart by user {}", request.getProductId(), user.getId());
+            throw new BadRequestException("Sản phẩm bạn chọn không tồn tại hoặc đã ngừng bán."); // Thông báo rõ ràng hơn
+        } catch (BadRequestException e) { // Bắt lỗi nếu sản phẩm không PUBLISHED
+            throw e; // Ném lại lỗi gốc
+        }
 
         int currentStock = product.getStockQuantity(); // Lấy tồn kho hiện tại
 
@@ -114,7 +187,21 @@ public class CartServiceImpl implements CartService {
             throw new AccessDeniedException("User does not own this cart item");
         }
 
-        Product product = findAvailableProduct(cartItem.getProduct().getId()); // Kiểm tra lại sản phẩm
+        Product product;
+        try {
+            // Kiểm tra lại sản phẩm khi cập nhật số lượng
+            product = findAvailableProduct(cartItem.getProduct().getId());
+        } catch (ResourceNotFoundException e) {
+            log.warn("Product (ID: {}) in cart item {} no longer exists or is deleted. Removing item.", cartItem.getProduct().getId(), cartItemId);
+            // Tự động xóa item khỏi giỏ nếu sản phẩm không còn hợp lệ
+            cartItemRepository.delete(cartItem);
+            // Ném lỗi khác để báo cho frontend biết item đã bị xóa
+            throw new BadRequestException("Sản phẩm trong giỏ hàng không còn tồn tại và đã được xóa.");
+        } catch (BadRequestException e) { // Bắt lỗi nếu sản phẩm không PUBLISHED
+            // Tương tự, xóa item khỏi giỏ
+            cartItemRepository.delete(cartItem);
+            throw new BadRequestException("Sản phẩm trong giỏ hàng không còn được bán và đã được xóa.");
+        }
         int currentStock = product.getStockQuantity(); // Lấy tồn kho hiện tại
         int newQuantity = request.getQuantity(); // Số lượng mới yêu cầu
 
@@ -172,6 +259,11 @@ public class CartServiceImpl implements CartService {
     private Product findAvailableProduct(Long productId) {
         Product product = productRepository.findById(productId) // findById đã lọc is_deleted=false
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
+        // Thêm kiểm tra isDeleted (dù @Where đã làm) để chắc chắn
+         if (product.isDeleted()) {
+             log.warn("Attempted to access a soft-deleted product with id: {}", productId);
+             throw new ResourceNotFoundException("Product", "id", productId);
+         }
         if(product.getStatus() != ProductStatus.PUBLISHED) {
             throw new BadRequestException("Product is not available: " + product.getName());
         }
