@@ -52,8 +52,12 @@ public class PublicCatalogController {
             @RequestParam(required = false) Integer categoryId,
             @RequestParam(required = false) String provinceCode, // Lọc theo tỉnh (cho B2C)
 
+            @RequestParam(required = false) Double minPrice,   // Thêm
+            @RequestParam(required = false) Double maxPrice,   // Thêm
+            @RequestParam(required = false) Integer minRating, // Thêm (dùng Integer để có thể là null)
+
             @PageableDefault(size = 12, sort = "created_at,desc") Pageable pageable) {
-        Page<ProductSummaryResponse> products = productService.searchPublicProducts(keyword, categoryId, provinceCode, pageable);
+        Page<ProductSummaryResponse> products = productService.searchPublicProducts(keyword, categoryId, provinceCode, minPrice, maxPrice, minRating, pageable);
         return ResponseEntity.ok(ApiResponse.success(products));
     }
 

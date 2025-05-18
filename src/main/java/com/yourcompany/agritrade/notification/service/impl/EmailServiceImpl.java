@@ -31,10 +31,17 @@ public class EmailServiceImpl implements EmailService {
     @Value("${spring.mail.username}")
     private String senderEmail;
 
+    @Value("${app.mail.from}") // <--- THÊM DÒNG NÀY ĐỂ LẤY ĐÚNG EMAIL NGƯỜI GỬI
+    private String appMailFrom;
+
+    @Value("${app.mail.sender-name}") // <--- THÊM DÒNG NÀY ĐỂ LẤY TÊN NGƯỜI GỬI
+    private String appMailSenderName;
+
+
     @Value("${app.frontend.url:http://localhost:4200}")
     private String frontendUrl;
 
-    @Value("${app.name:AgriTradeLS}") // Thêm tên ứng dụng vào config
+    @Value("${app.name:AgriTrade}") // Thêm tên ứng dụng vào config
     private String appName;
 
     // --- User Related ---
@@ -261,7 +268,7 @@ public class EmailServiceImpl implements EmailService {
         MimeMessage message = mailSender.createMimeMessage();
         try {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(senderEmail); // Hoặc tên hiển thị: helper.setFrom(senderEmail, appName);
+            helper.setFrom(appMailFrom, appMailSenderName); // Hoặc tên hiển thị: helper.setFrom(senderEmail, appName);
             helper.setTo(recipientEmail);
             helper.setSubject(subject);
             helper.setText(htmlContent, true); // true = HTML content

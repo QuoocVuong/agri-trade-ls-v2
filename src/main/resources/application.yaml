@@ -39,17 +39,35 @@ spring:
 #          # connectiontimeout: 5000
 #          # timeout: 5000
 #          # writetimeout: 5000
+#  mail:
+#    host: sandbox.smtp.mailtrap.io # Hoặc host Mailtrap cung cấp
+#    port: 2525           # Hoặc port Mailtrap cung cấp (thường là 25, 465, 587, 2525)
+#    username: dabd14f1bb39bf  # Username từ Mailtrap
+#    password: 2502b8b827ca4a # Password từ Mailtrap
+#    properties:
+#      mail:
+#        smtp:
+#          auth: true
+#          starttls:
+#            enable: true # Hoặc false tùy theo port
+#  mail:
+#    host: smtp-relay.brevo.com
+#    port: 587
+#    username: "8d147c001@smtp-brevo.com"  # THAY THẾ BẰNG EMAIL ĐĂNG NHẬP BREVO CỦA BẠN
+#    password: "xsmtpsib-1c54f8948c50c2e24c7cc068716afec00a72f8f3785353a777270e6779737d1e-mZrz9pyhsn1JSxEH"               # THAY THẾ BẰNG SMTP KEY (API KEY V3) CỦA BẠN
+#    properties:
+#      mail.smtp.auth: true
+#      mail.smtp.starttls.enable: true
+#      # mail.debug: true # Bật nếu muốn xem log chi tiết khi gửi mail (chỉ cho dev)
   mail:
-    host: sandbox.smtp.mailtrap.io # Hoặc host Mailtrap cung cấp
-    port: 2525           # Hoặc port Mailtrap cung cấp (thường là 25, 465, 587, 2525)
-    username: dabd14f1bb39bf  # Username từ Mailtrap
-    password: 2502b8b827ca4a # Password từ Mailtrap
+    host: smtp.sendgrid.net
+    port: 587
+    username: "apikey"                         # GIÁ TRỊ CỐ ĐỊNH
+    password: "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"          # THAY THẾ BẰNG API KEY CỦA BẠN
     properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true # Hoặc false tùy theo port
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      # mail.debug: true # Bật nếu muốn xem log chi tiết khi gửi mail (chỉ cho dev)
 
   # Cấu hình cho JWT (Sẽ dùng ở Bước 10)
   security:
@@ -138,5 +156,23 @@ app:
     vnpayIpnUrl: "${app.backend.url}/api/payments/callback/vnpay/ipn"
     momoIpnUrl: ${app.backend.url}/api/payments/callback/momo/ipn
 
+
+  bank:
+    accountName: CONG TY TNHH AGRI TRADE
+    accountNumber: "666366668888"
+    nameDisplay: Ngân hàng Kỹ thương Việt Nam (Techcombank)
+    bin: "970407"  # Mã BIN của Techcombank
+    # template: không cần nếu frontend tự render QR
+    qr:
+      template: compact2  # Template của VietQR.io
+      serviceUrlBase: https://img.vietqr.io/image  # Dịch vụ tạo ảnh QR
+    frontend:
+      url: http://localhost:4200  # URL Frontend
+
+  mail:
+    from: "lanhquocvuong26@gmail.com" # THAY THẾ BẰNG EMAIL NGƯỜI GỬI ĐÃ XÁC MINH VỚI SENDGRID
+    sender-name: "AgriTrade Platform"
+#    frontend:
+#      url: http://localhost:4200
 
 

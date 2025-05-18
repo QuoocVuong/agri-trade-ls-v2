@@ -39,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
@@ -403,13 +404,33 @@ public class ProductServiceImpl implements ProductService {
     // *** SỬA LẠI: Dùng Specification API (LIKE Search) ***
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductSummaryResponse> searchPublicProducts(String keyword, Integer categoryId, String provinceCode, Pageable pageable) {
-        log.debug("Searching public products with keyword: '{}', categoryId: {}, provinceCode: {}, pageable: {}", keyword, categoryId, provinceCode, pageable);
+    public Page<ProductSummaryResponse> searchPublicProducts(
+            String keyword,
+            Integer categoryId,
+            String provinceCode,
+            Double minPrice,
+            Double maxPrice,
+            Integer minRating,
+            Pageable pageable) {
+        log.debug("Searching public products with keyword: '{}', categoryId: {}, provinceCode: {}, minPrice: {}, maxPrice: {}, minRating: {}, pageable: {}", keyword, categoryId, provinceCode, minPrice, maxPrice, minRating, pageable);
         Specification<Product> spec = Specification.where(ProductSpecifications.isPublished())
                 .and(ProductSpecifications.hasKeyword(keyword))
                 .and(ProductSpecifications.inCategory(categoryId))
                 .and(ProductSpecifications.inProvince(provinceCode))
                 .and(ProductSpecifications.fetchFarmerAndProfile());
+
+        // Thêm các điều kiện lọc mới vào Specification
+        if (minPrice != null) {
+            spec = spec.and(ProductSpecifications.hasMinPrice(BigDecimal.valueOf(minPrice)));
+        }
+        if (maxPrice != null) {
+            spec = spec.and(ProductSpecifications.hasMaxPrice(BigDecimal.valueOf(maxPrice)));
+        }
+        // Chỉ lọc theo minRating nếu nó > 0
+        if (minRating != null && minRating > 0) {
+            spec = spec.and(ProductSpecifications.hasMinRating(minRating.doubleValue())); // Chuyển sang double cho averageRating
+        }
+
         // findAll với Specification và Pageable (đã bao gồm sort)
         Page<Product> productPage = productRepository.findAll(spec, pageable);
         // Map kết quả sang DTO

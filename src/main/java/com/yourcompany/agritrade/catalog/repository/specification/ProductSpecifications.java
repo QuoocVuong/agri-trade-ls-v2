@@ -8,6 +8,8 @@ import jakarta.persistence.criteria.*; // Import các thành phần criteria
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
+
 public class ProductSpecifications {
 
     // ****** THÊM PHƯƠNG THỨC NÀY ******
@@ -41,7 +43,8 @@ public class ProductSpecifications {
             String pattern = "%" + keyword.toLowerCase() + "%";
             // Tạo biểu thức OR cho tìm kiếm trong name hoặc description
             Predicate nameLike = criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), pattern);
-            Predicate descriptionLike = criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), pattern);
+//            Predicate descriptionLike = criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), pattern);
+            Predicate descriptionLike = criteriaBuilder.like(root.get("description"), "%" + keyword + "%");
             return criteriaBuilder.or(nameLike, descriptionLike);
         };
     }
@@ -68,6 +71,33 @@ public class ProductSpecifications {
             return criteriaBuilder.equal(root.get("provinceCode"), provinceCode);
         };
     }
+
+    // --- THÊM CÁC SPECIFICATIONS MỚI ---
+    public static Specification<Product> hasMinPrice(BigDecimal minPrice) {
+        if (minPrice == null) {
+            return null;
+        }
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.greaterThanOrEqualTo(root.get("price"), minPrice);
+    }
+
+    public static Specification<Product> hasMaxPrice(BigDecimal maxPrice) {
+        if (maxPrice == null) {
+            return null;
+        }
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.lessThanOrEqualTo(root.get("price"), maxPrice);
+    }
+
+    public static Specification<Product> hasMinRating(Double minRating) {
+        // Giả sử Product entity có trường 'averageRating' kiểu Double
+        if (minRating == null || minRating <= 0) { // Không lọc nếu rating <= 0
+            return null;
+        }
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.greaterThanOrEqualTo(root.get("averageRating"), minRating);
+    }
+    // ------------------------------------
 
     // Specification: Lọc theo trạng thái (dùng cho Admin)
     public static Specification<Product> hasStatus(String statusString) {

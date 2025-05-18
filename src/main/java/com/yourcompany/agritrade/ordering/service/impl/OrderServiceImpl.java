@@ -1,6 +1,7 @@
 package com.yourcompany.agritrade.ordering.service.impl;
 
 import com.yourcompany.agritrade.catalog.domain.Product;
+import com.yourcompany.agritrade.catalog.domain.ProductImage;
 import com.yourcompany.agritrade.catalog.domain.ProductPricingTier;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
@@ -8,12 +9,14 @@ import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
+import com.yourcompany.agritrade.common.service.FileStorageService;
 import com.yourcompany.agritrade.notification.service.EmailService; // Import EmailService
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
+import com.yourcompany.agritrade.ordering.dto.response.BankTransferInfoResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
@@ -30,6 +33,7 @@ import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException; // Import OptimisticLocking
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +52,8 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -71,8 +77,17 @@ public class OrderServiceImpl implements OrderService {
     private final EmailService emailService; // Inject EmailService
     private final NotificationService notificationService;
     private final FarmerProfileRepository farmerProfileRepository;
+
+    private final FileStorageService fileStorageService;
     // private final LockProvider lockProvider; // Bỏ qua nếu dùng Optimistic Lock
     private static final String LANG_SON_PROVINCE_CODE = "20";
+
+    @Value("${app.bank.accountName}") private String appBankAccountName;
+    @Value("${app.bank.accountNumber}") private String appBankAccountNumber;
+    @Value("${app.bank.nameDisplay}") private String appBankNameDisplay;
+    @Value("${app.bank.bin}") private String appBankBin; // Mã BIN ngân hàng
+    @Value("${app.bank.qr.serviceUrlBase:#{null}}") private String qrServiceUrlBase; // Ví dụ: https://img.vietqr.io/image
+    @Value("${app.bank.qr.template:compact2}") private String qrTemplate;
 
 
     @Override
@@ -311,6 +326,9 @@ public class OrderServiceImpl implements OrderService {
         if (!isAdmin && !order.getBuyer().getId().equals(user.getId()) && !order.getFarmer().getId().equals(user.getId())) {
             throw new AccessDeniedException("User does not have permission to view this order");
         }
+
+        populateProductImageUrlsInOrder(order); // << GỌI HELPER TRƯỚC KHI MAP
+
         return orderMapper.toOrderResponse(order);
     }
 
@@ -326,6 +344,7 @@ public class OrderServiceImpl implements OrderService {
         if (!isAdmin && !order.getBuyer().getId().equals(user.getId()) && !order.getFarmer().getId().equals(user.getId())) {
             throw new AccessDeniedException("User does not have permission to view this order");
         }
+        populateProductImageUrlsInOrder(order); // << GỌI HELPER TRƯỚC KHI MAP
         return orderMapper.toOrderResponse(order);
     }
 
@@ -335,6 +354,7 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse getOrderDetailsForAdmin(Long orderId) {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+        populateProductImageUrlsInOrder(order); // << GỌI HELPER TRƯỚC KHI MAP
         return orderMapper.toOrderResponse(order);
     }
 
@@ -513,7 +533,7 @@ public class OrderServiceImpl implements OrderService {
         // Ví dụ: LS + Năm + Tháng + Ngày + 4 số ngẫu nhiên
         String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
         int randomPart = ThreadLocalRandom.current().nextInt(1000, 10000);
-        return "LS" + datePart + "-" + randomPart;
+        return "AGT" + datePart + "-" + randomPart;
     }
 
     private void copyShippingAddress(Order order, Address address) {
@@ -923,5 +943,151 @@ public class OrderServiceImpl implements OrderService {
         notificationService.sendPaymentSuccessNotification(savedOrder); // Thông báo cho buyer
         return orderMapper.toOrderResponse(savedOrder);
     }
+
+    @Override
+    @Transactional
+    public OrderResponse confirmOrderPaymentByAdmin(Long orderId, PaymentMethod paymentMethodConfirmed, String transactionReference, String adminNotes) {
+        Order order = orderRepository.findById(orderId) // Admin có thể xem mọi đơn hàng
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+// Kiểm tra xem phương thức thanh toán của đơn hàng có khớp với phương thức admin xác nhận không (tùy chọn)
+// if (order.getPaymentMethod() != paymentMethodConfirmed) {
+// log.warn("Admin attempted to confirm payment for order {} with method {}, but order was placed with {}",
+// orderId, paymentMethodConfirmed, order.getPaymentMethod());
+// // Có thể throw lỗi hoặc cho phép ghi đè paymentMethod nếu cần
+// }
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Đơn hàng này đã được ghi nhận thanh toán.");
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
+            throw new BadRequestException("Không thể xác nhận thanh toán cho đơn hàng đã hủy hoặc đã hoàn thành.");
+        }
+        order.setPaymentStatus(PaymentStatus.PAID);
+// Khi Admin xác nhận thanh toán, chuyển đơn hàng sang trạng thái phù hợp
+        if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
+            order.setStatus(OrderStatus.CONFIRMED); // Hoặc PROCESSING tùy quy trình
+        }
+// Tạo bản ghi Payment
+        Payment payment = new Payment();
+        payment.setOrder(order);
+        payment.setAmount(order.getTotalAmount());
+        payment.setPaymentGateway(paymentMethodConfirmed.name()); // Phương thức mà Admin xác nhận
+        payment.setStatus(PaymentTransactionStatus.SUCCESS);
+        payment.setPaymentTime(LocalDateTime.now());
+        payment.setTransactionCode(transactionReference); // Mã giao dịch do Admin nhập (nếu có)
+        payment.setGatewayMessage("Payment confirmed by Admin." + (StringUtils.hasText(adminNotes) ? " Notes: " + adminNotes : ""));
+        paymentRepository.save(payment);
+        Order savedOrder = orderRepository.save(order);
+        log.info("Admin confirmed {} payment for order {}", paymentMethodConfirmed.name(), order.getOrderCode());
+// Gửi thông báo cho người mua rằng thanh toán đã được xác nhận
+        notificationService.sendPaymentSuccessNotification(savedOrder);
+// Gửi thông báo cho người mua rằng trạng thái đơn hàng đã thay đổi
+        notificationService.sendOrderStatusUpdateNotification(savedOrder, OrderStatus.PENDING); // Giả sử trạng thái trước đó là PENDING
+// (Tùy chọn) Gửi thông báo cho Farmer rằng đơn hàng đã được thanh toán và có thể chuẩn bị hàng
+// notificationService.sendOrderPaidNotificationToFarmer(savedOrder);
+        return orderMapper.toOrderResponse(savedOrder);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BankTransferInfoResponse getBankTransferInfoForOrder(Long orderId, Authentication authentication) {
+        User user = getUserFromAuthentication(authentication);
+        Order order = orderRepository.findByIdWithDetails(orderId) // Dùng query có fetch
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(ga -> ga.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin && !order.getBuyer().getId().equals(user.getId())) {
+            throw new AccessDeniedException("Bạn không có quyền xem thông tin thanh toán cho đơn hàng này.");
+        }
+
+        if (order.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
+            throw new BadRequestException("Đơn hàng này không sử dụng phương thức chuyển khoản ngân hàng.");
+        }
+        if (order.getPaymentStatus() != PaymentStatus.PENDING && order.getPaymentStatus() != PaymentStatus.AWAITING_PAYMENT_TERM) {
+            throw new BadRequestException("Đơn hàng này không ở trạng thái chờ thanh toán chuyển khoản.");
+        }
+
+        String transferContent = "CK " + order.getOrderCode();
+        String qrCodeDataString;
+
+        // Tạo chuỗi cho QR code
+        // Lựa chọn 1: Tạo URL đến dịch vụ tạo ảnh QR (như VietQR.io)
+        if (StringUtils.hasText(qrServiceUrlBase) && StringUtils.hasText(appBankBin) && StringUtils.hasText(appBankAccountNumber)) {
+            try {
+                String encodedOrderInfo = URLEncoder.encode(transferContent, StandardCharsets.UTF_8.toString());
+                String encodedAccountName = URLEncoder.encode(appBankAccountName, StandardCharsets.UTF_8.toString());
+                qrCodeDataString = String.format("%s/%s-%s-%s.png?amount=%s&addInfo=%s&accountName=%s",
+                        qrServiceUrlBase.replaceAll("/$", ""), // Xóa dấu / ở cuối nếu có
+                        appBankBin,
+                        appBankAccountNumber,
+                        qrTemplate,
+                        order.getTotalAmount().toPlainString(),
+                        encodedOrderInfo,
+                        encodedAccountName
+                );
+                log.info("Generated QR Image URL for order {}: {}", order.getOrderCode(), qrCodeDataString);
+            } catch (Exception e) {
+                log.error("Error generating QR Image URL for order {}: {}", order.getOrderCode(), e.getMessage());
+                qrCodeDataString = "Lỗi tạo mã QR (URL)";
+            }
+        } else {
+            // Lựa chọn 2: Tạo chuỗi dữ liệu thô theo chuẩn VietQR (để frontend tự render)
+            // Đây là một ví dụ đơn giản hóa, bạn cần tham khảo chuẩn VietQR/Napas247 để có chuỗi chính xác
+            // Payload version 000201, Point of Initiation 010212 (static QR with beneficiary)
+            // Merchant Account Info (tag 38)
+            //   GUID (tag 00) - A000000727 (NAPAS247 by VNPAY)
+            //   Beneficiary Organization (tag 01) - Bank BIN (tag 00) + Account Number (tag 01)
+            //     Bank BIN (tag 00) - appBankBin
+            //     Account Number (tag 01) - appBankAccountNumber
+            // Transaction Currency (tag 53) - 03704 (VND)
+            // Transaction Amount (tag 54) - order.getTotalAmount()
+            // Country Code (tag 58) - 02VN
+            // Additional Data (tag 62)
+            //   Purpose of Transaction (tag 08) - transferContent
+            // CRC (tag 63) - 04XXXX
+
+            // Ví dụ tạo chuỗi data đơn giản hơn mà nhiều thư viện QR có thể hiểu
+            // (Không hoàn toàn theo chuẩn VietQR nhưng chứa đủ thông tin cơ bản)
+            // Hoặc bạn có thể tìm thư viện Java để tạo chuỗi VietQR đầy đủ.
+            // String data = "STK: " + appBankAccountNumber + "\n" +
+            //               "Ngân hàng: " + appBankNameDisplay + "\n" +
+            //               "Số tiền: " + order.getTotalAmount().toPlainString() + "\n" +
+            //               "Nội dung: " + transferContent;
+            // qrCodeDataString = data;
+
+            // Để nhất quán với ví dụ trước, nếu không có qrServiceUrlBase, ta sẽ báo lỗi
+            // hoặc trả về null/chuỗi rỗng cho qrCodeDataString
+            log.warn("QR Service URL Base not configured. Cannot generate QR image URL for order {}", order.getOrderCode());
+            qrCodeDataString = null; // Hoặc một thông báo lỗi
+        }
+
+
+        return new BankTransferInfoResponse(
+                appBankAccountName,
+                appBankAccountNumber,
+                appBankNameDisplay,
+                order.getTotalAmount(),
+                order.getOrderCode(),
+                transferContent,
+                qrCodeDataString
+        );
+    }
+
+    // Phương thức helper để điền imageUrls cho sản phẩm trong OrderItems
+    private void populateProductImageUrlsInOrder(Order order) {
+        if (order != null && order.getOrderItems() != null) {
+            for (OrderItem item : order.getOrderItems()) {
+                Product product = item.getProduct(); // Lấy Product từ OrderItem
+                if (product != null && product.getImages() != null && !product.getImages().isEmpty()) {
+                    for (ProductImage image : product.getImages()) {
+                        if (StringUtils.hasText(image.getBlobPath())) {
+                            image.setImageUrl(fileStorageService.getFileUrl(image.getBlobPath()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 
 }

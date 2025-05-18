@@ -1,9 +1,11 @@
 package com.yourcompany.agritrade.ordering.service;
 
 import com.yourcompany.agritrade.ordering.domain.OrderStatus; // Import Enum
+import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest; // Import DTO
+import com.yourcompany.agritrade.ordering.dto.response.BankTransferInfoResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
@@ -44,5 +46,9 @@ public interface OrderService {
     OrderCalculationResponse calculateOrderTotals(Authentication authentication, OrderCalculationRequest request);
 
     OrderResponse confirmBankTransferPayment(Long orderId, String bankTransactionCode);
+
+    BankTransferInfoResponse getBankTransferInfoForOrder(Long orderId, Authentication authentication);
+
+    OrderResponse confirmOrderPaymentByAdmin(Long orderId, PaymentMethod paymentMethodConfirmed, String transactionReference, String adminNotes);
 
 }

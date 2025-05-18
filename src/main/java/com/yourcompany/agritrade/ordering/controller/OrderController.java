@@ -10,10 +10,7 @@ import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
-import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
-import com.yourcompany.agritrade.ordering.dto.response.PaymentUrlResponse;
+import com.yourcompany.agritrade.ordering.dto.response.*;
 import com.yourcompany.agritrade.ordering.repository.OrderRepository;
 import com.yourcompany.agritrade.ordering.service.OrderService;
 import com.yourcompany.agritrade.ordering.service.PaymentGatewayService;
@@ -212,6 +209,15 @@ public class OrderController {
                     // log.error("Authenticated user not found in database with identifier: {}", userIdentifier);
                     return new UsernameNotFoundException("Authenticated user not found: " + userIdentifier);
                 });
+    }
+
+    @GetMapping("/{orderId}/bank-transfer-info")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<BankTransferInfoResponse>> getBankTransferInfo(
+            @PathVariable Long orderId,
+            Authentication authentication) {
+        BankTransferInfoResponse transferInfo = orderService.getBankTransferInfoForOrder(orderId, authentication);
+        return ResponseEntity.ok(ApiResponse.success(transferInfo));
     }
     // **************************************************
 }

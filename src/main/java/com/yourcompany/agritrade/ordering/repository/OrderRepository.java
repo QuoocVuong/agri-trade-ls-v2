@@ -36,17 +36,20 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             "WHERE f.id = :farmerId",
             countQuery = "SELECT count(o) FROM Order o WHERE o.farmer.id = :farmerId")
     Page<Order> findByFarmerIdWithDetails(Long farmerId, Pageable pageable);
-
-    // Lấy chi tiết đơn hàng theo ID (bao gồm items, payments) - Cần JOIN FETCH
+    // Phương thức này nên fetch các thông tin cần thiết để tránh N+1
+    // Ví dụ: fetch buyer, farmer, orderItems, product trong orderItems
     @Query("SELECT o FROM Order o " +
-            "LEFT JOIN FETCH o.orderItems oi " +
-            "LEFT JOIN FETCH oi.product p " + // Fetch product trong item nếu cần thông tin product
-            "LEFT JOIN FETCH o.payments pay " + // Đổi alias 'p' để tránh trùng
             "LEFT JOIN FETCH o.buyer b " +
             "LEFT JOIN FETCH o.farmer f " +
-            "LEFT JOIN FETCH f.farmerProfile fp " + // Thêm fetch farmerProfile
+            "LEFT JOIN FETCH f.farmerProfile fp " + // Fetch farmer profile để có bank info nếu chuyển cho farmer
+            "LEFT JOIN FETCH o.orderItems oi " +
+            "LEFT JOIN FETCH oi.product p " +
+            "LEFT JOIN FETCH p.images " + // << QUAN TRỌNG: FETCH IMAGES
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH o.payments " +
             "WHERE o.id = :orderId")
-    Optional<Order> findByIdWithDetails(Long orderId);
+    Optional<Order> findByIdWithDetails(@Param("orderId") Long orderId);
+
 
     // Hoặc dùng @EntityGraph thay thế nếu muốn
 //    @EntityGraph(attributePaths = {
@@ -61,14 +64,14 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     // Lấy chi tiết đơn hàng theo Code (bao gồm items, payments)
     @Query("SELECT o FROM Order o " +
-            "LEFT JOIN FETCH o.orderItems oi " +
-            "LEFT JOIN FETCH oi.product p " + // Fetch product trong item nếu cần thông tin product
-            "LEFT JOIN FETCH o.payments pay " + // Đổi alias 'p' để tránh trùng
             "LEFT JOIN FETCH o.buyer b " +
             "LEFT JOIN FETCH o.farmer f " +
-            "LEFT JOIN FETCH f.farmerProfile fp " + // Thêm fetch farmerProfile
+            "LEFT JOIN FETCH f.farmerProfile fp " +
+            "LEFT JOIN FETCH o.orderItems oi " +
+            "LEFT JOIN FETCH oi.product p " +
+            "LEFT JOIN FETCH o.payments " +
             "WHERE o.orderCode = :orderCode")
-    Optional<Order> findByOrderCodeWithDetails(String orderCode);
+    Optional<Order> findByOrderCodeWithDetails(@Param("orderCode") String orderCode);
 
     // Tìm đơn hàng theo ID và Buyer ID (kiểm tra ownership)
     Optional<Order> findByIdAndBuyerId(Long orderId, Long buyerId);

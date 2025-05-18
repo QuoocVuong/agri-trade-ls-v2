@@ -18,7 +18,14 @@ public interface ProductService {
     void deleteMyProduct(Authentication authentication, Long productId); // Soft delete
 
     // Cho Public/Buyers
-    Page<ProductSummaryResponse> searchPublicProducts(String keyword, Integer categoryId, String provinceCode, Pageable pageable);
+    Page<ProductSummaryResponse> searchPublicProducts(
+            String keyword,
+            Integer categoryId,
+            String provinceCode,
+            Double minPrice,
+            Double maxPrice,
+            Integer minRating,
+            Pageable pageable);
     ProductDetailResponse getPublicProductBySlug(String slug);
     ProductDetailResponse getPublicProductById(Long id); // Lấy theo ID nếu cần
 

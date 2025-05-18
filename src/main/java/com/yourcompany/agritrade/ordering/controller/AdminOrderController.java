@@ -2,6 +2,7 @@ package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus; // Import Enum
+import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
@@ -73,4 +74,18 @@ public class AdminOrderController {
         OrderResponse updatedOrder = orderService.confirmBankTransferPayment(orderId, bankTransactionCode);
         return ResponseEntity.ok(ApiResponse.success(updatedOrder, "Bank transfer confirmed."));
     }
+
+    // ****** THÊM ENDPOINT NÀY ******
+    @PostMapping("/{orderId}/confirm-payment")
+    public ResponseEntity<ApiResponse<OrderResponse>> confirmOrderPayment(
+            @PathVariable Long orderId,
+            @RequestParam PaymentMethod paymentMethod, // Admin chọn phương thức đã nhận
+            @RequestBody(required = false) Map<String, String> payload) { // Có thể nhận ghi chú, mã giao dịch từ Admin
+        String adminNotes = payload != null ? payload.get("notes") : null;
+        String transactionReference = payload != null ? payload.get("transactionReference") : null; // Ví dụ: mã giao dịch ngân hàng
+
+        OrderResponse updatedOrder = orderService.confirmOrderPaymentByAdmin(orderId, paymentMethod, transactionReference, adminNotes);
+        return ResponseEntity.ok(ApiResponse.success(updatedOrder, "Xác nhận thanh toán cho đơn hàng #" + orderId + " thành công."));
+    }
+    // **********************************
 }
