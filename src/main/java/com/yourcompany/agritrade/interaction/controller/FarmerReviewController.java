@@ -1,7 +1,6 @@
 package com.yourcompany.agritrade.interaction.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
-import com.yourcompany.agritrade.common.model.ReviewStatus; // Import nếu dùng lọc status
 import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
 import com.yourcompany.agritrade.interaction.service.ReviewService;
 import lombok.RequiredArgsConstructor;
@@ -22,24 +21,26 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('FARMER')") // Yêu cầu quyền FARMER cho cả controller
 public class FarmerReviewController {
 
-    private final ReviewService reviewService;
+  private final ReviewService reviewService;
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getMyProductReviews(
-            Authentication authentication,
-            // (Tùy chọn) Thêm RequestParam để lọc theo status
-            // @RequestParam(required = false) ReviewStatus status,
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+  @GetMapping
+  public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getMyProductReviews(
+      Authentication authentication,
+      // (Tùy chọn) Thêm RequestParam để lọc theo status
+      // @RequestParam(required = false) ReviewStatus status,
+      @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
 
-        log.info("API /api/farmer/reviews called by farmer: {}", authentication.getName());
-        Page<ReviewResponse> reviews;
-        // if (status != null) {
-        //     reviews = reviewService.getReviewsForFarmerProductsByStatus(authentication, status, pageable);
-        // } else {
-        reviews = reviewService.getReviewsForFarmerProducts(authentication, pageable);
-        // }
-        return ResponseEntity.ok(ApiResponse.success(reviews));
-    }
+    log.info("API /api/farmer/reviews called by farmer: {}", authentication.getName());
+    Page<ReviewResponse> reviews;
+    // if (status != null) {
+    //     reviews = reviewService.getReviewsForFarmerProductsByStatus(authentication, status,
+    // pageable);
+    // } else {
+    reviews = reviewService.getReviewsForFarmerProducts(authentication, pageable);
+    // }
+    return ResponseEntity.ok(ApiResponse.success(reviews));
+  }
 
-    // Có thể thêm các endpoint khác cho farmer liên quan đến review ở đây (ví dụ: trả lời review)
+  // Có thể thêm các endpoint khác cho farmer liên quan đến review ở đây (ví dụ: trả lời review)
 }

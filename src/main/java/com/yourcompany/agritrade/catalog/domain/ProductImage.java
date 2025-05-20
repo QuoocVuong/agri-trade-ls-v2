@@ -1,12 +1,11 @@
 package com.yourcompany.agritrade.catalog.domain;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "product_images")
@@ -14,35 +13,35 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 public class ProductImage {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "product_id", nullable = false)
+  private Product product;
 
-    @Transient // <<<< QUAN TRỌNG: Không lưu vào DB, sẽ được tạo động
-    private String imageUrl;
+  @Transient // <<<< QUAN TRỌNG: Không lưu vào DB, sẽ được tạo động
+  private String imageUrl;
 
-    @Column(nullable = false)
-    private boolean isDefault = false;
+  @Column(nullable = false)
+  private boolean isDefault = false;
 
-    @Column(nullable = false)
-    private int displayOrder = 0; // Thêm trường thứ tự
+  @Column(nullable = false)
+  private int displayOrder = 0; // Thêm trường thứ tự
 
-    @Column(length = 1024, nullable = false) // Độ dài phù hợp với blobPath
-    private String blobPath; // <<< THÊM TRƯỜNG NÀY
+  @Column(length = 1024, nullable = false) // Độ dài phù hợp với blobPath
+  private String blobPath; // <<< THÊM TRƯỜNG NÀY
 
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+  @CreationTimestamp
+  @Column(nullable = false, updatable = false)
+  private LocalDateTime createdAt;
 
-    // Constructor cập nhật
-    public ProductImage( String blobPath, boolean isDefault, int displayOrder) {
-        //this.imageUrl = imageUrl;
-        this.blobPath = blobPath;
-        this.isDefault = isDefault;
-        this.displayOrder = displayOrder;
-    }
+  // Constructor cập nhật
+  public ProductImage(String blobPath, boolean isDefault, int displayOrder) {
+    // this.imageUrl = imageUrl;
+    this.blobPath = blobPath;
+    this.isDefault = isDefault;
+    this.displayOrder = displayOrder;
+  }
 }

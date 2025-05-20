@@ -1,7 +1,7 @@
 package com.yourcompany.agritrade.interaction.service.impl;
 
-import com.yourcompany.agritrade.catalog.domain.Product; // Import Product
-import com.yourcompany.agritrade.catalog.repository.ProductRepository; // Import ProductRepo
+import com.yourcompany.agritrade.catalog.domain.Product;
+import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.ReviewStatus;
@@ -12,10 +12,14 @@ import com.yourcompany.agritrade.interaction.mapper.ReviewMapper;
 import com.yourcompany.agritrade.interaction.repository.ReviewRepository;
 import com.yourcompany.agritrade.interaction.service.ReviewService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
-import com.yourcompany.agritrade.ordering.domain.Order; // Import Order
-import com.yourcompany.agritrade.ordering.repository.OrderRepository; // Import OrderRepo
+import com.yourcompany.agritrade.ordering.domain.Order;
+import com.yourcompany.agritrade.ordering.repository.OrderRepository;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Arrays;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,249 +30,304 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal; // Import BigDecimal
-import java.math.RoundingMode; // Import RoundingMode
-import java.util.Arrays;
-import java.util.Optional; // Import Optional
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ReviewServiceImpl implements ReviewService {
 
-    private final ReviewRepository reviewRepository;
-    private final ProductRepository productRepository;
-    private final UserRepository userRepository;
-    private final OrderRepository orderRepository; // Inject OrderRepository
-    private final ReviewMapper reviewMapper;
-    private final NotificationService notificationService;
+  private final ReviewRepository reviewRepository;
+  private final ProductRepository productRepository;
+  private final UserRepository userRepository;
+  private final OrderRepository orderRepository; // Inject OrderRepository
+  private final ReviewMapper reviewMapper;
+  private final NotificationService notificationService;
 
-    @Override
-    @Transactional
-    public ReviewResponse createReview(Authentication authentication, ReviewRequest request) {
-        User consumer = getUserFromAuthentication(authentication);
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
+  @Override
+  @Transactional
+  public ReviewResponse createReview(Authentication authentication, ReviewRequest request) {
+    User consumer = getUserFromAuthentication(authentication);
+    Product product =
+        productRepository
+            .findById(request.getProductId())
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Product", "id", request.getProductId()));
 
-        // --- Kiểm tra điều kiện viết review (quan trọng) ---
-        // 1. Kiểm tra xem user đã mua sản phẩm này chưa (khuyến nghị)
-        boolean hasPurchased = checkIfUserPurchasedProduct(consumer.getId(), request.getProductId(), request.getOrderId());
-        if (!hasPurchased) {
-            throw new BadRequestException("You must purchase this product to leave a review.");
-        }
-
-        // 2. Kiểm tra xem user đã review sản phẩm này trong đơn hàng này chưa (nếu có orderId)
-        if (request.getOrderId() != null && reviewRepository.existsByConsumerIdAndProductIdAndOrderId(consumer.getId(), request.getProductId(), request.getOrderId())) {
-            throw new BadRequestException("You have already reviewed this product for this order.");
-        }
-        // 3. Hoặc kiểm tra xem user đã review sản phẩm này bao giờ chưa (nếu không cần theo đơn hàng)
-         if (reviewRepository.existsByConsumerIdAndProductId(consumer.getId(), request.getProductId())) {
-             throw new BadRequestException("You have already reviewed this product.");
-         }
-
-
-        Review review = reviewMapper.requestToReview(request);
-        review.setConsumer(consumer);
-        review.setProduct(product);
-        // Liên kết với Order nếu có ID
-        if (request.getOrderId() != null) {
-            Order order = orderRepository.findById(request.getOrderId()).orElse(null);
-            if (order != null && order.getBuyer().getId().equals(consumer.getId())) { // Đảm bảo đúng đơn hàng của user
-                review.setOrder(order);
-            } else {
-                log.warn("Order ID {} provided in review request for product {} by user {} is invalid or does not belong to the user.",
-                        request.getOrderId(), request.getProductId(), consumer.getId());
-                // Có thể throw lỗi hoặc bỏ qua orderId
-            }
-        }
-        review.setStatus(ReviewStatus.APPROVED); // Đặt trạng thái là APPROVED ngay lập tức
-
-        Review savedReview = reviewRepository.save(review);
-        log.info("Review created with id {} for product {} by user {}", savedReview.getId(), product.getId(), consumer.getId());
-        // ****** THAY ĐỔI QUAN TRỌNG ******
-        // Cập nhật rating trung bình của sản phẩm ngay sau khi lưu review mới
-        updateProductAverageRating(product.getId());
-        // ********************************
-
-        // (Tùy chọn) Gửi thông báo review đã được đăng (thay vì pending)
-        // notificationService.sendReviewPendingNotification(savedReview); // Xóa hoặc comment dòng này
-        notificationService.sendReviewApprovedNotification(savedReview); // Có thể gọi hàm này nếu muốn thông báo
-
-        return reviewMapper.toReviewResponse(savedReview);
+    // --- Kiểm tra điều kiện viết review (quan trọng) ---
+    // 1. Kiểm tra xem user đã mua sản phẩm này chưa (khuyến nghị)
+    boolean hasPurchased =
+        checkIfUserPurchasedProduct(consumer.getId(), request.getProductId(), request.getOrderId());
+    if (!hasPurchased) {
+      throw new BadRequestException("You must purchase this product to leave a review.");
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ReviewResponse> getApprovedReviewsByProduct(Long productId, Pageable pageable) {
-        if (!productRepository.existsById(productId)) {
-            throw new ResourceNotFoundException("Product", "id", productId);
-        }
-        Page<Review> reviewPage = reviewRepository.findByProductIdAndStatus(productId, ReviewStatus.APPROVED, pageable);
-        return reviewMapper.toReviewResponsePage(reviewPage);
+    // 2. Kiểm tra xem user đã review sản phẩm này trong đơn hàng này chưa (nếu có orderId)
+    if (request.getOrderId() != null
+        && reviewRepository.existsByConsumerIdAndProductIdAndOrderId(
+            consumer.getId(), request.getProductId(), request.getOrderId())) {
+      throw new BadRequestException("You have already reviewed this product for this order.");
+    }
+    // 3. Hoặc kiểm tra xem user đã review sản phẩm này bao giờ chưa (nếu không cần theo đơn hàng)
+    if (reviewRepository.existsByConsumerIdAndProductId(consumer.getId(), request.getProductId())) {
+      throw new BadRequestException("You have already reviewed this product.");
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ReviewResponse> getMyReviews(Authentication authentication, Pageable pageable) {
-        User consumer = getUserFromAuthentication(authentication);
-        Page<Review> reviewPage = reviewRepository.findByConsumerId(consumer.getId(), pageable);
-        return reviewMapper.toReviewResponsePage(reviewPage);
+    Review review = reviewMapper.requestToReview(request);
+    review.setConsumer(consumer);
+    review.setProduct(product);
+    // Liên kết với Order nếu có ID
+    if (request.getOrderId() != null) {
+      Order order = orderRepository.findById(request.getOrderId()).orElse(null);
+      if (order != null
+          && order.getBuyer().getId().equals(consumer.getId())) { // Đảm bảo đúng đơn hàng của user
+        review.setOrder(order);
+      } else {
+        log.warn(
+            "Order ID {} provided in review request for product {} by user {} is invalid or does not belong to the user.",
+            request.getOrderId(),
+            request.getProductId(),
+            consumer.getId());
+        // Có thể throw lỗi hoặc bỏ qua orderId
+      }
     }
+    review.setStatus(ReviewStatus.APPROVED); // Đặt trạng thái là APPROVED ngay lập tức
 
-    // ****** IMPLEMENT PHƯƠNG THỨC NÀY ******
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ReviewResponse> getReviewsForFarmerProducts(Authentication authentication, Pageable pageable) {
-        User farmer = getUserFromAuthentication(authentication); // Lấy user farmer đang đăng nhập
-        // Kiểm tra xem có đúng là farmer không (tùy chọn, vì đã có @PreAuthorize ở controller)
-        // if (!farmer.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
-        //     throw new AccessDeniedException("User is not a farmer.");
-        // }
-        Page<Review> reviewPage = reviewRepository.findReviewsForFarmerProducts(farmer.getId(), pageable);
-        // Hoặc: Page<Review> reviewPage = reviewRepository.findByProduct_Farmer_Id(farmer.getId(), pageable);
-        return reviewMapper.toReviewResponsePage(reviewPage);
-    }
-
-    // (Tùy chọn) Implement phương thức lọc theo trạng thái
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ReviewResponse> getReviewsForFarmerProductsByStatus(Authentication authentication, ReviewStatus status, Pageable pageable) {
-        User farmer = getUserFromAuthentication(authentication);
-        Page<Review> reviewPage = reviewRepository.findReviewsForFarmerProductsByStatus(farmer.getId(), status, pageable);
-        // Hoặc: Page<Review> reviewPage = reviewRepository.findByProduct_Farmer_IdAndStatus(farmer.getId(), status, pageable);
-        return reviewMapper.toReviewResponsePage(reviewPage);
-    }
-    // *************************************
-
-    // --- Admin Methods ---
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ReviewResponse> getReviewsByStatus(ReviewStatus status, Pageable pageable) {
-        Page<Review> reviewPage = reviewRepository.findByStatus(status, pageable);
-        return reviewMapper.toReviewResponsePage(reviewPage);
-    }
-
-    @Override
-    @Transactional
-    public ReviewResponse approveReview(Long reviewId) {
-        Review review = findReviewById(reviewId);
-        if (review.getStatus() == ReviewStatus.PENDING || review.getStatus() == ReviewStatus.REJECTED) {
-            review.setStatus(ReviewStatus.APPROVED);
-            Review savedReview = reviewRepository.save(review);
-            // Cập nhật lại rating trung bình của sản phẩm sau khi duyệt
-            updateProductAverageRating(review.getProduct().getId());
-            log.info("Review {} approved by admin.", reviewId);
-            // *** Gửi thông báo cho người viết review ***
-            notificationService.sendReviewApprovedNotification(savedReview); // Gọi NotificationService
-            return reviewMapper.toReviewResponse(savedReview);
-        } else {
-            log.warn("Admin tried to approve review {} which is already in status {}", reviewId, review.getStatus());
-            throw new BadRequestException("Review cannot be approved from its current status.");
-        }
-    }
-
-    @Override
-    @Transactional
-    public ReviewResponse rejectReview(Long reviewId) {
-        Review review = findReviewById(reviewId);
-        if (review.getStatus() == ReviewStatus.PENDING || review.getStatus() == ReviewStatus.APPROVED) { // Có thể từ chối cả review đã duyệt
-            ReviewStatus previousStatus = review.getStatus();
-            review.setStatus(ReviewStatus.REJECTED);
-            Review savedReview = reviewRepository.save(review);
-            // Cập nhật lại rating trung bình nếu review trước đó đã được duyệt
-            if (previousStatus == ReviewStatus.APPROVED) {
-                updateProductAverageRating(review.getProduct().getId());
-            }
-            log.info("Review {} rejected by admin.", reviewId);
-            // *** Gửi thông báo cho người viết review ***
-            notificationService.sendReviewRejectedNotification(savedReview); // Gọi NotificationService
-            return reviewMapper.toReviewResponse(savedReview);
-        } else {
-            log.warn("Admin tried to reject review {} which is already in status {}", reviewId, review.getStatus());
-            throw new BadRequestException("Review cannot be rejected from its current status.");
-        }
-    }
-
-    @Override
-    @Transactional
-    public void deleteReview(Long reviewId) {
-        Review review = findReviewById(reviewId);
-        ReviewStatus statusBeforeDelete = review.getStatus();
-        Long productId = review.getProduct().getId();
-
-        reviewRepository.delete(review);
-        log.info("Review {} deleted by admin.", reviewId);
-
-        // Cập nhật lại rating nếu review bị xóa là review đã duyệt
-        if (statusBeforeDelete == ReviewStatus.APPROVED) {
-            updateProductAverageRating(productId);
-        }
-    }
-
-    // *** SỬA LẠI HELPER METHOD NÀY ***
-    private User getUserFromAuthentication(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
-            // Ném lỗi nếu không xác thực, vì API tạo review yêu cầu đăng nhập
-            throw new AccessDeniedException("User is not authenticated to create a review.");
-        }
-        String email = authentication.getName(); // Lấy email/username từ Principal
-        return userRepository.findByEmail(email) // Tìm trong DB
-                .orElseThrow(() -> new UsernameNotFoundException("Authenticated user not found with email: " + email)); // Ném lỗi nếu không thấy user trong DB
-    }
+    Review savedReview = reviewRepository.save(review);
+    log.info(
+        "Review created with id {} for product {} by user {}",
+        savedReview.getId(),
+        product.getId(),
+        consumer.getId());
+    // ****** THAY ĐỔI QUAN TRỌNG ******
+    // Cập nhật rating trung bình của sản phẩm ngay sau khi lưu review mới
+    updateProductAverageRating(product.getId());
     // ********************************
 
-    private Review findReviewById(Long reviewId) {
-        return reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
-    }
-    private boolean checkIfUserPurchasedProduct(Long userId, Long productId, Long orderId) {
-        // Ưu tiên kiểm tra theo orderId nếu được cung cấp
-        if (orderId != null) {
-            return orderRepository.existsByIdAndBuyerIdAndOrderItemsProductId(orderId, userId, productId);
-        } else {
-            // Nếu không có orderId, kiểm tra xem user đã từng mua và nhận hàng thành công chưa
-            return orderRepository.existsByBuyerIdAndStatusAndOrderItemsProductId(userId, productId);
-        }
-    }
+    // (Tùy chọn) Gửi thông báo review đã được đăng (thay vì pending)
+    // notificationService.sendReviewPendingNotification(savedReview); // Xóa hoặc comment dòng này
+    notificationService.sendReviewApprovedNotification(
+        savedReview); // Có thể gọi hàm này nếu muốn thông báo
 
-    // Cập nhật rating trung bình và số lượng rating cho sản phẩm
-    // ReviewServiceImpl.java
-    private void updateProductAverageRating(Long productId) {
-        log.info("Attempting to update average rating for product ID: {}", productId); // Log bắt đầu
-        productRepository.findById(productId).ifPresent(product -> {
-            log.info("Found product: {}", product.getName()); // Log tên sản phẩm
-            // Dùng query đã tạo trong ReviewRepository
-            Optional<Object[]> result = reviewRepository.getAverageRatingAndCountByProductIdAndStatus(productId, ReviewStatus.APPROVED);
-            log.info("Query result for average rating and count: {}", result.map(Arrays::toString).orElse("EMPTY")); // Log kết quả query
+    return reviewMapper.toReviewResponse(savedReview);
+  }
 
-            if (result.isPresent() && result.get().length == 2 && result.get()[0] != null) {
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ReviewResponse> getApprovedReviewsByProduct(Long productId, Pageable pageable) {
+    if (!productRepository.existsById(productId)) {
+      throw new ResourceNotFoundException("Product", "id", productId);
+    }
+    Page<Review> reviewPage =
+        reviewRepository.findByProductIdAndStatus(productId, ReviewStatus.APPROVED, pageable);
+    return reviewMapper.toReviewResponsePage(reviewPage);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ReviewResponse> getMyReviews(Authentication authentication, Pageable pageable) {
+    User consumer = getUserFromAuthentication(authentication);
+    Page<Review> reviewPage = reviewRepository.findByConsumerId(consumer.getId(), pageable);
+    return reviewMapper.toReviewResponsePage(reviewPage);
+  }
+
+  // ****** IMPLEMENT PHƯƠNG THỨC NÀY ******
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ReviewResponse> getReviewsForFarmerProducts(
+      Authentication authentication, Pageable pageable) {
+    User farmer = getUserFromAuthentication(authentication); // Lấy user farmer đang đăng nhập
+    // Kiểm tra xem có đúng là farmer không (tùy chọn, vì đã có @PreAuthorize ở controller)
+    // if (!farmer.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
+    //     throw new AccessDeniedException("User is not a farmer.");
+    // }
+    Page<Review> reviewPage =
+        reviewRepository.findReviewsForFarmerProducts(farmer.getId(), pageable);
+    // Hoặc: Page<Review> reviewPage = reviewRepository.findByProduct_Farmer_Id(farmer.getId(),
+    // pageable);
+    return reviewMapper.toReviewResponsePage(reviewPage);
+  }
+
+  // (Tùy chọn) Implement phương thức lọc theo trạng thái
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ReviewResponse> getReviewsForFarmerProductsByStatus(
+      Authentication authentication, ReviewStatus status, Pageable pageable) {
+    User farmer = getUserFromAuthentication(authentication);
+    Page<Review> reviewPage =
+        reviewRepository.findReviewsForFarmerProductsByStatus(farmer.getId(), status, pageable);
+    // Hoặc: Page<Review> reviewPage =
+    // reviewRepository.findByProduct_Farmer_IdAndStatus(farmer.getId(), status, pageable);
+    return reviewMapper.toReviewResponsePage(reviewPage);
+  }
+
+  // *************************************
+
+  // --- Admin Methods ---
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ReviewResponse> getReviewsByStatus(ReviewStatus status, Pageable pageable) {
+    Page<Review> reviewPage = reviewRepository.findByStatus(status, pageable);
+    return reviewMapper.toReviewResponsePage(reviewPage);
+  }
+
+  @Override
+  @Transactional
+  public ReviewResponse approveReview(Long reviewId) {
+    Review review = findReviewById(reviewId);
+    if (review.getStatus() == ReviewStatus.PENDING || review.getStatus() == ReviewStatus.REJECTED) {
+      review.setStatus(ReviewStatus.APPROVED);
+      Review savedReview = reviewRepository.save(review);
+      // Cập nhật lại rating trung bình của sản phẩm sau khi duyệt
+      updateProductAverageRating(review.getProduct().getId());
+      log.info("Review {} approved by admin.", reviewId);
+      // *** Gửi thông báo cho người viết review ***
+      notificationService.sendReviewApprovedNotification(savedReview); // Gọi NotificationService
+      return reviewMapper.toReviewResponse(savedReview);
+    } else {
+      log.warn(
+          "Admin tried to approve review {} which is already in status {}",
+          reviewId,
+          review.getStatus());
+      throw new BadRequestException("Review cannot be approved from its current status.");
+    }
+  }
+
+  @Override
+  @Transactional
+  public ReviewResponse rejectReview(Long reviewId) {
+    Review review = findReviewById(reviewId);
+    if (review.getStatus() == ReviewStatus.PENDING
+        || review.getStatus() == ReviewStatus.APPROVED) { // Có thể từ chối cả review đã duyệt
+      ReviewStatus previousStatus = review.getStatus();
+      review.setStatus(ReviewStatus.REJECTED);
+      Review savedReview = reviewRepository.save(review);
+      // Cập nhật lại rating trung bình nếu review trước đó đã được duyệt
+      if (previousStatus == ReviewStatus.APPROVED) {
+        updateProductAverageRating(review.getProduct().getId());
+      }
+      log.info("Review {} rejected by admin.", reviewId);
+      // *** Gửi thông báo cho người viết review ***
+      notificationService.sendReviewRejectedNotification(savedReview); // Gọi NotificationService
+      return reviewMapper.toReviewResponse(savedReview);
+    } else {
+      log.warn(
+          "Admin tried to reject review {} which is already in status {}",
+          reviewId,
+          review.getStatus());
+      throw new BadRequestException("Review cannot be rejected from its current status.");
+    }
+  }
+
+  @Override
+  @Transactional
+  public void deleteReview(Long reviewId) {
+    Review review = findReviewById(reviewId);
+    ReviewStatus statusBeforeDelete = review.getStatus();
+    Long productId = review.getProduct().getId();
+
+    reviewRepository.delete(review);
+    log.info("Review {} deleted by admin.", reviewId);
+
+    // Cập nhật lại rating nếu review bị xóa là review đã duyệt
+    if (statusBeforeDelete == ReviewStatus.APPROVED) {
+      updateProductAverageRating(productId);
+    }
+  }
+
+  // *** SỬA LẠI HELPER METHOD NÀY ***
+  private User getUserFromAuthentication(Authentication authentication) {
+    if (authentication == null
+        || !authentication.isAuthenticated()
+        || "anonymousUser".equals(authentication.getPrincipal())) {
+      // Ném lỗi nếu không xác thực, vì API tạo review yêu cầu đăng nhập
+      throw new AccessDeniedException("User is not authenticated to create a review.");
+    }
+    String email = authentication.getName(); // Lấy email/username từ Principal
+    return userRepository
+        .findByEmail(email) // Tìm trong DB
+        .orElseThrow(
+            () ->
+                new UsernameNotFoundException(
+                    "Authenticated user not found with email: "
+                        + email)); // Ném lỗi nếu không thấy user trong DB
+  }
+
+  // ********************************
+
+  private Review findReviewById(Long reviewId) {
+    return reviewRepository
+        .findById(reviewId)
+        .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
+  }
+
+  private boolean checkIfUserPurchasedProduct(Long userId, Long productId, Long orderId) {
+    // Ưu tiên kiểm tra theo orderId nếu được cung cấp
+    if (orderId != null) {
+      return orderRepository.existsByIdAndBuyerIdAndOrderItemsProductId(orderId, userId, productId);
+    } else {
+      // Nếu không có orderId, kiểm tra xem user đã từng mua và nhận hàng thành công chưa
+      return orderRepository.existsByBuyerIdAndStatusAndOrderItemsProductId(userId, productId);
+    }
+  }
+
+  // Cập nhật rating trung bình và số lượng rating cho sản phẩm
+  // ReviewServiceImpl.java
+  private void updateProductAverageRating(Long productId) {
+    log.info("Attempting to update average rating for product ID: {}", productId); // Log bắt đầu
+    productRepository
+        .findById(productId)
+        .ifPresent(
+            product -> {
+              log.info("Found product: {}", product.getName()); // Log tên sản phẩm
+              // Dùng query đã tạo trong ReviewRepository
+              Optional<Object[]> result =
+                  reviewRepository.getAverageRatingAndCountByProductIdAndStatus(
+                      productId, ReviewStatus.APPROVED);
+              log.info(
+                  "Query result for average rating and count: {}",
+                  result.map(Arrays::toString).orElse("EMPTY")); // Log kết quả query
+
+              if (result.isPresent() && result.get().length == 2 && result.get()[0] != null) {
                 Double avgRatingDouble = (Double) result.get()[0];
                 Long ratingCountLong = (Long) result.get()[1];
-                log.info("Raw avgRating: {}, Raw ratingCount: {}", avgRatingDouble, ratingCountLong); // Log giá trị thô
+                log.info(
+                    "Raw avgRating: {}, Raw ratingCount: {}",
+                    avgRatingDouble,
+                    ratingCountLong); // Log giá trị thô
 
-                BigDecimal avgRating = BigDecimal.valueOf(avgRatingDouble).setScale(1, RoundingMode.HALF_UP);
+                BigDecimal avgRating =
+                    BigDecimal.valueOf(avgRatingDouble).setScale(1, RoundingMode.HALF_UP);
                 int ratingCount = ratingCountLong.intValue(); // Chuyển sang int
 
-                log.info("Calculated avgRating: {}, Calculated ratingCount: {}", avgRating.floatValue(), ratingCount); // Log giá trị đã tính
+                log.info(
+                    "Calculated avgRating: {}, Calculated ratingCount: {}",
+                    avgRating.floatValue(),
+                    ratingCount); // Log giá trị đã tính
 
                 product.setAverageRating(avgRating.floatValue());
                 product.setRatingCount(ratingCount);
-            } else {
-                log.info("No approved reviews found or query failed, setting ratings to 0."); // Log trường hợp else
+              } else {
+                log.info("No approved reviews found or query failed, setting ratings to 0."); // Log
+                // trường
+                // hợp else
                 product.setAverageRating(0.0f);
                 product.setRatingCount(0);
-            }
-            try {
+              }
+              try {
                 log.info("Attempting to save product with updated ratings...");
                 productRepository.save(product); // Lưu sản phẩm
-                log.info("Successfully saved product with updated ratings for product ID: {}", productId); // Log thành công
-            } catch (Exception e) {
-                log.error("Error saving product with updated ratings for product ID: {}", productId, e); // Log lỗi nếu save thất bại
-            }
-        });
-        if (productRepository.findById(productId).isEmpty()) { // Log nếu không tìm thấy product
-            log.warn("Product with ID {} not found when trying to update average rating.", productId);
-        }
+                log.info(
+                    "Successfully saved product with updated ratings for product ID: {}",
+                    productId); // Log thành công
+              } catch (Exception e) {
+                log.error(
+                    "Error saving product with updated ratings for product ID: {}",
+                    productId,
+                    e); // Log lỗi nếu save thất bại
+              }
+            });
+    if (productRepository.findById(productId).isEmpty()) { // Log nếu không tìm thấy product
+      log.warn("Product with ID {} not found when trying to update average rating.", productId);
     }
+  }
 }

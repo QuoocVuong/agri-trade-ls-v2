@@ -5,7 +5,7 @@ import lombok.Data;
 // DTO đơn giản để nhúng vào Product
 @Data
 public class CategoryInfoResponse {
-    private Integer id;
-    private String name;
-    private String slug;
+  private Integer id;
+  private String name;
+  private String slug;
 }

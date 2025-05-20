@@ -1,12 +1,10 @@
 package com.yourcompany.agritrade.usermanagement.controller;
 
-
-
 import com.yourcompany.agritrade.common.dto.ApiResponse;
-import com.yourcompany.agritrade.common.model.VerificationStatus; // Import Enum
-import com.yourcompany.agritrade.usermanagement.dto.request.FarmerRejectRequest; // Tạo DTO này nếu cần
+import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.usermanagement.dto.request.FarmerRejectRequest;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserProfileResponse;
-import com.yourcompany.agritrade.usermanagement.service.AdminUserService; // Import AdminUserService
+import com.yourcompany.agritrade.usermanagement.service.AdminUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,48 +20,50 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('ADMIN')") // Yêu cầu quyền Admin cho tất cả API trong controller này
 public class AdminFarmerController {
 
-    private final AdminUserService adminUserService; // Inject service xử lý logic
+  private final AdminUserService adminUserService; // Inject service xử lý logic
 
-    // API lấy danh sách Farmer đang chờ duyệt (PENDING)
-    @GetMapping("/pending")
-    public ResponseEntity<ApiResponse<Page<UserProfileResponse>>> getPendingFarmers(
-            @PageableDefault(size = 10, sort = "createdAt,asc") Pageable pageable) {
-        Page<UserProfileResponse> pendingFarmers = adminUserService.getPendingFarmers(pageable); // Gọi service
-        return ResponseEntity.ok(ApiResponse.success(pendingFarmers));
-    }
+  // API lấy danh sách Farmer đang chờ duyệt (PENDING)
+  @GetMapping("/pending")
+  public ResponseEntity<ApiResponse<Page<UserProfileResponse>>> getPendingFarmers(
+      @PageableDefault(size = 10, sort = "createdAt,asc") Pageable pageable) {
+    Page<UserProfileResponse> pendingFarmers =
+        adminUserService.getPendingFarmers(pageable); // Gọi service
+    return ResponseEntity.ok(ApiResponse.success(pendingFarmers));
+  }
 
-    // API lấy danh sách tất cả Farmer (có thể thêm filter)
-    @GetMapping
-    public ResponseEntity<ApiResponse<Page<UserProfileResponse>>> getAllFarmers(
-            @RequestParam(required = false) VerificationStatus verificationStatus, // Filter theo trạng thái duyệt
-            @RequestParam(required = false) String keyword, // Filter theo keyword
-            @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
-        // Cần thêm phương thức getAllFarmers vào AdminUserService
-        Page<UserProfileResponse> allFarmers = adminUserService.getAllFarmers(verificationStatus, keyword, pageable);
-        return ResponseEntity.ok(ApiResponse.success(allFarmers));
-    }
+  // API lấy danh sách tất cả Farmer (có thể thêm filter)
+  @GetMapping
+  public ResponseEntity<ApiResponse<Page<UserProfileResponse>>> getAllFarmers(
+      @RequestParam(required = false)
+          VerificationStatus verificationStatus, // Filter theo trạng thái duyệt
+      @RequestParam(required = false) String keyword, // Filter theo keyword
+      @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
+    // Cần thêm phương thức getAllFarmers vào AdminUserService
+    Page<UserProfileResponse> allFarmers =
+        adminUserService.getAllFarmers(verificationStatus, keyword, pageable);
+    return ResponseEntity.ok(ApiResponse.success(allFarmers));
+  }
 
+  // API duyệt Farmer
+  @PostMapping("/{userId}/approve")
+  public ResponseEntity<ApiResponse<Void>> approveFarmer(
+      @PathVariable Long userId, Authentication authentication) { // *** Inject Authentication ***
+    adminUserService.approveFarmer(userId, authentication); // *** Truyền authentication xuống ***
+    return ResponseEntity.ok(ApiResponse.success("Farmer approved successfully."));
+  }
 
-    // API duyệt Farmer
-    @PostMapping("/{userId}/approve")
-    public ResponseEntity<ApiResponse<Void>> approveFarmer(
-            @PathVariable Long userId,
-            Authentication authentication) { // *** Inject Authentication ***
-        adminUserService.approveFarmer(userId, authentication); // *** Truyền authentication xuống ***
-        return ResponseEntity.ok(ApiResponse.success("Farmer approved successfully."));
-    }
+  // API từ chối Farmer
+  @PostMapping("/{userId}/reject")
+  public ResponseEntity<ApiResponse<Void>> rejectFarmer(
+      @PathVariable Long userId,
+      @RequestBody(required = false) FarmerRejectRequest request,
+      Authentication authentication) { // *** Inject Authentication ***
+    String reason = (request != null) ? request.getReason() : null;
+    adminUserService.rejectFarmer(
+        userId, reason, authentication); // *** Truyền authentication xuống ***
+    return ResponseEntity.ok(ApiResponse.success("Farmer rejected successfully."));
+  }
 
-    // API từ chối Farmer
-    @PostMapping("/{userId}/reject")
-    public ResponseEntity<ApiResponse<Void>> rejectFarmer(
-            @PathVariable Long userId,
-            @RequestBody(required = false) FarmerRejectRequest request,
-            Authentication authentication) { // *** Inject Authentication ***
-        String reason = (request != null) ? request.getReason() : null;
-        adminUserService.rejectFarmer(userId, reason, authentication); // *** Truyền authentication xuống ***
-        return ResponseEntity.ok(ApiResponse.success("Farmer rejected successfully."));
-    }
-
-    // Có thể thêm các API khác như xem chi tiết Farmer (dùng lại API của AdminUserService), xóa Farmer...
+  // Có thể thêm các API khác như xem chi tiết Farmer (dùng lại API của AdminUserService), xóa
+  // Farmer...
 }
-

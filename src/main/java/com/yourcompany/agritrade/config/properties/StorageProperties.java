@@ -10,9 +10,8 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 public class StorageProperties {
-    /**
-     * Folder location for storing files
-     */
-    private String location = "upload-dir"; // Thư mục lưu trữ mặc định
-    private String baseUrl = "/api/files/download"; // Đường dẫn base URL để truy cập file
+  /** Folder location for storing files */
+  private String location = "upload-dir"; // Thư mục lưu trữ mặc định
+
+  private String baseUrl = "/api/files/download"; // Đường dẫn base URL để truy cập file
 }

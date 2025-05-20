@@ -1,11 +1,11 @@
 package com.yourcompany.agritrade.catalog.dto.response;
 
-import lombok.Data;
 import java.math.BigDecimal;
+import lombok.Data;
 
 @Data
 public class ProductPricingTierResponse {
-    private Long id;
-    private Integer minQuantity;
-    private BigDecimal pricePerUnit;
+  private Long id;
+  private Integer minQuantity;
+  private BigDecimal pricePerUnit;
 }

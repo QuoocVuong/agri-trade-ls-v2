@@ -1,33 +1,33 @@
-//package com.yourcompany.agritrade.common.service.impl;
+// package com.yourcompany.agritrade.common.service.impl;
 //
-//import com.yourcompany.agritrade.common.exception.StorageException;
-//import com.yourcompany.agritrade.common.exception.StorageFileNotFoundException;
-//import com.yourcompany.agritrade.common.service.FileStorageService;
-//import com.yourcompany.agritrade.config.properties.StorageProperties;
-//import jakarta.annotation.PostConstruct; // Import PostConstruct
-//import lombok.extern.slf4j.Slf4j;
-//import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.core.io.Resource;
-//import org.springframework.core.io.UrlResource;
-//import org.springframework.stereotype.Service;
-//import org.springframework.util.FileSystemUtils;
-//import org.springframework.util.StringUtils;
-//import org.springframework.web.multipart.MultipartFile;
-//import org.springframework.web.servlet.support.ServletUriComponentsBuilder; // Import để tạo URL
+// import com.yourcompany.agritrade.common.exception.StorageException;
+// import com.yourcompany.agritrade.common.exception.StorageFileNotFoundException;
+// import com.yourcompany.agritrade.common.service.FileStorageService;
+// import com.yourcompany.agritrade.config.properties.StorageProperties;
+// import jakarta.annotation.PostConstruct; // Import PostConstruct
+// import lombok.extern.slf4j.Slf4j;
+// import org.springframework.beans.factory.annotation.Autowired;
+// import org.springframework.core.io.Resource;
+// import org.springframework.core.io.UrlResource;
+// import org.springframework.stereotype.Service;
+// import org.springframework.util.FileSystemUtils;
+// import org.springframework.util.StringUtils;
+// import org.springframework.web.multipart.MultipartFile;
+// import org.springframework.web.servlet.support.ServletUriComponentsBuilder; // Import để tạo URL
 //
-//import java.io.IOException;
-//import java.io.InputStream;
-//import java.net.MalformedURLException;
-//import java.nio.file.Files;
-//import java.nio.file.Path;
-//import java.nio.file.Paths;
-//import java.nio.file.StandardCopyOption;
-//import java.util.UUID;
-//import java.util.stream.Stream;
+// import java.io.IOException;
+// import java.io.InputStream;
+// import java.net.MalformedURLException;
+// import java.nio.file.Files;
+// import java.nio.file.Path;
+// import java.nio.file.Paths;
+// import java.nio.file.StandardCopyOption;
+// import java.util.UUID;
+// import java.util.stream.Stream;
 //
-//@Service
-//@Slf4j
-//public class FileSystemStorageService implements FileStorageService {
+// @Service
+// @Slf4j
+// public class FileSystemStorageService implements FileStorageService {
 //
 //    private final Path rootLocation;
 //    private final String baseUrl;
@@ -50,7 +50,8 @@
 //            Files.createDirectories(rootLocation);
 //            log.info("Created root storage directory: {}", rootLocation.toAbsolutePath());
 //        } catch (IOException e) {
-//            throw new StorageException("Could not initialize storage location: " + rootLocation.toAbsolutePath(), e);
+//            throw new StorageException("Could not initialize storage location: " +
+// rootLocation.toAbsolutePath(), e);
 //        }
 //    }
 //
@@ -61,7 +62,8 @@
 //        }
 //
 //        // Tạo thư mục con nếu chưa có
-//        Path subFolderPath = this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
+//        Path subFolderPath =
+// this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
 //        if (!subFolderPath.startsWith(this.rootLocation.toAbsolutePath())) {
 //            throw new StorageException("Cannot store file outside current directory.");
 //        }
@@ -95,7 +97,8 @@
 //
 //    @Override
 //    public Stream<Path> loadAll(String subFolder) {
-//        Path subFolderPath = this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
+//        Path subFolderPath =
+// this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
 //        try {
 //            return Files.walk(subFolderPath, 1) // Chỉ lấy file trong thư mục con, không đệ quy
 //                    .filter(path -> !path.equals(subFolderPath))
@@ -107,7 +110,8 @@
 //
 //    @Override
 //    public Path load(String filename, String subFolder) {
-//        Path subFolderPath = this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
+//        Path subFolderPath =
+// this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
 //        return subFolderPath.resolve(filename);
 //    }
 //
@@ -151,8 +155,9 @@
 //
 //    @Override
 //    public void deleteAll(String subFolder) {
-//        Path subFolderPath = this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
+//        Path subFolderPath =
+// this.rootLocation.resolve(Paths.get(subFolder)).normalize().toAbsolutePath();
 //        FileSystemUtils.deleteRecursively(subFolderPath.toFile());
 //        log.info("Deleted all files in subfolder: {}", subFolder);
 //    }
-//}
+// }

@@ -5,9 +5,12 @@ import com.yourcompany.agritrade.usermanagement.dto.response.FarmerProfileRespon
 import org.springframework.security.core.Authentication;
 
 public interface FarmerProfileService {
-    FarmerProfileResponse createOrUpdateFarmerProfile(Authentication authentication, FarmerProfileRequest request);
-    FarmerProfileResponse getFarmerProfile(Long userId); // Lấy profile của farmer bất kỳ (cho public view)
-    // Các hàm cho Admin duyệt
-    // void approveFarmerProfile(Long userId, Authentication adminAuth);
-    // void rejectFarmerProfile(Long userId, String reason, Authentication adminAuth);
+  FarmerProfileResponse createOrUpdateFarmerProfile(
+      Authentication authentication, FarmerProfileRequest request);
+
+  FarmerProfileResponse getFarmerProfile(
+      Long userId); // Lấy profile của farmer bất kỳ (cho public view)
+  // Các hàm cho Admin duyệt
+  // void approveFarmerProfile(Long userId, Authentication adminAuth);
+  // void rejectFarmerProfile(Long userId, String reason, Authentication adminAuth);
 }

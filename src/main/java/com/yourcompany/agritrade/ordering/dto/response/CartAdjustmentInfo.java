@@ -8,8 +8,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CartAdjustmentInfo {
-    private Long productId;
-    private String productName;
-    private String message; // Ví dụ: "Số lượng đã được cập nhật thành X do thay đổi tồn kho." hoặc "Sản phẩm đã hết hàng và được xóa."
-    private String type; // Ví dụ: "ADJUSTED", "REMOVED"
+  private Long productId;
+  private String productName;
+  private String
+      message; // Ví dụ: "Số lượng đã được cập nhật thành X do thay đổi tồn kho." hoặc "Sản phẩm đã
+  // hết hàng và được xóa."
+  private String type; // Ví dụ: "ADJUSTED", "REMOVED"
 }
