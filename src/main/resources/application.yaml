@@ -142,8 +142,8 @@ firebase:
 payment:
   vnpay:
     version: "2.1.0"
-    tmnCode: "YOUR_VNPAY_TMNCODE" # Lấy từ VNPay Portal
-    hashSecret: "YOUR_VNPAY_HASH_SECRET" # Lấy từ VNPay Portal
+    tmnCode: "J02TTCB1" # Lấy từ VNPay Portal
+    hashSecret: "DULJDLKQYYCB8EZDPPH27EYUA5NEVFFI" # Lấy từ VNPay Portal
     url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html" # URL cổng thanh toán TEST
     apiUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction" # URL API truy vấn (nếu cần)
   momo:
@@ -165,7 +165,8 @@ app:
     fullname: Quản Trị Viên
 
   backend:
-    url: "http://localhost:8080" # hoặc domain BE thật của bạn
+    url: "http://localhost:8080" # URL cũ
+    #url: "https://a006-2001-ee0-41c1-2963-ecf3-6bad-eaca-9b58.ngrok-free.app" # hoặc domain BE thật của bạn
     vnpayIpnUrl: "${app.backend.url}/api/payments/callback/vnpay/ipn"
     momoIpnUrl: ${app.backend.url}/api/payments/callback/momo/ipn
 

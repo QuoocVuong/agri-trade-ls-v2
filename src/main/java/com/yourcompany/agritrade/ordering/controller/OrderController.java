@@ -112,7 +112,7 @@ public class OrderController {
     return ResponseEntity.ok(ApiResponse.success(totals));
   }
 
-  @PostMapping("/api/orders/{orderId}/create-payment-url")
+  @PostMapping("/{orderId}/create-payment-url")
   @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')")
   public ResponseEntity<ApiResponse<PaymentUrlResponse>> createPaymentUrl(
       Authentication authentication,
@@ -136,15 +136,17 @@ public class OrderController {
 
     PaymentUrlResponse paymentUrlResponse = null;
     String clientIp = VnPayUtils.getIpAddress(httpServletRequest); // Sử dụng VnPayUtils
-    String frontendReturnUrl =
-        frontendAppUrl + "/payment/result"; // URL Frontend xử lý sau khi thanh toán
+    String frontendReturnUrl = frontendAppUrl + "/payment/result"; // URL Frontend xử lý sau khi thanh toán
 
     switch (paymentMethod) {
       case VNPAY:
         frontendReturnUrl = frontendAppUrl + "/payment/vnpay/result"; // Hoặc lấy từ config
         // Cập nhật paymentMethod của Order nếu người dùng chọn lại
-        if (order.getPaymentMethod() != PaymentMethod.VNPAY) {
+        if (order.getPaymentMethod() != PaymentMethod.VNPAY ||
+                order.getPaymentStatus() == PaymentStatus.FAILED ) {
           order.setPaymentMethod(PaymentMethod.VNPAY);
+          order.setPaymentStatus(PaymentStatus.PENDING); // Reset về PENDING
+          // Cân nhắc tạo Payment record mới nếu thử lại
           orderRepository.save(order); // Lưu lại
         }
         paymentUrlResponse = vnPayService.createVnPayPaymentUrl(order, clientIp, frontendReturnUrl);
