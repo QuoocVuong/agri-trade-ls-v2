@@ -298,18 +298,61 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, Pageable pageable) {
+    public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
         User farmer = getUserFromAuthentication(authentication);
-        Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(), pageable);
-        return orderMapper.toOrderSummaryResponsePage(orderPage);
+//        Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(), pageable);
+//        return orderMapper.toOrderSummaryResponsePage(orderPage);
+//    }
+        Specification<Order> spec = Specification.where(OrderSpecifications.byFarmer(farmer.getId())); // Luôn lọc theo farmerId
+
+        if (StringUtils.hasText(keyword)) {
+            // Giả sử keyword có thể là mã đơn hàng hoặc tên người mua
+            spec = spec.and(
+                    Specification.anyOf( // Sử dụng OR
+                            OrderSpecifications.hasOrderCode(keyword), // Cần tạo spec này
+                            OrderSpecifications.hasBuyerName(keyword)  // Cần tạo spec này
+                    )
+            );
+        }
+        if (status != null) {
+            spec = spec.and(OrderSpecifications.hasStatus(status)); // Dùng lại spec đã có
+        }
+
+        // Fetch các thông tin cần thiết cho OrderSummaryResponse để tránh N+1
+        // Ví dụ: fetch buyer, farmer (nếu OrderSummaryResponse cần tên của họ)
+        // spec = spec.and(OrderSpecifications.fetchBuyerAndFarmerSummary()); // Cần tạo spec này
+
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+
+        // QUAN TRỌNG: Gọi populateProductImageUrlsInOrder nếu OrderSummaryResponse
+        // hoặc bất kỳ DTO con nào của nó cần imageUrl từ ProductImage
+        // Nếu OrderSummaryResponse không hiển thị ảnh sản phẩm thì không cần dòng này.
+        // orderPage.getContent().forEach(this::populateProductImageUrlsInOrder);
+
+
+        return orderPage.map(orderMapper::toOrderSummaryResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderSummaryResponse> getAllOrdersForAdmin(OrderStatus status, Long buyerId, Long farmerId, Pageable pageable) {
+    public Page<OrderSummaryResponse> getAllOrdersForAdmin(String keyword, OrderStatus status, Long buyerId, Long farmerId, Pageable pageable) {
         Specification<Order> spec = Specification.where(OrderSpecifications.hasStatus(status))
                 .and(OrderSpecifications.byBuyer(buyerId))
                 .and(OrderSpecifications.byFarmer(farmerId));
+
+        if (StringUtils.hasText(keyword)) {
+            // Keyword có thể là mã đơn hàng, tên người mua, hoặc tên người bán
+            spec = spec.and(
+                    Specification.anyOf(
+                            OrderSpecifications.hasOrderCode(keyword),
+                            OrderSpecifications.hasBuyerName(keyword),
+                            OrderSpecifications.hasFarmerName(keyword) // Cần tạo spec này
+                    )
+            );
+        }
+
+        // Fetch thông tin cần thiết cho OrderSummaryResponse
+        // spec = spec.and(OrderSpecifications.fetchBuyerAndFarmerSummary()); // Đã có trong OrderRepository
         Page<Order> orderPage = orderRepository.findAll(spec, pageable); // Dùng findAll với Spec
         return orderMapper.toOrderSummaryResponsePage(orderPage);
     }

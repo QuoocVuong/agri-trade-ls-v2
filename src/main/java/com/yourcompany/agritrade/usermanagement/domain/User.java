@@ -96,5 +96,10 @@ public class User {
 
     private LocalDateTime verificationTokenExpiry;
 
+    @Column(length = 512) // Độ dài đủ cho refresh token
+    private String refreshToken;
+
+    private LocalDateTime refreshTokenExpiryDate;
+
     // Constructors, other fields (verification code etc.) can be added later
 }

@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
 public class JwtProperties {
     private String secret;
     private long expirationMs;
-    // Thêm refresh token nếu cần
-    // private RefreshToken refreshToken;
-    // @Getter @Setter
-    // public static class RefreshToken {
-    //     private long expirationMs;
-    // }
+    private RefreshToken refreshToken;
+
+     @Getter @Setter
+     public static class RefreshToken {
+         private long expirationMs;
+     }
 }

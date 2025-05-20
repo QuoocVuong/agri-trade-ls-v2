@@ -17,7 +17,7 @@ public class OpenApiConfig {
     public OpenAPI customOpenAPI() {
         final String securitySchemeName = "bearerAuth"; // Tên của security scheme
         return new OpenAPI()
-                .info(new Info().title("AgriTradeLS API")
+                .info(new Info().title("AgriTrade API")
                         .version("v1.0")
                         .description("API Documentation for AgriTradeLS Application (B2B & B2C E-commerce)")
                         .termsOfService("http://swagger.io/terms/") // Thay bằng link điều khoản sử dụng nếu có

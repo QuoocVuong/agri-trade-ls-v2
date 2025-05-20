@@ -15,6 +15,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication; // Import Authentication nếu cần lấy thông tin admin
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -30,11 +31,22 @@ public class AdminOrderController {
     // Lấy tất cả đơn hàng với bộ lọc
     @GetMapping
     public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getAllOrders(
-            @RequestParam(required = false) OrderStatus status, // Lọc theo trạng thái Enum
+            @RequestParam(required = false) String keyword, // THÊM KEYWORD
+            @RequestParam(required = false) String status,  // Đổi thành String để linh hoạt
             @RequestParam(required = false) Long buyerId,
             @RequestParam(required = false) Long farmerId,
             @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
-        Page<OrderSummaryResponse> orders = orderService.getAllOrdersForAdmin(status, buyerId, farmerId, pageable);
+
+        OrderStatus statusEnum = null;
+        if (StringUtils.hasText(status)) {
+            try {
+                statusEnum = OrderStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // log.warn("Invalid order status value received for admin: {}", status);
+            }
+        }
+
+        Page<OrderSummaryResponse> orders = orderService.getAllOrdersForAdmin(keyword, statusEnum, buyerId, farmerId, pageable);
         return ResponseEntity.ok(ApiResponse.success(orders));
     }
 

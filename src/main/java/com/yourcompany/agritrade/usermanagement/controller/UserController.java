@@ -6,6 +6,7 @@ import com.yourcompany.agritrade.usermanagement.dto.request.PasswordChangeReques
 import com.yourcompany.agritrade.usermanagement.dto.request.UserUpdateRequest;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserProfileResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserResponse;
+import com.yourcompany.agritrade.usermanagement.service.AdminUserService;
 import com.yourcompany.agritrade.usermanagement.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize; // Import PreAuthorize
 import org.springframework.security.core.Authentication; // Import Authentication
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
@@ -26,6 +28,8 @@ import java.util.Set;
 public class UserController {
 
     private final UserService userService;
+
+    private final AdminUserService adminUserService;
 
     // Endpoint lấy thông tin profile của user đang đăng nhập
     @GetMapping("/me/profile")
@@ -58,9 +62,21 @@ public class UserController {
     @GetMapping
     //@PreAuthorize("hasRole('ADMIN')")
     @PreAuthorize("hasAuthority('USER_READ_ALL')") // Cách mới dùng permission
-    public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsers(
+    public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsersForAdmin(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String role, // Nhận role là String
+            @RequestParam(required = false) Boolean isActive, // Nhận isActive
             @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) { // Thêm phân trang mặc định
-        Page<UserResponse> users = userService.getAllUsers(pageable);
+
+        RoleType roleEnum = null;
+        if (StringUtils.hasText(role)) {
+            try {
+                roleEnum = RoleType.valueOf(role.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // log.warn("Invalid role value received: {}", role);
+            }
+        }
+        Page<UserResponse> users =  adminUserService.getAllUsers(pageable, roleEnum, keyword, isActive);
         return ResponseEntity.ok(ApiResponse.success(users));
     }
 

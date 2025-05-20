@@ -23,10 +23,10 @@ public interface OrderService {
     Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, Pageable pageable);
 
     /** Lấy danh sách đơn hàng của nông dân hiện tại (phân trang) */
-    Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, Pageable pageable);
+    Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable);
 
     /** Lấy danh sách tất cả đơn hàng cho Admin (phân trang, có filter) */
-    Page<OrderSummaryResponse> getAllOrdersForAdmin(OrderStatus status, Long buyerId, Long farmerId, Pageable pageable);
+    Page<OrderSummaryResponse> getAllOrdersForAdmin(String keyword, OrderStatus status, Long buyerId, Long farmerId, Pageable pageable);
 
     /** Lấy chi tiết đơn hàng theo ID (kiểm tra quyền truy cập) */
     OrderResponse getOrderDetails(Authentication authentication, Long orderId);

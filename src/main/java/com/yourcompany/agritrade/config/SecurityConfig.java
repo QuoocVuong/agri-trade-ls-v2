@@ -84,6 +84,7 @@ public class SecurityConfig {
                                 "/api/files/download/**", // Public file downloads
                                 "/swagger-ui/**", // Swagger UI
                                 "/api-docs/**", // OpenAPI docs
+                                "/api/auth/refresh-token",
                                 "/swagger-ui.html",
                                 "/ws/**" // <-- Cho phép kết nối WebSocket ban đầu
                         ).permitAll()

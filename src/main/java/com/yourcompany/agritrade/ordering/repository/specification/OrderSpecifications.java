@@ -2,6 +2,7 @@ package com.yourcompany.agritrade.ordering.repository.specification;
 
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import jakarta.persistence.criteria.*; // Import các thành phần criteria
 import org.springframework.data.jpa.domain.Specification;
@@ -57,6 +58,53 @@ public class OrderSpecifications {
             // Join với bảng User (farmer) để lấy id
             Join<Order, User> farmerJoin = root.join("farmer", JoinType.INNER);
             return criteriaBuilder.equal(farmerJoin.get("id"), farmerId);
+        };
+    }
+
+    public static Specification<Order> hasOrderCode(String orderCode) {
+        if (!StringUtils.hasText(orderCode)) {
+            return null;
+        }
+        String codePattern = "%" + orderCode.toLowerCase() + "%";
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.like(criteriaBuilder.lower(root.get("orderCode")), codePattern);
+    }
+
+    public static Specification<Order> hasBuyerName(String buyerName) {
+        if (!StringUtils.hasText(buyerName)) {
+            return null;
+        }
+        String namePattern = "%" + buyerName.toLowerCase() + "%";
+        return (root, query, criteriaBuilder) -> {
+            Join<Order, User> buyerJoin = root.join("buyer", JoinType.LEFT); // LEFT JOIN để không loại bỏ đơn nếu buyer bị null (dù không nên)
+            return criteriaBuilder.like(criteriaBuilder.lower(buyerJoin.get("fullName")), namePattern);
+        };
+    }
+
+    // (Tùy chọn) Specification để fetch thông tin cho Summary
+    public static Specification<Order> fetchBuyerAndFarmerSummary() {
+        return (root, query, criteriaBuilder) -> {
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("buyer", JoinType.LEFT);
+                root.fetch("farmer", JoinType.LEFT).fetch("farmerProfile", JoinType.LEFT);
+            }
+            return criteriaBuilder.conjunction();
+        };
+    }
+
+    public static Specification<Order> hasFarmerName(String farmerName) {
+        if (!StringUtils.hasText(farmerName)) {
+            return null;
+        }
+        String namePattern = "%" + farmerName.toLowerCase() + "%";
+        return (root, query, criteriaBuilder) -> {
+            Join<Order, User> farmerJoin = root.join("farmer", JoinType.LEFT);
+            // Giả sử User entity có fullName, hoặc FarmerProfile có farmName
+            // Ưu tiên tìm theo farmName nếu có, sau đó là fullName của farmer
+            Join<User, FarmerProfile> profileJoin = farmerJoin.join("farmerProfile", JoinType.LEFT); // Giả sử User có quan hệ tới FarmerProfile
+            Predicate farmNameLike = criteriaBuilder.like(criteriaBuilder.lower(profileJoin.get("farmName")), namePattern);
+            Predicate farmerFullNameLike = criteriaBuilder.like(criteriaBuilder.lower(farmerJoin.get("fullName")), namePattern);
+            return criteriaBuilder.or(farmNameLike, farmerFullNameLike);
         };
     }
 

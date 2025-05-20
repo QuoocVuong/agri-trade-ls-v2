@@ -1,6 +1,7 @@
 package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
+import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
@@ -13,6 +14,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -27,8 +29,21 @@ public class FarmerOrderController {
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsFarmer(
             Authentication authentication,
+            @RequestParam(required = false) String keyword, // THÊM
+            @RequestParam(required = false) String status,  // THÊM (nhận là String)
             @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
-        Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsFarmer(authentication, pageable);
+
+        OrderStatus statusEnum = null;
+        if (StringUtils.hasText(status)) {
+            try {
+                statusEnum = OrderStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // log.warn("Invalid order status value received: {}", status);
+                // Có thể trả về lỗi BadRequest hoặc bỏ qua filter này
+            }
+        }
+
+        Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsFarmer(authentication, keyword, statusEnum, pageable);
         return ResponseEntity.ok(ApiResponse.success(orders));
     }
 

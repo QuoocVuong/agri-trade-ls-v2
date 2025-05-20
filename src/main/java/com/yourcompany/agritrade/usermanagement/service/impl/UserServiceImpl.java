@@ -8,6 +8,7 @@ import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.config.properties.JwtProperties;
 import com.yourcompany.agritrade.config.security.JwtTokenProvider;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
@@ -19,6 +20,7 @@ import com.yourcompany.agritrade.usermanagement.dto.request.PasswordChangeReques
 import com.yourcompany.agritrade.usermanagement.dto.request.UserRegistrationRequest;
 import com.yourcompany.agritrade.usermanagement.dto.request.UserUpdateRequest;
 import com.yourcompany.agritrade.usermanagement.dto.response.FarmerSummaryResponse;
+import com.yourcompany.agritrade.usermanagement.dto.response.LoginResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserProfileResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserResponse;
 import com.yourcompany.agritrade.usermanagement.mapper.BusinessProfileMapper;
@@ -36,6 +38,7 @@ import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +58,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -74,6 +78,8 @@ public class UserServiceImpl implements UserService {
     private final FarmerSummaryMapper farmerSummaryMapper;
     private final JwtTokenProvider jwtTokenProvider; // Inject JWT provider
 
+    private final JwtProperties jwtProperties;
+
     private final NotificationService notificationService;
     @Value("${app.frontend.url:http://localhost:4200}") // Lấy URL frontend
     private String frontendUrl;
@@ -87,8 +93,11 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse registerUser(UserRegistrationRequest registrationRequest) { // Đổi tên tham số
+
+        String email = registrationRequest.getEmail().toLowerCase(); // << CHUẨN HÓA EMAIL
+
         // 1. Kiểm tra trùng lặp
-        if (userRepository.existsByEmailIgnoringSoftDelete(registrationRequest.getEmail())) {
+        if (userRepository.existsByEmailIgnoringSoftDelete(email)) {
             throw new BadRequestException("Error: Email is already taken!");
         }
         if (registrationRequest.getPhoneNumber() != null && userRepository.existsByPhoneNumber(registrationRequest.getPhoneNumber())) {
@@ -116,15 +125,20 @@ public class UserServiceImpl implements UserService {
         user.setRoles(roles);
 
         // 4. Lưu User vào DB
-        User savedUser = userRepository.save(user);
+        try {
+            User savedUser = userRepository.saveAndFlush(user); // Dùng saveAndFlush để lỗi DB xảy ra ngay lập tức nếu có
 
-        // Gửi email xác thực (bất đồng bộ)
-        String verificationUrl = frontendUrl + "/auth/verify-email?token=" + token; // Hoặc /api/auth/verify?token=
-        emailService.sendVerificationEmail(savedUser, token, verificationUrl);
+            // Gửi email xác thực (bất đồng bộ)
 
+            String verificationUrl = frontendUrl + "/auth/verify-email?token=" + token;
+            emailService.sendVerificationEmail(savedUser, token, verificationUrl);
 
-        // 5. Map sang DTO để trả về
-        return userMapper.toUserResponse(savedUser);
+            // 5. Map sang DTO để trả về
+
+            return userMapper.toUserResponse(savedUser);
+        } catch (DataIntegrityViolationException e) {
+            throw new BadRequestException("Error: Email is already taken! Please try a different email.");
+        }
     }
 
     @Override
@@ -173,6 +187,9 @@ public class UserServiceImpl implements UserService {
 
         // Mã hóa và cập nhật mật khẩu mới
         user.setPasswordHash(passwordEncoder.encode(passwordChangeRequest.getNewPassword()));
+
+        invalidateRefreshTokenForUser(user.getEmail());
+
         userRepository.save(user);
     }
 
@@ -486,10 +503,30 @@ public class UserServiceImpl implements UserService {
         };
     }
 
+    @Override
+    @Transactional
+    public LoginResponse processLoginAuthentication(Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found after authentication"));
+
+        String accessToken = jwtTokenProvider.generateAccessToken(authentication);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication);
+
+        user.setRefreshToken(refreshToken);
+        // Lấy thời gian hết hạn từ jwtProperties
+        long refreshTokenDurationMs = jwtProperties.getRefreshToken().getExpirationMs();
+        user.setRefreshTokenExpiryDate(LocalDateTime.now().plusNanos(TimeUnit.MILLISECONDS.toNanos(refreshTokenDurationMs)));
+        userRepository.save(user);
+
+        UserResponse userResponse = userMapper.toUserResponse(user);
+        return new LoginResponse(accessToken, refreshToken, userResponse);
+    }
+
+
 
     @Override
     @Transactional
-    public String processGoogleLogin(String googleIdTokenString) throws GeneralSecurityException, IOException {
+    public LoginResponse processGoogleLogin(String googleIdTokenString) throws GeneralSecurityException, IOException {
         // 1. Xác thực Google ID Token
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
                 .setAudience(Collections.singletonList(googleClientId))
@@ -528,13 +565,19 @@ public class UserServiceImpl implements UserService {
         // Lấy authorities từ user đã tìm/tạo
         Collection<? extends GrantedAuthority> authorities = mapRolesToAuthorities(user.getRoles()); // Giả sử có hàm này
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                user.getEmail(),
-                null,
-                authorities);
+                user.getEmail(), null, mapRolesToAuthorities(user.getRoles())
+        );
 
-        String jwt = jwtTokenProvider.generateToken(authentication);
+        String accessToken = jwtTokenProvider.generateAccessToken(authentication);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication);
 
-        return jwt; // Trả về JWT
+        user.setRefreshToken(refreshToken);
+        long refreshTokenDurationMs = jwtProperties.getRefreshToken().getExpirationMs();
+        user.setRefreshTokenExpiryDate(LocalDateTime.now().plusNanos(TimeUnit.MILLISECONDS.toNanos(refreshTokenDurationMs)));
+        userRepository.save(user);
+
+        UserResponse userResponse = userMapper.toUserResponse(user);
+        return new LoginResponse(accessToken, refreshToken, userResponse);
     }
 
     // Hàm helper tìm hoặc tạo user
@@ -594,6 +637,71 @@ public class UserServiceImpl implements UserService {
         return roles.stream()
                 .map(role -> new SimpleGrantedAuthority(role.getName().name()))
                 .collect(Collectors.toList());
+    }
+
+    // Phương thức làm mới token
+    @Transactional
+    public LoginResponse refreshToken(String refreshTokenRequest) { // refreshTokenRequest là chuỗi refresh token từ client
+        // 1. Validate refresh token (cấu trúc, chữ ký, chưa hết hạn theo claim 'exp')
+        if (!jwtTokenProvider.validateToken(refreshTokenRequest)) {
+            log.warn("Attempt to refresh with an invalid (malformed, expired by claim, or bad signature) refresh token.");
+            throw new BadRequestException("Invalid Refresh Token");
+        }
+
+        // 2. Lấy email (hoặc subject) từ refresh token
+        String email = jwtTokenProvider.getEmailFromToken(refreshTokenRequest);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    log.warn("User not found for refresh token with email: {}", email);
+                    return new UsernameNotFoundException("User not found with email from refresh token: " + email);
+                });
+
+        // 3. Kiểm tra refresh token trong DB với token được gửi lên và thời gian hết hạn trong DB
+        if (user.getRefreshToken() == null ||
+                !user.getRefreshToken().equals(refreshTokenRequest) || // So sánh token trong DB với token client gửi
+                user.getRefreshTokenExpiryDate() == null ||
+                user.getRefreshTokenExpiryDate().isBefore(LocalDateTime.now())) { // Kiểm tra thời gian hết hạn trong DB
+
+            log.warn("Refresh token for user {} is invalid, not matching DB, or expired in DB. Forcing re-login.", email);
+            // (Tùy chọn) Thu hồi tất cả refresh token của user này nếu phát hiện lạm dụng hoặc token cũ
+            // user.setRefreshToken(null);
+            // user.setRefreshTokenExpiryDate(null);
+            // userRepository.save(user);
+            throw new BadRequestException("Refresh token is invalid or expired. Please login again.");
+        }
+
+        // 4. Nếu mọi thứ ổn, tạo access token mới
+        // Tạo Authentication object mới từ User để generate access token
+        Collection<? extends GrantedAuthority> authorities = mapRolesToAuthorities(user.getRoles());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                user.getEmail(), null, authorities
+        );
+        String newAccessToken = jwtTokenProvider.generateAccessToken(authentication);
+
+        // 5. (QUAN TRỌNG - Chiến lược Refresh Token)
+        // Lựa chọn 1: Trả về access token mới và giữ nguyên refresh token cũ (nếu nó còn hạn dài)
+        // LoginResponse response = new LoginResponse(newAccessToken, refreshTokenRequest, userMapper.toUserResponse(user));
+
+        // Lựa chọn 2: Tạo cả access token MỚI và refresh token MỚI (xoay vòng refresh token - an toàn hơn)
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(authentication);
+        user.setRefreshToken(newRefreshToken);
+        user.setRefreshTokenExpiryDate(LocalDateTime.now().plusSeconds(jwtProperties.getRefreshToken().getExpirationMs() / 1000));
+        userRepository.save(user);
+        LoginResponse response = new LoginResponse(newAccessToken, newRefreshToken, userMapper.toUserResponse(user));
+        log.info("Refreshed token for user {}. New access and refresh tokens generated.", email);
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public void invalidateRefreshTokenForUser(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.setRefreshToken(null);
+            user.setRefreshTokenExpiryDate(null);
+            userRepository.save(user);
+            log.info("Invalidated refresh token for user: {}", email);
+        });
     }
 
 

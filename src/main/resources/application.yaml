@@ -10,6 +10,19 @@ spring:
     username: root # Thay đổi
     password: root # Thay đổi
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: localhost # Hoặc địa chỉ Redis server của bạn
+      port: 6379
+      # password: your-redis-password # Nếu có
+      # database: 0 # Nếu cần
+      # timeout: 3000ms # Thời gian chờ kết nối
+      # lettuce:
+      #   pool:
+      #     max-active: 8
+      #     max-idle: 8
+      #     min-idle: 0
+      #     max-wait: -1ms # Chờ vô hạn nếu không có kết nối sẵn
 
   jpa:
     hibernate:
@@ -73,9 +86,9 @@ spring:
   security:
     jwt:
       secret: be7aa243bf7c384f2714e9e11316da6cb659ab0a0c63bc0db96f1c543e9bbeec38ded28c9aa9055e11c385a83882b81417e32675e3bc9ef2d615309fea3bc1d2f742a1ac90c2e410656c18cbaf0b33b97bd48f12cb8daa85d36e091767805a11dfabe5bf92c324f56d3bee63f04d501a538ebb7f300098dca28a6db4780830e0e6efc513f1b7472a1dcda8df1c92f9391a4944a91a46877a44896c52a0f0dd902f785742e0d3af5404327aacf95927830de3a2764fa72538f9a586261a1fcf4a50721156ff43ef8eaeb66bdd3261c6e12bf971cbbfe9d20621380afdc7021eefdd034e5f1d6faad989e45eb3ee765f6dc24f1859f58c17d336cb3cc8824268d2 # Thay bằng key bí mật thực sự dài và an toàn
-      expiration-ms: 86400000 # 1 ngày (tính bằng mili giây)
+      expiration-ms:  3600000 # 1 giờ cho access token
       refresh-token:
-        expiration-ms: 604800000 # 7 ngày
+        expiration-ms: 604800000 # 7 ngày cho refresh token
 
 # Cấu hình cho SpringDoc OpenAPI (Swagger UI)
 springdoc:

@@ -50,12 +50,13 @@ public class AdminCatalogController {
     // --- Product Management & Approval ---
     @GetMapping("/products")
     public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> getAllProductsForAdmin(
+            @RequestParam(required = false) String keyword, // THÊM KEYWORD
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Integer categoryId,
             @RequestParam(required = false) Long farmerId,
             @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
         // Gọi phương thức đã implement trong ProductService
-        Page<ProductSummaryResponse> products = productService.getAllProductsForAdmin(status, categoryId, farmerId, pageable);
+        Page<ProductSummaryResponse> products = productService.getAllProductsForAdmin(keyword, status, categoryId, farmerId, pageable);
         return ResponseEntity.ok(ApiResponse.success(products));
     }
 

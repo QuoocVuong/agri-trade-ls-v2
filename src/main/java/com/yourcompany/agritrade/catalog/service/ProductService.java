@@ -1,5 +1,6 @@
 package com.yourcompany.agritrade.catalog.service;
 
+import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
@@ -11,7 +12,7 @@ import org.springframework.security.core.Authentication;
 public interface ProductService {
 
     // Cho Farmer
-    Page<ProductSummaryResponse> getMyProducts(Authentication authentication, Pageable pageable);
+    Page<ProductSummaryResponse> getMyProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable);
     ProductDetailResponse getMyProductById(Authentication authentication, Long productId);
     ProductDetailResponse createMyProduct(Authentication authentication, ProductRequest request);
     ProductDetailResponse updateMyProduct(Authentication authentication, Long productId, ProductRequest request);
@@ -40,7 +41,7 @@ public interface ProductService {
     // ===========================
 
     // Cho Admin
-    Page<ProductSummaryResponse> getAllProductsForAdmin(String status, Integer categoryId, Long farmerId, Pageable pageable);
+    Page<ProductSummaryResponse> getAllProductsForAdmin(String keyword, String status, Integer categoryId, Long farmerId, Pageable pageable);
     ProductDetailResponse getProductByIdForAdmin(Long productId); // Lấy cả sản phẩm chưa publish/đã xóa
     ProductDetailResponse approveProduct(Long productId);
     ProductDetailResponse rejectProduct(Long productId, String reason); // Có thể thêm lý do từ chối

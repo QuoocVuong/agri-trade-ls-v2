@@ -78,11 +78,42 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductSummaryResponse> getMyProducts(Authentication authentication, Pageable pageable) {
+    public Page<ProductSummaryResponse> getMyProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
         User farmer = getUserFromAuthentication(authentication);
         // findByFarmerId đã tự lọc is_deleted=false nhờ @Where
-        return productRepository.findByFarmerId(farmer.getId(), pageable)
-                .map(productMapper::toProductSummaryResponse);
+//        return productRepository.findByFarmerId(farmer.getId(), pageable)
+//                .map(productMapper::toProductSummaryResponse);
+
+        // Xây dựng Specification để lọc
+        Specification<Product> spec = Specification.where(ProductSpecifications.byFarmer(farmer.getId())); // Luôn lọc theo farmerId
+
+        if (StringUtils.hasText(keyword)) {
+            spec = spec.and(ProductSpecifications.hasKeyword(keyword)); // Tái sử dụng specification đã có
+        }
+        if (status != null) {
+            spec = spec.and(ProductSpecifications.hasStatus(status.name())); // Tái sử dụng specification, truyền tên Enum
+        }
+        // Không cần fetchFarmerAndProfile ở đây vì đã lọc theo farmer.id
+        // Có thể fetch category nếu ProductSummaryResponse cần tên category
+        // spec = spec.and(ProductSpecifications.fetchCategory());
+
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+
+        // QUAN TRỌNG: Gọi populateImageUrls cho mỗi sản phẩm TRƯỚC KHI MAP
+        productPage.getContent().forEach(this::populateImageUrls); // Hoặc productPage.forEach(this::populateImageUrls);
+
+        return productPage.map(productMapper::toProductSummaryResponse);
+    }
+
+    // Phương thức helper để điền imageUrls (đã có từ trước)
+    private void populateImageUrls(Product product) {
+        if (product != null && product.getImages() != null && !product.getImages().isEmpty()) {
+            for (ProductImage image : product.getImages()) {
+                if (StringUtils.hasText(image.getBlobPath())) {
+                    image.setImageUrl(fileStorageService.getFileUrl(image.getBlobPath()));
+                }
+            }
+        }
     }
 
     @Override
@@ -507,15 +538,24 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductSummaryResponse> getAllProductsForAdmin(String status, Integer categoryId, Long farmerId, Pageable pageable) {
+    public Page<ProductSummaryResponse> getAllProductsForAdmin(String keyword, String status, Integer categoryId, Long farmerId, Pageable pageable) {
         // Lọc cả sản phẩm chưa publish, đã xóa mềm nếu cần (tùy yêu cầu)
         // Hiện tại đang dùng repo mặc định (lọc is_deleted=false)
-        Specification<Product> spec = Specification.where(ProductSpecifications.hasStatus(status)) // Tạo spec này
+        Specification<Product> spec =Specification.where(ProductSpecifications.hasKeyword(keyword))
+                .and(ProductSpecifications.hasStatus(status))
                 .and(ProductSpecifications.inCategory(categoryId))
-                .and(ProductSpecifications.byFarmer(farmerId)); // Tạo spec này
+                .and(ProductSpecifications.byFarmer(farmerId));
+        // Có thể thêm fetch join nếu ProductSummaryResponse cần thêm thông tin
+        // spec = spec.and(ProductSpecifications.fetchFarmerAndProfile());
+        // spec = spec.and(ProductSpecifications.fetchCategory());
 
-        return productRepository.findAll(spec, pageable)
-                .map(productMapper::toProductSummaryResponse);
+
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+
+        // Gọi populateImageUrls nếu ProductSummaryResponse cần thumbnail
+        productPage.getContent().forEach(this::populateImageUrls);
+
+        return productPage.map(productMapper::toProductSummaryResponse);
     }
 
     @Override

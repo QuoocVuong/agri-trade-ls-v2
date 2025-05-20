@@ -6,6 +6,7 @@ import com.yourcompany.agritrade.usermanagement.dto.request.PasswordChangeReques
 import com.yourcompany.agritrade.usermanagement.dto.request.UserRegistrationRequest;
 import com.yourcompany.agritrade.usermanagement.dto.request.UserUpdateRequest;
 import com.yourcompany.agritrade.usermanagement.dto.response.FarmerSummaryResponse;
+import com.yourcompany.agritrade.usermanagement.dto.response.LoginResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserProfileResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserResponse;
 import org.springframework.data.domain.Page;
@@ -85,6 +86,14 @@ public interface UserService {
     Page<FarmerSummaryResponse> searchPublicFarmers(String keyword, String provinceCode, Pageable pageable);
     // ===========================
 
+    // --- PHƯƠNG THỨC CHO XỬ LÝ LOGIN VÀ TOKEN ---
+    /**
+     * Xử lý việc xác thực thành công, tạo tokens và lưu refresh token.
+     * @param authentication Đối tượng Authentication đã được xác thực.
+     * @return LoginResponse chứa accessToken, refreshToken và thông tin user.
+     */
+    LoginResponse processLoginAuthentication(Authentication authentication); // << THÊM PHƯƠNG THỨC NÀY
+
     // ****** THÊM PHƯƠNG THỨC NÀY ******
     /**
      * Xử lý đăng nhập bằng Google ID Token.
@@ -93,6 +102,16 @@ public interface UserService {
      * @return JWT của ứng dụng AgriTradeLS cho người dùng đã xác thực.
 
      */
-    String processGoogleLogin(String idTokenString) throws GeneralSecurityException, IOException;
+    LoginResponse  processGoogleLogin(String idTokenString) throws GeneralSecurityException, IOException;
     // **********************************
+
+    /**
+     * Làm mới access token bằng cách sử dụng refresh token.
+     * @param refreshTokenRequest Chuỗi refresh token từ client.
+     * @return LoginResponse chứa accessToken mới và refresh token (có thể là cũ hoặc mới tùy chiến lược).
+     //* @throws BadRequestException Nếu refresh token không hợp lệ hoặc hết hạn.
+     */
+    LoginResponse refreshToken(String refreshTokenRequest); // << THÊM PHƯƠNG THỨC N
+
+    void invalidateRefreshTokenForUser(String email);
 }

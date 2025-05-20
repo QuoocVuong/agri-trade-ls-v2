@@ -2,7 +2,8 @@
 package com.yourcompany.agritrade.usermanagement.controller;
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.usermanagement.dto.request.GoogleLoginRequest;
-import com.yourcompany.agritrade.usermanagement.dto.response.AuthResponse; // DTO chứa JWT
+
+import com.yourcompany.agritrade.usermanagement.dto.response.LoginResponse;
 import com.yourcompany.agritrade.usermanagement.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,17 +20,13 @@ public class OAuth2Controller {
     private final UserService userService;
 
     @PostMapping("/google/verify") // Endpoint nhận ID Token từ Frontend
-    public ResponseEntity<ApiResponse<AuthResponse>> verifyGoogleToken(@Valid @RequestBody GoogleLoginRequest request) {
+    public ResponseEntity<ApiResponse<LoginResponse>> verifyGoogleToken(@Valid @RequestBody GoogleLoginRequest request) {
         try {
-            String jwt = userService.processGoogleLogin(request.getIdToken());
-            AuthResponse authResponse = new AuthResponse(jwt); // Tạo response chứa JWT
 
-            // Hoặc nếu muốn thêm thông tin khác (ví dụ: expiry)
-            // long expiresIn = tokenProvider.getExpirationMsFromToken(jwt); // Cần thêm hàm này vào JwtTokenProvider
-            // AuthResponse authResponse = new AuthResponse(jwt, "Bearer", expiresIn / 1000); // Ví dụ
+            LoginResponse loginResponse = userService.processGoogleLogin(request.getIdToken());
 
 
-            return ResponseEntity.ok(ApiResponse.success(authResponse, "Google Sign-In successful"));
+            return ResponseEntity.ok(ApiResponse.success(loginResponse, "Google Sign-In successful"));
         } catch (Exception e) {
             log.error("Google Sign-In failed: {}", e.getMessage());
             // Trả về lỗi cụ thể hơn nếu có thể
