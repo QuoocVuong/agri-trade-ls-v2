@@ -34,7 +34,7 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect # Hoặc phiên bản mới hơn
 
   flyway:
-    enabled: true
+    enabled: false
     # baseline-on-migrate: true # Chỉ dùng lần đầu nếu DB đã có bảng
 
   # Cấu hình Mail (Ví dụ với Gmail - Cần bật Less Secure App hoặc dùng App Password)

@@ -30,6 +30,7 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
 
   // Chỉ map các trường cơ bản từ User sang UserResponse
   @Mapping(source = "roles", target = "roles", qualifiedByName = "rolesToRoleNames")
+
   @Named("toUserResponse") // *** Đặt tên cho phương thức nà
   public abstract UserResponse toUserResponse(User user);
 

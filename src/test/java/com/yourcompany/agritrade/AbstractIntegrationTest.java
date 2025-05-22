@@ -19,11 +19,12 @@ public abstract class AbstractIntegrationTest {
   // 'mysql:8.0' là tên image Docker
   // static để container chỉ khởi động 1 lần cho tất cả test trong các lớp kế thừa
   @Container
-  static final MySQLContainer<?> mySQLContainer =
-      new MySQLContainer<>(DockerImageName.parse("mysql:8.0"))
-          .withDatabaseName("testdb") // Tên DB trong container
-          .withUsername("testuser") // User trong container
-          .withPassword("testpass"); // Password trong container
+  static final MySQLContainer<?> mySQLContainerForIntegration = // Đổi tên biến để rõ ràng
+          new MySQLContainer<>(DockerImageName.parse("mysql:8.0"))
+                  .withDatabaseName("test_integration_db") // Tên DB riêng
+                  .withUsername("testuser")
+                  .withPassword("testpass")
+                  .withReuse(true);
 
   // .withReuse(true); // Có thể bật để tái sử dụng container giữa các lần chạy test (nhanh hơn)
 
@@ -31,9 +32,9 @@ public abstract class AbstractIntegrationTest {
   // Các thuộc tính này sẽ ghi đè lên application-test.yaml (nếu có)
   @DynamicPropertySource
   static void mysqlProperties(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", mySQLContainer::getJdbcUrl); // Lấy URL động từ container
-    registry.add("spring.datasource.username", mySQLContainer::getUsername); // Lấy username động
-    registry.add("spring.datasource.password", mySQLContainer::getPassword); // Lấy password động
+    registry.add("spring.datasource.url", mySQLContainerForIntegration::getJdbcUrl); // Lấy URL động từ container
+    registry.add("spring.datasource.username", mySQLContainerForIntegration::getUsername); // Lấy username động
+    registry.add("spring.datasource.password", mySQLContainerForIntegration::getPassword); // Lấy password động
     // registry.add("spring.flyway.url", mySQLContainer::getJdbcUrl); // Cấu hình cả cho Flyway nếu
     // dùng
     // registry.add("spring.flyway.user", mySQLContainer::getUsername);

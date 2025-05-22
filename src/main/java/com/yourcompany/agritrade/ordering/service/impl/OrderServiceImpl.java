@@ -23,6 +23,7 @@ import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.ordering.mapper.OrderMapper;
 import com.yourcompany.agritrade.ordering.repository.*;
 import com.yourcompany.agritrade.ordering.repository.specification.OrderSpecifications;
+import com.yourcompany.agritrade.ordering.service.InvoiceService;
 import com.yourcompany.agritrade.ordering.service.OrderService;
 import com.yourcompany.agritrade.usermanagement.domain.Address;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
@@ -75,6 +76,10 @@ public class OrderServiceImpl implements OrderService {
   private final EmailService emailService; // Inject EmailService
   private final NotificationService notificationService;
   private final FarmerProfileRepository farmerProfileRepository;
+
+  private final InvoiceService invoiceService;
+
+  private final InvoiceRepository invoiceRepository;
 
   private final FileStorageService fileStorageService;
   // private final LockProvider lockProvider; // Bỏ qua nếu dùng Optimistic Lock
@@ -298,6 +303,13 @@ public class OrderServiceImpl implements OrderService {
         notificationService.sendOrderPlacementNotification(savedOrder);
 
         createInitialPaymentRecord(savedOrder); // Helper tạo paymentcalculateShippingFee
+
+        // *** TẠO INVOICE NẾU LÀ ĐƠN HÀNG CÔNG NỢ ***
+        if (savedOrder.getPaymentMethod() == PaymentMethod.INVOICE) {
+          invoiceService.getOrCreateInvoiceForOrder(savedOrder); // Gọi InvoiceService
+          // InvoiceService sẽ tạo Invoice với status là ISSUED và tính dueDate nếu cần
+        }
+// *****************************************
 
         // Tạo Payment PENDING
         //            Payment initialPayment = new Payment();
@@ -1161,7 +1173,7 @@ public class OrderServiceImpl implements OrderService {
   @Transactional
   public OrderResponse confirmOrderPaymentByAdmin(
       Long orderId,
-      PaymentMethod paymentMethodConfirmed,
+      PaymentMethod paymentMethodConfirmedByAdmin,
       String transactionReference,
       String adminNotes) {
     Order order =
@@ -1179,38 +1191,67 @@ public class OrderServiceImpl implements OrderService {
     if (order.getPaymentStatus() == PaymentStatus.PAID) {
       throw new BadRequestException("Đơn hàng này đã được ghi nhận thanh toán.");
     }
-    if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
+    if (order.getStatus() == OrderStatus.CANCELLED) {
       throw new BadRequestException(
-          "Không thể xác nhận thanh toán cho đơn hàng đã hủy hoặc đã hoàn thành.");
+          "Không thể xác nhận thanh toán cho đơn hàng đã hủy.");
     }
+
+    PaymentStatus originalPaymentStatus = order.getPaymentStatus(); // Lưu lại để so sánh
+
+
     order.setPaymentStatus(PaymentStatus.PAID);
-    // Khi Admin xác nhận thanh toán, chuyển đơn hàng sang trạng thái phù hợp
-    if (order.getStatus() == OrderStatus.PENDING
-        || order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
+
+
+    // Đối với đơn hàng INVOICE, trạng thái đơn hàng (PROCESSING, SHIPPING, DELIVERED)
+    // thường đã được cập nhật trước đó. Việc xác nhận thanh toán công nợ chủ yếu cập nhật PaymentStatus.
+    // Nếu đơn hàng là loại khác (ví dụ BANK_TRANSFER) và đang PENDING, thì mới chuyển OrderStatus.
+    OrderStatus originalOrderStatus = order.getStatus(); // Lưu lại để gửi thông báo nếu thay đổi
+    if (order.getPaymentMethod() != PaymentMethod.INVOICE &&
+            (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.AWAITING_PAYMENT)) {
       order.setStatus(OrderStatus.CONFIRMED); // Hoặc PROCESSING tùy quy trình
     }
+
+    // Cập nhật trạng thái Invoice liên quan (nếu có)
+    if (order.getPaymentMethod() == PaymentMethod.INVOICE) {
+      invoiceRepository.findByOrderId(order.getId()).ifPresent(invoice -> {
+        invoice.setStatus(InvoiceStatus.PAID);
+        // invoice.setPaymentDate(LocalDate.now()); // Có thể thêm trường này
+        invoiceRepository.save(invoice);
+        log.info("Invoice {} for order {} marked as PAID.", invoice.getInvoiceNumber(), order.getOrderCode());
+      });
+    }
+
+//    // Khi Admin xác nhận thanh toán, chuyển đơn hàng sang trạng thái phù hợp
+//    if (order.getStatus() == OrderStatus.PENDING
+//        || order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
+//      order.setStatus(OrderStatus.CONFIRMED); // Hoặc PROCESSING tùy quy trình
+//    }
     // Tạo bản ghi Payment
     Payment payment = new Payment();
     payment.setOrder(order);
     payment.setAmount(order.getTotalAmount());
-    payment.setPaymentGateway(paymentMethodConfirmed.name()); // Phương thức mà Admin xác nhận
+    payment.setPaymentGateway(paymentMethodConfirmedByAdmin.name()); // Phương thức mà Admin xác nhận
     payment.setStatus(PaymentTransactionStatus.SUCCESS);
     payment.setPaymentTime(LocalDateTime.now());
     payment.setTransactionCode(transactionReference); // Mã giao dịch do Admin nhập (nếu có)
     payment.setGatewayMessage(
-        "Payment confirmed by Admin."
-            + (StringUtils.hasText(adminNotes) ? " Notes: " + adminNotes : ""));
+            "Payment confirmed by Admin for " + order.getPaymentMethod().name() + " order."
+                    + (StringUtils.hasText(adminNotes) ? " Notes: " + adminNotes : ""));
+
     paymentRepository.save(payment);
     Order savedOrder = orderRepository.save(order);
     log.info(
-        "Admin confirmed {} payment for order {}",
-        paymentMethodConfirmed.name(),
-        order.getOrderCode());
+            "Admin confirmed {} payment for order {}. Original payment method: {}. Order payment status changed from {} to PAID.",
+            paymentMethodConfirmedByAdmin.name(),
+            order.getOrderCode(),
+            order.getPaymentMethod().name(), // Log cả phương thức gốc của đơn hàng
+            originalPaymentStatus);
     // Gửi thông báo cho người mua rằng thanh toán đã được xác nhận
     notificationService.sendPaymentSuccessNotification(savedOrder);
     // Gửi thông báo cho người mua rằng trạng thái đơn hàng đã thay đổi
-    notificationService.sendOrderStatusUpdateNotification(
-        savedOrder, OrderStatus.PENDING); // Giả sử trạng thái trước đó là PENDING
+    if (originalOrderStatus != savedOrder.getStatus()) {
+      notificationService.sendOrderStatusUpdateNotification(savedOrder, originalOrderStatus);
+    }
     // (Tùy chọn) Gửi thông báo cho Farmer rằng đơn hàng đã được thanh toán và có thể chuẩn bị hàng
     // notificationService.sendOrderPaidNotificationToFarmer(savedOrder);
     return orderMapper.toOrderResponse(savedOrder);

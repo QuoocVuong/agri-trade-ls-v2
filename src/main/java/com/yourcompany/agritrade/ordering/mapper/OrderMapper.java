@@ -2,9 +2,13 @@ package com.yourcompany.agritrade.ordering.mapper;
 
 import com.yourcompany.agritrade.catalog.dto.response.FarmerInfoResponse;
 import com.yourcompany.agritrade.catalog.mapper.FarmerInfoMapper;
+import com.yourcompany.agritrade.ordering.domain.Invoice;
 import com.yourcompany.agritrade.ordering.domain.Order;
+import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
+import com.yourcompany.agritrade.ordering.dto.response.InvoiceInfoResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
+import com.yourcompany.agritrade.ordering.repository.InvoiceRepository;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.dto.response.UserResponse;
@@ -31,6 +35,9 @@ public abstract class OrderMapper { // Đổi thành abstract class
   @Autowired protected FarmerInfoMapper farmerInfoMapper;
   @Autowired protected OrderItemMapper orderItemMapper;
   @Autowired protected PaymentMapper paymentMapper;
+  @Autowired // << INJECT INVOICEREPOSITORY
+  protected InvoiceRepository invoiceRepository;
+
 
   // Map sang OrderResponse (chi tiết)
   // MapStruct sẽ dùng các mapper trong 'uses' cho các trường tương ứng
@@ -41,7 +48,30 @@ public abstract class OrderMapper { // Đổi thành abstract class
       qualifiedByName = "mapUserAndProfileToFarmerInfo") // Dùng FarmerInfoMapper thông qua helper
   @Mapping(target = "orderItems", source = "orderItems") // Dùng OrderItemMapper
   @Mapping(target = "payments", source = "payments") // Dùng PaymentMapper
+
+  @Mapping(target = "invoiceInfo", source = "order", qualifiedByName = "mapOrderToInvoiceInfo")
   public abstract OrderResponse toOrderResponse(Order order);
+
+
+  @Named("mapOrderToInvoiceInfo")
+  protected InvoiceInfoResponse mapOrderToInvoiceInfo(Order order) {
+    if (order == null || order.getPaymentMethod() != PaymentMethod.INVOICE) {
+      return null; // Chỉ tạo InvoiceInfo cho đơn hàng công nợ
+    }
+
+    // Tìm Invoice liên quan đến Order này
+    // Giả sử Invoice được tạo khi đơn hàng INVOICE được tạo
+    // Nếu bạn dùng invoiceService.getOrCreateInvoiceForOrder() khi checkout,
+    // thì ở đây invoiceRepository.findByOrderId() sẽ luôn tìm thấy.
+    return invoiceRepository.findByOrderId(order.getId())
+            .map(invoice -> new InvoiceInfoResponse(
+                    invoice.getInvoiceNumber(),
+                    invoice.getIssueDate(),
+                    invoice.getDueDate(),
+                    invoice.getStatus()
+            ))
+            .orElse(null); // Trả về null nếu không tìm thấy Invoice (dù không nên xảy ra)
+  }
 
   // Map sang OrderSummaryResponse (tóm tắt)
   @Mapping(target = "buyerName", source = "buyer.fullName") // Lấy tên trực tiếp

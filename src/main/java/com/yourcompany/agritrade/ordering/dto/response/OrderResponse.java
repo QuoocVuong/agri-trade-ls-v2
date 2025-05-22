@@ -48,6 +48,8 @@ public class OrderResponse {
   private List<OrderItemResponse> orderItems;
   private List<PaymentResponse> payments; // Lịch sử giao dịch
 
+  private InvoiceInfoResponse invoiceInfo;
+
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

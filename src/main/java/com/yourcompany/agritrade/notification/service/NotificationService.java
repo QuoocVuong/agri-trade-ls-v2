@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.notification.service;
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.notification.dto.response.NotificationResponse;
+import com.yourcompany.agritrade.ordering.domain.Invoice;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
@@ -74,4 +75,9 @@ public interface NotificationService {
 
   /** Gửi thông báo cho user khi review của họ bị từ chối */
   void sendReviewRejectedNotification(Review review); // Thêm mới
+
+
+  void sendOverdueInvoiceReminderToBuyer(Invoice invoice);
+  void sendDueSoonInvoiceReminderToBuyer(Invoice invoice);
+  void sendOverdueInvoiceNotificationToAdmin(Invoice invoice); // Gửi cho admin/kế toán
 }

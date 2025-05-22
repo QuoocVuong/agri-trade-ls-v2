@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.notification.service.impl;
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.NotificationType;
+import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.notification.domain.Notification;
 import com.yourcompany.agritrade.notification.dto.response.NotificationResponse;
@@ -11,12 +12,15 @@ import com.yourcompany.agritrade.notification.repository.NotificationRepository;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.InAppNotificationService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
+import com.yourcompany.agritrade.ordering.domain.Invoice;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,10 +56,10 @@ public class NotificationServiceImpl implements NotificationService {
     // Gửi cho người mua
     String buyerMsg =
         String.format("Đơn hàng #%s của bạn đã được đặt thành công.", order.getOrderCode());
-    String buyerLink = frontendUrl + "/orders/" + order.getId(); // Link đến chi tiết đơn hàng
+    String buyerLink = frontendUrl + "/user/orders/" + order.getId(); // Link đến chi tiết đơn hàng
     inAppNotificationService.createAndSendInAppNotification(
         order.getBuyer(), buyerMsg, NotificationType.ORDER_PLACED, buyerLink);
-    // emailService.sendOrderConfirmationEmailToBuyer(order); // Gọi gửi mail
+     //emailService.sendOrderConfirmationEmailToBuyer(order); // Gọi gửi mail
 
     // Gửi cho người bán
     String farmerMsg =
@@ -64,7 +68,7 @@ public class NotificationServiceImpl implements NotificationService {
     String farmerLink = frontendUrl + "/farmer/orders/" + order.getId();
     inAppNotificationService.createAndSendInAppNotification(
         order.getFarmer(), farmerMsg, NotificationType.ORDER_PLACED, farmerLink);
-    // emailService.sendNewOrderNotificationToFarmer(order); // Gọi gửi mail
+     //emailService.sendNewOrderNotificationToFarmer(order); // Gọi gửi mail
   }
 
   @Override
@@ -74,10 +78,10 @@ public class NotificationServiceImpl implements NotificationService {
         String.format(
             "Đơn hàng #%s của bạn đã được cập nhật trạng thái thành: %s.",
             order.getOrderCode(), order.getStatus().name());
-    String buyerLink = frontendUrl + "/orders/" + order.getId();
+    String buyerLink = frontendUrl + "/user/orders/" + order.getId();
     inAppNotificationService.createAndSendInAppNotification(
         order.getBuyer(), buyerMsg, NotificationType.ORDER_STATUS_UPDATE, buyerLink);
-    // emailService.sendOrderStatusUpdateEmailToBuyer(order, previousStatus);
+     //emailService.sendOrderStatusUpdateEmailToBuyer(order, previousStatus);
 
     // Gửi cho người bán (nếu trạng thái thay đổi không phải do chính họ) - cần thêm logic kiểm tra
     // người thực hiện
@@ -98,27 +102,27 @@ public class NotificationServiceImpl implements NotificationService {
   public void sendOrderCancellationNotification(Order order) {
     // Gửi cho người mua
     String buyerMsg = String.format("Đơn hàng #%s của bạn đã bị hủy.", order.getOrderCode());
-    String buyerLink = frontendUrl + "/orders/" + order.getId();
+    String buyerLink = frontendUrl + "/user/orders/" + order.getId();
     inAppNotificationService.createAndSendInAppNotification(
         order.getBuyer(), buyerMsg, NotificationType.ORDER_CANCELLED, buyerLink);
-    // emailService.sendOrderCancellationEmailToBuyer(order);
+     //emailService.sendOrderCancellationEmailToBuyer(order);
 
     // Gửi cho người bán
     String farmerMsg = String.format("Đơn hàng #%s đã bị hủy.", order.getOrderCode());
     String farmerLink = frontendUrl + "/farmer/orders/" + order.getId();
     inAppNotificationService.createAndSendInAppNotification(
         order.getFarmer(), farmerMsg, NotificationType.ORDER_CANCELLED, farmerLink);
-    // emailService.sendOrderCancellationNotificationToFarmer(order);
+     //emailService.sendOrderCancellationNotificationToFarmer(order);
   }
 
   @Override
   public void sendPaymentSuccessNotification(Order order) {
     String buyerMsg =
         String.format("Thanh toán cho đơn hàng #%s đã thành công.", order.getOrderCode());
-    String buyerLink = frontendUrl + "/orders/" + order.getId();
+    String buyerLink = frontendUrl + "/user/orders/" + order.getId();
     inAppNotificationService.createAndSendInAppNotification(
         order.getBuyer(), buyerMsg, NotificationType.PAYMENT_SUCCESS, buyerLink);
-    // emailService.sendPaymentSuccessEmailToBuyer(order);
+     //emailService.sendPaymentSuccessEmailToBuyer(order);
     // Thông báo cho farmer nếu cần
   }
 
@@ -126,10 +130,10 @@ public class NotificationServiceImpl implements NotificationService {
   public void sendPaymentFailureNotification(Order order) {
     String buyerMsg =
         String.format("Thanh toán cho đơn hàng #%s đã thất bại.", order.getOrderCode());
-    String buyerLink = frontendUrl + "/orders/" + order.getId();
+    String buyerLink = frontendUrl + "/user/orders/" + order.getId();
     inAppNotificationService.createAndSendInAppNotification(
         order.getBuyer(), buyerMsg, NotificationType.PAYMENT_FAILURE, buyerLink);
-    // emailService.sendPaymentFailureEmailToBuyer(order);
+     //emailService.sendPaymentFailureEmailToBuyer(order);
   }
 
   @Override
@@ -409,4 +413,45 @@ public class NotificationServiceImpl implements NotificationService {
     // emailService.sendFarmerProfileRejectedEmail(profile, reason); // Cần tạo hàm này và template
     // trong EmailService
   }
+
+
+  // Trong NotificationServiceImpl.java
+  @Override
+  public void sendOverdueInvoiceReminderToBuyer(Invoice invoice) {
+    User buyer = invoice.getOrder().getBuyer();
+    String message = String.format("Nhắc nhở: Hóa đơn #%s (Đơn hàng #%s) của bạn đã quá hạn thanh toán (Ngày đáo hạn: %s). Vui lòng thanh toán sớm.",
+            invoice.getInvoiceNumber(), invoice.getOrder().getOrderCode(), invoice.getDueDate().format(DateTimeFormatter.ISO_DATE));
+    String link = frontendUrl + "/user/orders/" + invoice.getOrder().getId(); // Link đến chi tiết đơn hàng
+    inAppNotificationService.createAndSendInAppNotification(buyer, message, NotificationType.INVOICE_OVERDUE, link); // Cần thêm NotificationType này
+    // emailService.sendOverdueInvoiceReminderEmail(invoice); // Gửi cả email
+    log.info("Sent overdue reminder for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+  }
+
+  @Override
+  public void sendDueSoonInvoiceReminderToBuyer(Invoice invoice) {
+    User buyer = invoice.getOrder().getBuyer();
+    String message = String.format("Nhắc nhở: Hóa đơn #%s (Đơn hàng #%s) của bạn sắp đến hạn thanh toán vào ngày %s.",
+            invoice.getInvoiceNumber(), invoice.getOrder().getOrderCode(), invoice.getDueDate().format(DateTimeFormatter.ISO_DATE));
+    String link = frontendUrl + "/user/orders/" + invoice.getOrder().getId();
+    inAppNotificationService.createAndSendInAppNotification(buyer, message, NotificationType.INVOICE_DUE_SOON, link); // Cần thêm NotificationType này
+    // emailService.sendDueSoonInvoiceReminderEmail(invoice);
+    log.info("Sent due soon reminder for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+  }
+
+  @Override
+  public void sendOverdueInvoiceNotificationToAdmin(Invoice invoice) {
+    // Logic tìm user admin hoặc gửi đến một email cố định của bộ phận kế toán
+    // Ví dụ:
+     List<User> admins = userRepository.findByRoles_Name(RoleType.ROLE_ADMIN);
+     for (User admin : admins) {
+        String message = String.format("Hóa đơn #%s (Đơn hàng #%s, Khách hàng: %s) đã QUÁ HẠN.",
+                invoice.getInvoiceNumber(), invoice.getOrder().getOrderCode(), invoice.getOrder().getBuyer().getFullName());
+        String link = frontendUrl + "/admin/orders/" + invoice.getOrder().getId(); // Link cho admin
+        inAppNotificationService.createAndSendInAppNotification(admin, message, NotificationType.ADMIN_ALERT, link);
+     }
+    log.info("Admin notified about overdue invoice {}", invoice.getInvoiceNumber());
+  }
+
+
+
 }

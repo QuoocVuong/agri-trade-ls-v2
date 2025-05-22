@@ -107,7 +107,8 @@ public class UserServiceImpl implements UserService {
 
     // 2. Tạo User mới
     User user = new User();
-    user.setEmail(registrationRequest.getEmail());
+    user.setEmail(email); // email đã được toLowerCase()
+    user.setProvider("LOCAL"); // << Đặt provider là LOCAL khi đăng ký thủ công
     user.setPasswordHash(passwordEncoder.encode(registrationRequest.getPassword()));
     user.setFullName(registrationRequest.getFullName());
     user.setPhoneNumber(registrationRequest.getPhoneNumber());
@@ -657,65 +658,146 @@ public class UserServiceImpl implements UserService {
   }
 
   // Hàm helper tìm hoặc tạo user
-  private User findOrCreateUserForOAuth2(
-      String email, String fullName, String avatarUrl, String provider, String providerId) {
-    Optional<User> userOptional = userRepository.findByEmail(email); // Tìm theo email
+  private User findOrCreateUserForOAuth2(String email, String fullName, String avatarUrl, String googleProviderName, String googleProviderId) {
+    // Luôn chuẩn hóa email về chữ thường để đảm bảo tính nhất quán khi truy vấn
+    String normalizedEmail = email.toLowerCase();
+
+    // Tìm kiếm user trong DB bằng email đã chuẩn hóa
+    Optional<User> userOptional = userRepository.findByEmail(normalizedEmail);
 
     if (userOptional.isPresent()) {
+      // Kịch bản: User đã tồn tại trong DB
       User existingUser = userOptional.get();
-      // Kiểm tra xem user này có phải từ Google không
-      if (!provider.equals(existingUser.getProvider())) {
-        // User đã tồn tại với provider khác (ví dụ: LOCAL)
-        // -> Có thể link tài khoản hoặc báo lỗi yêu cầu đăng nhập bằng cách cũ
-        log.warn(
-            "User with email {} already exists with provider {}. Cannot link Google account automatically.",
-            email,
-            existingUser.getProvider());
+      String currentProvider = existingUser.getProvider(); // Lấy provider hiện tại của user
+
+      // Kiểm tra xem user hiện tại có phải là user GOOGLE, LOCAL hoặc chưa có provider (null) không.
+      // Điều này cho phép liên kết tài khoản Google với tài khoản LOCAL đã có,
+      // hoặc đăng nhập lại nếu đã từng đăng nhập bằng Google.
+      if (googleProviderName.equals(currentProvider) || currentProvider == null || "LOCAL".equalsIgnoreCase(currentProvider)) {
+
+        log.info("User {} found. Current provider: {}. Attempting to login/link with provider: {}", normalizedEmail, currentProvider, googleProviderName);
+
+        boolean needsUpdate = false; // Cờ để theo dõi xem có cần lưu lại user không
+
+        // Nếu provider hiện tại là LOCAL hoặc null, cập nhật thành GOOGLE và lưu providerId
+        if (currentProvider == null || "LOCAL".equalsIgnoreCase(currentProvider)) {
+          existingUser.setProvider(googleProviderName);
+          existingUser.setProviderId(googleProviderId);
+          needsUpdate = true;
+          log.debug("Linking Google account to existing LOCAL/null provider user: {}", normalizedEmail);
+        } else if (googleProviderId != null && !googleProviderId.equals(existingUser.getProviderId())) {
+          // Trường hợp hiếm: providerId từ Google thay đổi cho cùng một email. Cập nhật nếu cần.
+          existingUser.setProviderId(googleProviderId);
+          needsUpdate = true;
+          log.warn("Google providerId for user {} changed from {} to {}. Updating.", normalizedEmail, existingUser.getProviderId(), googleProviderId);
+        }
+
+        // Cập nhật thông tin cá nhân (tên, avatar) nếu có từ Google và khác với thông tin hiện tại
+        if (fullName != null && !fullName.equals(existingUser.getFullName())) {
+          existingUser.setFullName(fullName);
+          needsUpdate = true;
+        }
+        if (avatarUrl != null && !avatarUrl.equals(existingUser.getAvatarUrl())) {
+          existingUser.setAvatarUrl(avatarUrl);
+          needsUpdate = true;
+        }
+
+        // Đảm bảo tài khoản được active (vì Google đã xác thực email)
+        // và xóa token xác thực email (nếu có) vì không còn cần thiết
+        if (!existingUser.isActive()) {
+          existingUser.setActive(true);
+          existingUser.setVerificationToken(null);
+          existingUser.setVerificationTokenExpiry(null);
+          needsUpdate = true;
+          log.debug("Activating user {} and clearing verification token due to Google Sign-In.", normalizedEmail);
+        }
+
+        // Nếu có bất kỳ thay đổi nào, lưu lại user vào DB
+        if (needsUpdate) {
+          try {
+            log.debug("Attempting to save updated existing user: {}", normalizedEmail);
+            return userRepository.save(existingUser);
+          } catch (DataIntegrityViolationException dive) {
+            // Xử lý lỗi nếu có vi phạm ràng buộc dữ liệu khi cập nhật
+            log.error("Data integrity violation while updating existing OAuth2 user {}: {}. Root cause: {}",
+                    normalizedEmail, dive.getMessage(), dive.getRootCause() != null ? dive.getRootCause().getMessage() : "N/A", dive);
+            throw new BadRequestException("Error updating user data. Possible data conflict: " +
+                    (dive.getRootCause() != null ? dive.getRootCause().getMessage() : dive.getMessage()));
+          } catch (Exception e) {
+            // Xử lý các lỗi không mong muốn khác
+            log.error("Unexpected error updating existing OAuth2 user {}: {}", normalizedEmail, e.getMessage(), e);
+            throw new RuntimeException("Failed to update user during OAuth2 process: " + e.getMessage(), e);
+          }
+        }
+        // Nếu không có gì cần cập nhật, trả về user hiện tại
+        return existingUser;
+
+      } else {
+        // User đã tồn tại nhưng với một provider OAuth2 khác (ví dụ: Facebook)
+        // và không phải là LOCAL hoặc null. Không cho phép liên kết tự động.
+        log.warn("User with email {} already exists with provider {} (expected {} or LOCAL/null). Cannot link Google account.",
+                normalizedEmail, currentProvider, googleProviderName);
         throw new BadRequestException(
-            "Tài khoản với email này đã tồn tại. Vui lòng đăng nhập bằng phương thức ban đầu.");
+                "Tài khoản với email này đã được đăng ký bằng một phương thức khác (" + currentProvider
+                        + ") không thể tự động liên kết với Google."
+        );
       }
-      // Cập nhật thông tin nếu cần (tên, avatar)
-      boolean updated = false;
-      if (fullName != null && !fullName.equals(existingUser.getFullName())) {
-        existingUser.setFullName(fullName);
-        updated = true;
-      }
-      if (avatarUrl != null && !avatarUrl.equals(existingUser.getAvatarUrl())) {
-        existingUser.setAvatarUrl(avatarUrl);
-        updated = true;
-      }
-      if (providerId != null && !providerId.equals(existingUser.getProviderId())) {
-        existingUser.setProviderId(providerId); // Lưu providerId nếu chưa có
-        updated = true;
-      }
-      if (updated) {
-        userRepository.save(existingUser);
-      }
-      return existingUser; // Trả về user đã tồn tại
     } else {
-      // Tạo user mới
+      // Kịch bản: User chưa tồn tại trong DB, tạo user mới
+      log.info("User with email {} not found. Creating new user from OAuth2 provider {}.", normalizedEmail, googleProviderName);
       User newUser = new User();
-      newUser.setEmail(email);
-      newUser.setFullName(fullName != null ? fullName : "Người dùng Google"); // Tên mặc định
+      newUser.setEmail(normalizedEmail);
+      newUser.setFullName(fullName != null ? fullName : "Người dùng " + googleProviderName); // Tên mặc định nếu không có
       newUser.setAvatarUrl(avatarUrl);
-      newUser.setPasswordHash(
-          passwordEncoder.encode(
-              UUID.randomUUID().toString())); // Tạo mật khẩu ngẫu nhiên, không dùng được
-      newUser.setActive(true); // Email đã được Google xác thực
-      newUser.setProvider(provider); // Đặt provider là GOOGLE
-      newUser.setProviderId(providerId); // Lưu Google User ID
+      // Tạo mật khẩu ngẫu nhiên vì user OAuth2 không dùng mật khẩu của ứng dụng
+      newUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+      newUser.setActive(true); // Tài khoản được kích hoạt ngay vì email đã được Google xác thực
+      newUser.setProvider(googleProviderName); // Đặt provider là "GOOGLE"
+      newUser.setProviderId(googleProviderId); // Lưu ID từ Google
 
-      // Gán vai trò mặc định
-      Role defaultRole =
-          roleRepository
-              .findByName(RoleType.ROLE_CONSUMER)
-              .orElseThrow(
-                  () ->
-                      new ResourceNotFoundException("Role", "name", RoleType.ROLE_CONSUMER.name()));
-      newUser.setRoles(Collections.singleton(defaultRole));
+      // Không cần token xác thực email của ứng dụng vì đã xác thực qua Google
+      newUser.setVerificationToken(null);
+      newUser.setVerificationTokenExpiry(null);
 
-      log.info("Creating new user from Google login: {}", email);
-      return userRepository.save(newUser);
+      // Khởi tạo các trường count nếu cần (mặc dù Entity User đã có giá trị mặc định là 0)
+      // newUser.setFollowerCount(0);
+      // newUser.setFollowingCount(0);
+
+      try {
+        // Gán vai trò mặc định cho user mới (ví dụ: ROLE_CONSUMER)
+        Role defaultRole = roleRepository.findByName(RoleType.ROLE_CONSUMER)
+                .orElseThrow(() -> {
+                  // Lỗi nghiêm trọng nếu role mặc định không được cấu hình trong DB
+                  log.error("Default role {} not found in database. Cannot create new OAuth2 user.", RoleType.ROLE_CONSUMER.name());
+                  // Ném ResourceNotFoundException để controller có thể bắt và trả về lỗi 500 hoặc 400 phù hợp
+                  return new ResourceNotFoundException("Role", "name", RoleType.ROLE_CONSUMER.name());
+                });
+
+        // Sử dụng một Set có thể thay đổi (mutable) như HashSet
+        // để tránh UnsupportedOperationException khi Hibernate quản lý collection
+        Set<Role> roles = new HashSet<>();
+        roles.add(defaultRole);
+        newUser.setRoles(roles);
+
+        log.info("Attempting to save new user from OAuth2 provider {}: {}", googleProviderName, normalizedEmail);
+        return userRepository.save(newUser);
+      } catch (ResourceNotFoundException rnfe) {
+        // Xử lý lỗi nếu không tìm thấy role mặc định
+        log.error("Failed to create new OAuth2 user {} due to missing default role: {}", normalizedEmail, rnfe.getMessage(), rnfe);
+        // Ném lại RuntimeException để báo hiệu lỗi cấu hình server
+        throw new RuntimeException("Server configuration error: " + rnfe.getMessage(), rnfe);
+      } catch (DataIntegrityViolationException dive) {
+        // Xử lý lỗi nếu có vi phạm ràng buộc dữ liệu khi tạo user mới
+        // (ví dụ: một trường unique khác ngoài email bị trùng, dù ít khả năng xảy ra ở đây nếu logic đúng)
+        log.error("Data integrity violation while creating new OAuth2 user {}: {}. Root cause: {}",
+                normalizedEmail, dive.getMessage(), dive.getRootCause() != null ? dive.getRootCause().getMessage() : "N/A", dive);
+        throw new BadRequestException("Error creating user. Possible duplicate entry or data conflict: " +
+                (dive.getRootCause() != null ? dive.getRootCause().getMessage() : dive.getMessage()));
+      } catch (Exception e) {
+        // Xử lý các lỗi không mong muốn khác
+        log.error("Unexpected error creating new OAuth2 user {}: {}", normalizedEmail, e.getMessage(), e);
+        throw new RuntimeException("Failed to create user during OAuth2 process: " + e.getMessage(), e);
+      }
     }
   }
 

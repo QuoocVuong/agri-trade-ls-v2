@@ -49,6 +49,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
   boolean existsByIdAndRoles_Name(Long id, RoleType roleName);
 
+  List<User> findByRoles_Name(RoleType roleName);
+
   // ===== PHƯƠNG THỨC MỚI =====
   /**
    * Tìm top N Users có vai trò là FARMER, sắp xếp theo followerCount giảm dần. Sử dụng Pageable để

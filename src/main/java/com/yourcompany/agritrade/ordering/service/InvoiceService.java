@@ -1,7 +1,12 @@
 package com.yourcompany.agritrade.ordering.service;
 
 import com.yourcompany.agritrade.ordering.domain.Invoice;
+import com.yourcompany.agritrade.ordering.domain.InvoiceStatus;
 import com.yourcompany.agritrade.ordering.domain.Order;
+import com.yourcompany.agritrade.ordering.dto.response.InvoiceSummaryResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.io.ByteArrayInputStream;
 
 public interface InvoiceService {
@@ -12,4 +17,9 @@ public interface InvoiceService {
   ByteArrayInputStream generateInvoicePdf(Long invoiceId); // Trả về stream để controller xử lý
   // Hoặc trả về byte[]
   // byte[] generateInvoicePdfBytes(Long invoiceId);
+
+  // -- Phương Thức của Admin--
+
+  Page<InvoiceSummaryResponse> getAllInvoices(InvoiceStatus status, String keyword, Pageable pageable);
+  // Thêm các phương thức khác nếu cần, ví dụ: void markInvoiceAsVoid(Long invoiceId);
 }

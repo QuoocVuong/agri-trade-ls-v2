@@ -8,12 +8,12 @@ import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
-import com.yourcompany.agritrade.ordering.domain.Invoice;
-import com.yourcompany.agritrade.ordering.domain.InvoiceStatus;
-import com.yourcompany.agritrade.ordering.domain.Order;
-import com.yourcompany.agritrade.ordering.domain.OrderItem;
+import com.yourcompany.agritrade.ordering.domain.*;
+import com.yourcompany.agritrade.ordering.dto.response.InvoiceSummaryResponse;
+import com.yourcompany.agritrade.ordering.mapper.InvoiceMapper;
 import com.yourcompany.agritrade.ordering.repository.InvoiceRepository;
 import com.yourcompany.agritrade.ordering.repository.OrderRepository;
+import com.yourcompany.agritrade.ordering.repository.specification.InvoiceSpecifications;
 import com.yourcompany.agritrade.ordering.service.InvoiceService;
 import java.awt.*;
 import java.io.ByteArrayInputStream;
@@ -22,8 +22,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +36,8 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   private final InvoiceRepository invoiceRepository;
   private final OrderRepository orderRepository; // Inject để lấy chi tiết Order khi tạo PDF
+
+  private final InvoiceMapper invoiceMapper;
 
   @Override
   @Transactional
@@ -46,8 +52,24 @@ public class InvoiceServiceImpl implements InvoiceService {
     invoice.setIssueDate(LocalDate.now());
     invoice.setTotalAmount(order.getTotalAmount());
     // Logic set dueDate, status tùy theo loại đơn/phương thức thanh toán
-    invoice.setStatus(InvoiceStatus.ISSUED); // Ví dụ mặc định là đã phát hành
-    log.info("Creating new invoice {} for order {}", invoice.getInvoiceNumber(), order.getId());
+    if (order.getPaymentMethod() == PaymentMethod.INVOICE) {
+      // Ví dụ: Công nợ 30 ngày
+      invoice.setDueDate(invoice.getIssueDate().plusDays(30));
+      invoice.setStatus(InvoiceStatus.ISSUED); // Hóa đơn công nợ được phát hành
+    } else {
+      // Đối với các phương thức thanh toán khác, hóa đơn có thể là DRAFT hoặc ISSUED ngay
+      // và có thể được đánh dấu PAID ngay nếu thanh toán thành công tức thì.
+      // Hoặc bạn có thể không tạo Invoice cho các đơn hàng không phải công nợ.
+      // Tùy thuộc vào yêu cầu nghiệp vụ.
+      // Ví dụ:
+      if (order.getPaymentStatus() == PaymentStatus.PAID) {
+        invoice.setStatus(InvoiceStatus.PAID);
+      } else {
+        invoice.setStatus(InvoiceStatus.ISSUED); // Hoặc DRAFT
+      }
+    }
+    log.info("Creating new invoice {} for order {}. Due date: {}, Status: {}",
+            invoice.getInvoiceNumber(), order.getId(), invoice.getDueDate(), invoice.getStatus());
     return invoiceRepository.save(invoice);
   }
 
@@ -293,4 +315,43 @@ public class InvoiceServiceImpl implements InvoiceService {
     sb.setCharAt(0, Character.toUpperCase(sb.charAt(0)));
     return sb.toString();
   }
+
+  // -- Phương Thức Của Admin --
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<InvoiceSummaryResponse> getAllInvoices(InvoiceStatus status, String keyword, Pageable pageable) {
+    log.debug("Admin fetching invoices with status: {}, keyword: {}, pageable: {}", status, keyword, pageable);
+
+    Specification<Invoice> spec = Specification.where(null); // Bắt đầu với một spec trống
+
+    if (status != null) {
+      spec = spec.and(InvoiceSpecifications.hasStatus(status));
+    }
+
+    if (StringUtils.hasText(keyword)) {
+      // Tìm kiếm theo invoiceNumber, orderCode, hoặc buyerFullName
+      Specification<Invoice> keywordSpec = Specification.anyOf(
+              InvoiceSpecifications.hasInvoiceNumber(keyword),
+              InvoiceSpecifications.hasOrderCode(keyword),
+              InvoiceSpecifications.hasBuyerFullName(keyword)
+      );
+      spec = spec.and(keywordSpec);
+    }
+
+    // Fetch các thông tin cần thiết để tránh N+1
+    // Ví dụ: fetch order, order.buyer
+    // Bạn có thể tạo một Specification riêng cho việc fetch hoặc dùng @EntityGraph trong InvoiceRepository
+    // Hoặc đảm bảo các mối quan hệ được fetch EAGER nếu phù hợp (ít khuyến khích cho performance)
+    // Hiện tại, mapper sẽ tự động load qua các mối quan hệ LAZY, có thể gây N+1.
+    // Để tối ưu, nên dùng JOIN FETCH trong query hoặc @EntityGraph.
+    // Ví dụ đơn giản:
+    spec = spec.and(InvoiceSpecifications.fetchOrderAndBuyer());
+
+
+    Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
+    return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
+  }
+
+
 }

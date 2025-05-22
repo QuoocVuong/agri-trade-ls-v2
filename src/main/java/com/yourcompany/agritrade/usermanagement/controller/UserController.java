@@ -61,8 +61,8 @@ public class UserController {
 
   // Lấy danh sách tất cả user (phân trang) - Chỉ Admin
   @GetMapping
-  // @PreAuthorize("hasRole('ADMIN')")
-  @PreAuthorize("hasAuthority('USER_READ_ALL')") // Cách mới dùng permission
+  @PreAuthorize("hasRole('ADMIN')")
+  //@PreAuthorize("hasAuthority('USER_READ_ALL')") // Cách mới dùng permission
   public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsersForAdmin(
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String role, // Nhận role là String
@@ -93,8 +93,8 @@ public class UserController {
 
   // Cập nhật trạng thái active/inactive của user - Chỉ Admin
   @PutMapping("/{id}/status")
-  // @PreAuthorize("hasRole('ADMIN')")
-  @PreAuthorize("hasAuthority('USER_UPDATE_STATUS')")
+  @PreAuthorize("hasRole('ADMIN')")
+  //@PreAuthorize("hasAuthority('USER_UPDATE_STATUS')")
   public ResponseEntity<ApiResponse<UserResponse>> updateUserStatus(
       @PathVariable Long id, @RequestParam boolean isActive) {
     UserResponse updatedUser = userService.updateUserStatus(id, isActive);
