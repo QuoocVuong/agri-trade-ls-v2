@@ -710,7 +710,8 @@ public class OrderServiceImpl implements OrderService {
             });
   }
 
-  private String generateOrderCode() {
+  @Override
+  public String generateOrderCode() {
     // Ví dụ: LS + Năm + Tháng + Ngày + 4 số ngẫu nhiên
     String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
     int randomPart = ThreadLocalRandom.current().nextInt(1000, 10000);

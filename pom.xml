@@ -28,8 +28,13 @@
 		<url/>
 	</scm>
 	<properties>
-		<java.version>17</java.version>
+		<java.version>21</java.version>
 		<mysql.version>8.0.33</mysql.version>
+
+		<lombok.version>1.18.30</lombok.version> <!-- Hoặc phiên bản mới nhất tương thích -->
+		<mapstruct.version>1.5.5.Final</mapstruct.version>
+
+		<icu4j.version>75.1</icu4j.version>
 
 		<flyway.url>jdbc:mysql://localhost:3306/agri_trade_ls_db</flyway.url>
 		<flyway.user>root</flyway.user>
@@ -150,6 +155,18 @@
 			<version>3.0.7</version> <!-- Hoặc phiên bản mới nhất -->
 		</dependency>
 
+		<dependency>
+			<groupId>com.ibm.icu</groupId>
+			<artifactId>icu4j</artifactId>
+			<version>${icu4j.version}</version>
+			<!--
+                Để scope là 'compile' nếu bạn dùng transliterator(true) trong code chính.
+                Để scope là 'test' nếu bạn chỉ dùng transliterator(true) trong code test.
+                Nếu không chắc, để là 'compile' (hoặc không ghi scope, mặc định là compile).
+            -->
+			<!-- <scope>test</scope> -->
+		</dependency>
+
 		<!-- Spring Retry -->
 		<dependency>
 			<groupId>org.springframework.retry</groupId>
@@ -184,12 +201,6 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- Cần có MySQL Driver ở scope test để Spring kết nối vào container -->
-<!--		<dependency>-->
-<!--			<groupId>com.mysql</groupId>-->
-<!--			<artifactId>mysql-connector-j</artifactId>-->
-<!--			<scope>test</scope> &lt;!&ndash; Chỉ cần cho test &ndash;&gt;-->
-<!--		</dependency>-->
 
 		<dependency>
 			<groupId>com.github.librepdf</groupId>
@@ -223,15 +234,6 @@
 		</dependency>
 
 
-		<!-- ========================================================== -->
-		<!-- THÊM DEPENDENCY CỦA H2 VÀO ĐÂY -->
-		<!-- ========================================================== -->
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<!-- ========================================================== -->
 
 
 
@@ -247,15 +249,15 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.11.0</version> <!-- Hoặc mới hơn -->
+				<version>3.10.1</version> <!-- Hoặc mới hơn -->
 				<configuration>
-					<source>17</source> <!-- Hoặc 21 -->
-					<target>17</target> <!-- Hoặc 21 -->
+					<source>21</source> <!-- Hoặc 21 -->
+					<target>21</target> <!-- Hoặc 21 -->
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.mapstruct</groupId>
 							<artifactId>mapstruct-processor</artifactId>
-							<version>1.5.5.Final</version> <!-- Cùng phiên bản với mapstruct -->
+							<version>${mapstruct.version}</version> <!-- Cùng phiên bản với mapstruct -->
 						</path>
 						<path>
 							<groupId>org.projectlombok</groupId>

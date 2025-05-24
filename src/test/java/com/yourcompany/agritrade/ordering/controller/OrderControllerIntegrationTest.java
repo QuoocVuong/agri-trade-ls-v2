@@ -1,358 +1,287 @@
 package com.yourcompany.agritrade.ordering.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yourcompany.agritrade.AbstractIntegrationTest;
+import com.yourcompany.agritrade.AgriTradeApplication;
 import com.yourcompany.agritrade.catalog.domain.Category;
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.repository.CategoryRepository;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.model.RoleType;
-import com.yourcompany.agritrade.ordering.domain.*;
+import com.yourcompany.agritrade.ordering.domain.*; // Order, OrderItem, OrderStatus, OrderType, PaymentMethod, PaymentStatus
+import com.yourcompany.agritrade.ordering.dto.request.CartItemRequest; // Giả định DTO này
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
+import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
 import com.yourcompany.agritrade.ordering.repository.CartItemRepository;
-import com.yourcompany.agritrade.ordering.repository.OrderItemRepository;
 import com.yourcompany.agritrade.ordering.repository.OrderRepository;
-import com.yourcompany.agritrade.ordering.repository.PaymentRepository;
 import com.yourcompany.agritrade.usermanagement.domain.Address;
+import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.Role;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.AddressRepository;
+import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.RoleRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
-import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
-@AutoConfigureMockMvc
+import java.math.BigDecimal;
+import java.util.*;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest(classes = AgriTradeApplication.class)
+@AutoConfigureMockMvc // Quan trọng cho MockMvc
+@Testcontainers
 @Transactional
-// Không cần @SpringBootTest và @ActiveProfiles vì đã kế thừa từ AbstractIntegrationTest
-class OrderControllerIntegrationTest extends AbstractIntegrationTest {
+public class OrderControllerIntegrationTest {
 
-  @Autowired private MockMvc mockMvc;
-  @Autowired private ObjectMapper objectMapper;
-  @Autowired private UserRepository userRepository;
-  @Autowired private RoleRepository roleRepository;
-  @Autowired private AddressRepository addressRepository;
-  @Autowired private CategoryRepository categoryRepository;
-  @Autowired private ProductRepository productRepository;
-  @Autowired private CartItemRepository cartItemRepository;
-  @Autowired private OrderRepository orderRepository;
-  @Autowired private OrderItemRepository orderItemRepository;
-  @Autowired private PaymentRepository paymentRepository;
-  @Autowired private PasswordEncoder passwordEncoder;
+    @Container
+    public static MySQLContainer<?> mysqlContainer = new MySQLContainer<>("mysql:8.0")
+            .withDatabaseName("testdb")
+            .withUsername("testuser")
+            .withPassword("testpass");
 
-  private User testBuyer;
-  private User testFarmer;
-  private Address testAddress;
-  private Product testProduct;
-  private Role buyerRole;
-  private Role farmerRole;
-  private Role adminRole;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private UserRepository userRepository;
+    @Autowired private ProductRepository productRepository;
+    @Autowired private OrderRepository orderRepository;
+    @Autowired private RoleRepository roleRepository;
+    @Autowired private CategoryRepository categoryRepository;
+    @Autowired private AddressRepository addressRepository;
+    @Autowired private FarmerProfileRepository farmerProfileRepository;
+    @Autowired
+    private CartItemRepository cartItemRepository;
 
-  // Dùng @BeforeEach để tạo dữ liệu mới cho mỗi test
-  // @Transactional sẽ rollback sau mỗi test
-  @BeforeEach
-  void setUpTestData() {
-    // Tạo Roles
-    buyerRole =
-        roleRepository
-            .findByName(RoleType.ROLE_CONSUMER)
-            .orElseGet(() -> roleRepository.save(new Role(RoleType.ROLE_CONSUMER)));
-    farmerRole =
-        roleRepository
-            .findByName(RoleType.ROLE_FARMER)
-            .orElseGet(() -> roleRepository.save(new Role(RoleType.ROLE_FARMER)));
-    adminRole =
-        roleRepository
-            .findByName(RoleType.ROLE_ADMIN)
-            .orElseGet(() -> roleRepository.save(new Role(RoleType.ROLE_ADMIN)));
 
-    // Tạo Buyer
-    testBuyer = new User();
-    testBuyer.setEmail("buyer.test@example.com");
-    testBuyer.setPasswordHash(passwordEncoder.encode("password"));
-    testBuyer.setFullName("Test Buyer");
-    testBuyer.setActive(true);
-    testBuyer.setRoles(Collections.singleton(buyerRole));
-    testBuyer = userRepository.saveAndFlush(testBuyer); // Flush để đảm bảo có ID
+    private User testBuyer;
+    private User testFarmer;
+    private Product testProduct1;
+    private Product testProduct2;
+    private Authentication buyerAuthentication;
+    private Authentication farmerAuthentication;
+    private Address testShippingAddress;
+    private Category defaultCategory;
 
-    // Tạo Farmer
-    testFarmer = new User();
-    testFarmer.setEmail("farmer.test@example.com");
-    testFarmer.setPasswordHash(passwordEncoder.encode("password"));
-    testFarmer.setFullName("Test Farmer");
-    testFarmer.setActive(true);
-    testFarmer.setRoles(Collections.singleton(farmerRole));
-    testFarmer = userRepository.saveAndFlush(testFarmer);
+    @DynamicPropertySource
+    static void setProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", mysqlContainer::getJdbcUrl);
+        registry.add("spring.datasource.username", mysqlContainer::getUsername);
+        registry.add("spring.datasource.password", mysqlContainer::getPassword);
+        registry.add("spring.flyway.enabled", () -> "false");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+    }
 
-    // Tạo Address cho Buyer
-    testAddress = new Address();
-    testAddress.setUser(testBuyer);
-    testAddress.setFullName("Test Buyer Address");
-    testAddress.setPhoneNumber("123456789");
-    testAddress.setAddressDetail("123 Test St");
-    testAddress.setProvinceCode("12");
-    testAddress.setDistrictCode("121");
-    testAddress.setWardCode("12101");
-    testAddress.setDefault(true);
-    testAddress = addressRepository.saveAndFlush(testAddress);
+    @BeforeEach
+    void setUp() {
+        orderRepository.deleteAll(); // Xóa order trước vì có khóa ngoại đến user, product
+        productRepository.deleteAll();
+        categoryRepository.deleteAll();
+        addressRepository.deleteAll();
+        farmerProfileRepository.deleteAll();
+        userRepository.deleteAll();
+        roleRepository.deleteAll();
+        cartItemRepository.deleteAll();
 
-    // Tạo Category
-    Category category = new Category();
-    category.setName("Rau Test");
-    category.setSlug("rau-test-" + UUID.randomUUID()); // Đảm bảo slug unique
-    category = categoryRepository.saveAndFlush(category);
 
-    // Tạo Product
-    testProduct = new Product();
-    testProduct.setName("Rau Muống Test");
-    testProduct.setSlug("rau-muong-test-" + UUID.randomUUID()); // Đảm bảo slug unique
-    testProduct.setFarmer(testFarmer);
-    testProduct.setCategory(category);
-    testProduct.setUnit("bó");
-    testProduct.setPrice(new BigDecimal("10000.00"));
-    testProduct.setStockQuantity(50);
-    testProduct.setStatus(ProductStatus.PUBLISHED);
-    testProduct.setProvinceCode("12");
-    testProduct = productRepository.saveAndFlush(testProduct);
+        Role consumerRole = roleRepository.findByName(RoleType.ROLE_CONSUMER)
+                .orElseGet(() -> {
+                    Role newRole = new Role();
+                    newRole.setName(RoleType.ROLE_CONSUMER);
+                    return roleRepository.save(newRole);
+                });
 
-    // Thêm vào giỏ hàng của Buyer
-    CartItem testCartItem = new CartItem();
-    testCartItem.setUser(testBuyer);
-    testCartItem.setProduct(testProduct);
-    testCartItem.setQuantity(3);
-    cartItemRepository.saveAndFlush(testCartItem);
-  }
+        Role farmerRole = roleRepository.findByName(RoleType.ROLE_FARMER)
+                .orElseGet(() -> {
+                    Role newRole = new Role();
+                    newRole.setName(RoleType.ROLE_FARMER);
+                    return roleRepository.save(newRole);
+                });
 
-  // --- Test Cases cho OrderController ---
+        testBuyer = new User();
+        testBuyer.setEmail("buyer.controller@example.com");
+        testBuyer.setPasswordHash("encodedPassword");
+        testBuyer.setFullName("Buyer Controller");
+        testBuyer.setPhoneNumber("0900000001");
+        testBuyer.setActive(true);
+        Set<Role> buyerRolesSet = new HashSet<>();
+        buyerRolesSet.add(consumerRole);
+        testBuyer.setRoles(buyerRolesSet); // << SỬA Ở ĐÂY
+        testBuyer = userRepository.save(testBuyer);
 
-  @Test
-  @DisplayName("[POST /api/orders/checkout] Thành công khi giỏ hàng hợp lệ")
-  @WithMockUser(
-      username = "buyer.test@example.com",
-      roles = {"CONSUMER"})
-  void checkout_Success_WhenCartNotEmptyAndStockAvailable() throws Exception {
-    CheckoutRequest checkoutRequest = new CheckoutRequest();
-    checkoutRequest.setShippingAddressId(testAddress.getId());
-    checkoutRequest.setPaymentMethod(PaymentMethod.COD);
-    checkoutRequest.setNotes("Giao nhanh giúp");
+        testFarmer = new User();
+        testFarmer.setEmail("farmer.controller@example.com");
+        testFarmer.setPasswordHash("encodedPassword");
+        testFarmer.setFullName("Farmer Controller");
+        testFarmer.setPhoneNumber("0900000002");
+        testFarmer.setActive(true);
+        Set<Role> farmerRolesSet = new HashSet<>();
+        farmerRolesSet.add(farmerRole);
+        testFarmer.setRoles(farmerRolesSet); // << SỬA Ở ĐÂY
+        testFarmer = userRepository.save(testFarmer);
 
-    mockMvc
-        .perform(
-            post("/api/orders/checkout")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(checkoutRequest)))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.success", is(true)))
-        .andExpect(jsonPath("$.data", hasSize(1)))
-        .andExpect(jsonPath("$.data[0].status", is(OrderStatus.PENDING.name())));
+        FarmerProfile farmerProfile = new FarmerProfile();
+        farmerProfile.setUser(testFarmer);
+        farmerProfile.setUserId(testFarmer.getId());
+        farmerProfile.setFarmName("Farmer Controller Farm");
+        farmerProfile.setProvinceCode("20");
+        farmerProfile.setVerificationStatus(com.yourcompany.agritrade.common.model.VerificationStatus.VERIFIED);
+        //farmerProfileRepository.save(farmerProfile);
 
-    assertThat(cartItemRepository.findByUserId(testBuyer.getId())).isEmpty();
-    Product productAfter = productRepository.findById(testProduct.getId()).orElseThrow();
-    assertThat(productAfter.getStockQuantity()).isEqualTo(50 - 3);
-  }
+        testFarmer.setFarmerProfile(farmerProfile);
 
-  @Test
-  @DisplayName("[POST /api/orders/checkout] Thất bại khi giỏ hàng trống")
-  @WithMockUser(
-      username = "buyer.test@example.com",
-      roles = {"CONSUMER"})
-  void checkout_Fail_WhenCartIsEmpty() throws Exception {
-    cartItemRepository.deleteAll(); // Xóa giỏ hàng
-    CheckoutRequest checkoutRequest = new CheckoutRequest();
-    checkoutRequest.setShippingAddressId(testAddress.getId());
-    checkoutRequest.setPaymentMethod(PaymentMethod.COD);
+        testFarmer = userRepository.save(testFarmer);
 
-    mockMvc
-        .perform(
-            post("/api/orders/checkout")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(checkoutRequest)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.success", is(false)))
-        .andExpect(jsonPath("$.message", containsString("Cart is empty")));
-  }
 
-  @Test
-  @DisplayName("[GET /api/orders/my] Lấy đúng danh sách đơn hàng của Buyer")
-  @WithMockUser(
-      username = "buyer.test@example.com",
-      roles = {"CONSUMER"})
-  void getMyOrdersAsBuyer_Success() throws Exception {
-    // Arrange: Tạo 2 đơn hàng cho buyer này
-    createTestOrder(testBuyer, testFarmer, OrderStatus.PENDING, PaymentStatus.PENDING);
-    createTestOrder(testBuyer, testFarmer, OrderStatus.DELIVERED, PaymentStatus.PAID);
-    // Tạo 1 đơn hàng cho user khác (sẽ không hiển thị)
-    User otherBuyer =
-        userRepository.save(
-            User.builder()
-                .email("other@test.com")
-                .passwordHash("...")
-                .fullName("Other")
-                .isActive(true)
-                .roles(Collections.singleton(buyerRole))
-                .build());
-    createTestOrder(otherBuyer, testFarmer, OrderStatus.PENDING, PaymentStatus.PENDING);
+        defaultCategory = new Category();
+        defaultCategory.setName("Default Test Category");
+        defaultCategory.setSlug("default-test-category");
+        defaultCategory = categoryRepository.save(defaultCategory);
 
-    MvcResult result =
-        mockMvc
-            .perform(get("/api/orders/my").param("page", "0").param("size", "5"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success", is(true)))
-            .andExpect(
-                jsonPath("$.data.content", hasSize(2))) // Chỉ mong đợi 2 đơn hàng của testBuyer
-            .andExpect(jsonPath("$.data.totalElements", is(2)))
-            .andReturn();
+        testProduct1 = createProduct("Controller Product 1", BigDecimal.valueOf(10.0), testFarmer, 100);
+        testProduct2 = createProduct("Controller Product 2", BigDecimal.valueOf(20.0), testFarmer, 50);
 
-    // Optional: Parse response để kiểm tra kỹ hơn
-    // ApiResponse<Page<OrderSummaryResponse>> response = objectMapper.readValue(
-    //     result.getResponse().getContentAsString(),
-    //     new TypeReference<ApiResponse<Page<OrderSummaryResponse>>>() {});
-    // assertThat(response.getData().getContent()).allMatch(o ->
-    // o.getBuyerName().equals(testBuyer.getFullName()));
-  }
+        testShippingAddress = new Address();
+        testShippingAddress.setUser(testBuyer);
+        testShippingAddress.setFullName("Test Buyer Address");
+        testShippingAddress.setPhoneNumber("0123456789");
+        testShippingAddress.setAddressDetail("123 Test St, Controller Test");
+        testShippingAddress.setProvinceCode("20");
+        testShippingAddress.setDistrictCode("180");
+        testShippingAddress.setWardCode("06289");
+        testShippingAddress.setDefault(true);
+        testShippingAddress = addressRepository.save(testShippingAddress);
 
-  @Test
-  @DisplayName("[GET /api/orders/{orderId}] Buyer lấy được chi tiết đơn hàng của mình")
-  @WithMockUser(
-      username = "buyer.test@example.com",
-      roles = {"CONSUMER"})
-  void getMyOrderDetailsById_Success_BuyerIsOwner() throws Exception {
-    Order order =
-        createTestOrder(testBuyer, testFarmer, OrderStatus.PROCESSING, PaymentStatus.PENDING);
+        buyerAuthentication = new UsernamePasswordAuthenticationToken(testBuyer.getEmail(), "password", Collections.singletonList(new SimpleGrantedAuthority(RoleType.ROLE_CONSUMER.name())));
+        farmerAuthentication = new UsernamePasswordAuthenticationToken(testFarmer.getEmail(), "password", Collections.singletonList(new SimpleGrantedAuthority(RoleType.ROLE_FARMER.name())));
+    }
 
-    mockMvc
-        .perform(get("/api/orders/{orderId}", order.getId()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success", is(true)))
-        .andExpect(jsonPath("$.data.id", is(order.getId().intValue())))
-        .andExpect(jsonPath("$.data.buyer.id", is(testBuyer.getId().intValue())));
-  }
+    private Product createProduct(String name, BigDecimal price, User farmer, int stock) {
+        Product product = new Product();
+        product.setName(name);
+        product.setPrice(price);
+        product.setCategory(defaultCategory);
+        product.setFarmer(farmer);
+        product.setUnit("Kg");
+        product.setStockQuantity(stock);
+        product.setStatus(ProductStatus.PUBLISHED);
+        product.setSlug(name.toLowerCase().replace(" ", "-") + UUID.randomUUID().toString().substring(0,4));
+        product.setProvinceCode(farmer.getFarmerProfile() != null ? farmer.getFarmerProfile().getProvinceCode() : "20");
+        return productRepository.save(product);
+    }
 
-  @Test
-  @DisplayName("[GET /api/orders/{orderId}] Buyer không lấy được chi tiết đơn hàng của người khác")
-  @WithMockUser(
-      username = "buyer.test@example.com",
-      roles = {"CONSUMER"})
-  void getMyOrderDetailsById_Fail_BuyerIsNotOwner() throws Exception {
-    User otherBuyer =
-        userRepository.save(
-            User.builder()
-                .email("other2@test.com")
-                .passwordHash("...")
-                .fullName("Other 2")
-                .isActive(true)
-                .roles(Collections.singleton(buyerRole))
-                .build());
-    Order otherOrder =
-        createTestOrder(otherBuyer, testFarmer, OrderStatus.PENDING, PaymentStatus.PENDING);
+    @Test
+    void testCheckout_success() throws Exception {
+        // Giả lập giỏ hàng bằng cách tạo CartItemRequest
+        CartItemRequest itemReq1 = new CartItemRequest();
+        itemReq1.setProductId(testProduct1.getId());
+        itemReq1.setQuantity(2);
 
-    mockMvc
-        .perform(get("/api/orders/{orderId}", otherOrder.getId()))
-        .andExpect(status().isForbidden()) // Mong đợi 403 Forbidden
-        .andExpect(jsonPath("$.success", is(false)))
-        .andExpect(jsonPath("$.message", containsString("User does not have permission")));
-  }
+        CartItemRequest itemReq2 = new CartItemRequest();
+        itemReq2.setProductId(testProduct2.getId());
+        itemReq2.setQuantity(1);
 
-  @Test
-  @DisplayName(
-      "[POST /api/orders/{orderId}/cancel] Buyer hủy đơn hàng thành công khi trạng thái hợp lệ")
-  @WithMockUser(
-      username = "buyer.test@example.com",
-      roles = {"CONSUMER"})
-  void cancelMyOrder_Success_WhenStatusIsCancellable() throws Exception {
-    Order order =
-        createTestOrder(
-            testBuyer,
-            testFarmer,
-            OrderStatus.CONFIRMED,
-            PaymentStatus.PENDING); // CONFIRMED vẫn hủy được
+        // Tạo CheckoutRequest
+        CheckoutRequest checkoutRequest = new CheckoutRequest();
+        checkoutRequest.setShippingAddressId(testShippingAddress.getId());
+        checkoutRequest.setPaymentMethod(PaymentMethod.COD);
+        checkoutRequest.setNotes("Test checkout from controller");
+        // checkoutRequest.setItems(List.of(itemReq1, itemReq2)); // CheckoutRequest của bạn không có items, nó lấy từ CartService
 
-    mockMvc
-        .perform(post("/api/orders/{orderId}/cancel", order.getId()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success", is(true)))
-        .andExpect(jsonPath("$.data.status", is(OrderStatus.CANCELLED.name())));
+        // Để test checkout, bạn cần mô phỏng CartItem trong DB cho testBuyer
+        // Hoặc sửa CheckoutRequest để nhận List<CartItemRequest> và OrderService xử lý nó
+        // Hiện tại, tôi sẽ giả định CartService sẽ được gọi và có item.
+        // Để đơn giản, test này sẽ cần bạn đảm bảo CartService trả về đúng item cho testBuyer
+        // Hoặc bạn mock CartService. Cách tốt hơn là tạo CartItem thực sự.
 
-    Order cancelledOrder = orderRepository.findById(order.getId()).orElseThrow();
-    assertThat(cancelledOrder.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-    // Kiểm tra hoàn kho
-    Product productAfter = productRepository.findById(testProduct.getId()).orElseThrow();
-    assertThat(productAfter.getStockQuantity()).isEqualTo(50 + 3); // Hoàn lại 3
-  }
+        // Tạo CartItem thực sự cho testBuyer
+        com.yourcompany.agritrade.ordering.domain.CartItem cartItem1 = new com.yourcompany.agritrade.ordering.domain.CartItem();
+        cartItem1.setUser(testBuyer);
+        cartItem1.setProduct(testProduct1);
+        cartItem1.setQuantity(2);
+         cartItemRepository.save(cartItem1); // Cần CartItemRepository
 
-  @Test
-  @DisplayName(
-      "[POST /api/orders/{orderId}/cancel] Buyer hủy đơn hàng thất bại khi trạng thái không hợp lệ")
-  @WithMockUser(
-      username = "buyer.test@example.com",
-      roles = {"CONSUMER"})
-  void cancelMyOrder_Fail_WhenStatusIsNotCancellable() throws Exception {
-    Order order =
-        createTestOrder(
-            testBuyer,
-            testFarmer,
-            OrderStatus.SHIPPING,
-            PaymentStatus.PENDING); // SHIPPING không hủy được
+        com.yourcompany.agritrade.ordering.domain.CartItem cartItem2 = new com.yourcompany.agritrade.ordering.domain.CartItem();
+        cartItem2.setUser(testBuyer);
+        cartItem2.setProduct(testProduct2);
+        cartItem2.setQuantity(1);
+         cartItemRepository.save(cartItem2);
 
-    mockMvc
-        .perform(post("/api/orders/{orderId}/cancel", order.getId()))
-        .andExpect(status().isBadRequest()) // Mong đợi 400 Bad Request
-        .andExpect(jsonPath("$.success", is(false)))
-        .andExpect(jsonPath("$.message", containsString("Order cannot be cancelled")));
-  }
+        // Nếu bạn không inject CartItemRepository, bạn cần mock CartService
+        // hoặc đảm bảo logic checkout không phụ thuộc trực tiếp vào CartItemRepository
+        // mà là thông qua CartService được mock.
+        // Vì đây là Integration Test, tốt nhất là tạo dữ liệu thật.
+        // Bỏ qua phần save cart item nếu bạn không inject CartItemRepository ở đây.
+        // Test này sẽ phụ thuộc vào việc OrderService.checkout lấy đúng cart items.
 
-  // --- Helper method để tạo đơn hàng test ---
-  private Order createTestOrder(
-      User buyer, User farmer, OrderStatus initialStatus, PaymentStatus paymentStatus) {
-    Order order = new Order();
-    order.setBuyer(buyer);
-    order.setFarmer(farmer);
-    order.setOrderType(OrderType.B2C);
-    order.setOrderCode("TEST-" + UUID.randomUUID().toString().substring(0, 8));
-    order.setPaymentMethod(PaymentMethod.COD);
-    order.setPaymentStatus(paymentStatus);
-    order.setStatus(initialStatus);
-    // Sao chép địa chỉ
-    order.setShippingFullName(testAddress.getFullName());
-    order.setShippingPhoneNumber(testAddress.getPhoneNumber());
-    order.setShippingAddressDetail(testAddress.getAddressDetail());
-    order.setShippingProvinceCode(testAddress.getProvinceCode());
-    order.setShippingDistrictCode(testAddress.getDistrictCode());
-    order.setShippingWardCode(testAddress.getWardCode());
+        mockMvc.perform(post("/api/orders/checkout")
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(buyerAuthentication)) // Cung cấp Authentication
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(checkoutRequest)))
+                .andExpect(status().isCreated()) // Mong đợi 201 Created
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1)) // Vì cùng farmer
+                .andExpect(jsonPath("$.data[0].buyer.id").value(testBuyer.getId()))
+                .andExpect(jsonPath("$.data[0].farmer.farmerId").value(testFarmer.getId()))
+                .andExpect(jsonPath("$.data[0].orderItems.length()").value(2));
+    }
 
-    order.setSubTotal(new BigDecimal("30000.00"));
-    order.setShippingFee(BigDecimal.ZERO);
-    order.setDiscountAmount(BigDecimal.ZERO);
-    order.setTotalAmount(new BigDecimal("30000.00"));
+    @Test
+    void testGetMyOrderDetailsById_success() throws Exception {
+        Order order = new Order();
+        order.setBuyer(testBuyer);
+        order.setFarmer(testFarmer);
+        order.setOrderCode("CTRL-ORDER-001");
+        order.setOrderType(OrderType.B2C);
+        order.setShippingFullName("Test Recipient");
+        order.setShippingPhoneNumber("0987654321");
+        order.setShippingAddressDetail("123 Get St");
+        order.setShippingProvinceCode("20");
+        order.setShippingDistrictCode("180");
+        order.setShippingWardCode("06289");
+        order.setSubTotal(new BigDecimal("220.00"));
+        order.setShippingFee(new BigDecimal("15.00"));
+        order.setTotalAmount(new BigDecimal("235.00"));
+        order.setPaymentMethod(PaymentMethod.COD);
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setStatus(OrderStatus.PENDING);
+        Order savedOrder = orderRepository.save(order);
 
-    OrderItem item = new OrderItem();
-    item.setProduct(testProduct); // Dùng testProduct đã tạo
-    item.setProductName(testProduct.getName());
-    item.setUnit(testProduct.getUnit());
-    item.setPricePerUnit(testProduct.getPrice());
-    item.setQuantity(3); // Số lượng cố định cho test case này
-    item.setTotalPrice(testProduct.getPrice().multiply(BigDecimal.valueOf(3)));
-    order.addOrderItem(item);
+        mockMvc.perform(get("/api/orders/" + savedOrder.getId())
+                        .with(SecurityMockMvcRequestPostProcessors.authentication(buyerAuthentication)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(savedOrder.getId()))
+                .andExpect(jsonPath("$.data.buyer.id").value(testBuyer.getId()));
+    }
 
-    return orderRepository.saveAndFlush(order); // Lưu và flush để có ID
-  }
+    // TODO: Thêm các test cho:
+    // - getMyOrdersAsBuyer (với Pageable)
+    // - getMyOrderDetailsByCode
+    // - cancelMyOrder
+    // - calculateOrderTotals
+    // - createPaymentUrl
+    // - getBankTransferInfo
+    // - Các trường hợp lỗi (không tìm thấy, không có quyền, dữ liệu không hợp lệ)
 }

@@ -24,6 +24,9 @@ public class Role {
   @Column(length = 20, unique = true, nullable = false)
   private RoleType name;
 
+  @Column(length = 255, nullable = true)
+  private String description;
+
   // Thêm mối quan hệ ManyToMany với Permission
   @ManyToMany(
       fetch = FetchType.EAGER) // Dùng EAGER để load permissions cùng role khi cần lấy authorities

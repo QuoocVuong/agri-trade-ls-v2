@@ -58,4 +58,6 @@ public interface OrderService {
       PaymentMethod paymentMethodConfirmed,
       String transactionReference,
       String adminNotes);
+
+  String generateOrderCode();
 }
