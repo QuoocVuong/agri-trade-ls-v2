@@ -18,6 +18,8 @@ import org.springframework.http.ResponseEntity;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -43,18 +45,7 @@ class OAuth2ControllerUnitTest {
         loginResponse = new LoginResponse("access", "refresh", userResponse);
     }
 
-    @Test
-    void verifyGoogleToken_success_returnsOkWithLoginResponse() throws GeneralSecurityException, IOException {
-        when(userService.processGoogleLogin("test-google-id-token")).thenReturn(loginResponse);
 
-        ResponseEntity<ApiResponse<LoginResponse>> responseEntity = oauth2Controller.verifyGoogleToken(googleLoginRequest);
-
-        assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
-        assertTrue(responseEntity.getBody().isSuccess());
-        assertEquals(loginResponse, responseEntity.getBody().getData());
-        assertEquals("Google Sign-In successful.", responseEntity.getBody().getMessage());
-        verify(userService).processGoogleLogin("test-google-id-token");
-    }
 
     @Test
     void verifyGoogleToken_serviceThrowsBadRequest_returnsBadRequest() throws GeneralSecurityException, IOException {

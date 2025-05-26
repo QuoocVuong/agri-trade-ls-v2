@@ -61,7 +61,7 @@ public class FarmerProductController {
     ProductDetailResponse createdProduct = productService.createMyProduct(authentication, request);
     // Trả về 201 Created
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.created(createdProduct, "Product created successfully"));
+            .body(ApiResponse.created(createdProduct, "Product created successfully"));
   }
 
   @PutMapping("/me/{id}")

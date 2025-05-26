@@ -6,9 +6,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -21,8 +20,10 @@ import org.hibernate.annotations.Where;
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
 @SQLDelete(sql = "UPDATE products SET is_deleted = true WHERE id = ? and version = ?")
 @Where(clause = "is_deleted = false")
+@Builder
 public class Product {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -60,7 +61,7 @@ public class Product {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private ProductStatus status = ProductStatus.DRAFT; // Tạo Enum này
+  private ProductStatus status = ProductStatus.PENDING_APPROVAL; // Tạo Enum này
 
   @Column(nullable = false, length = 10)
   private String provinceCode;

@@ -100,7 +100,7 @@ public abstract class ProductMapper {
   @Mapping(target = "version", ignore = true) // Bỏ qua version khi tạo mới
   @Mapping(target = "rejectReason", ignore = true) // Bỏ qua rejectReason khi tạo mới
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")
-  @Mapping(target = "deleted", ignore = true) // Bỏ qua isDeleted khi tạo mới
+  //@Mapping(target = "deleted", ignore = true) // Bỏ qua isDeleted khi tạo mới
   public abstract Product requestToProduct(ProductRequest request);
 
   // --- Update Mapper ---

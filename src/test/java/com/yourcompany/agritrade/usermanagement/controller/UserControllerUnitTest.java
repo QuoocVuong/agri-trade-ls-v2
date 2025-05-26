@@ -26,15 +26,15 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq; // Thêm eq
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerUnitTest {
 
     @Mock private UserService userService;
-    @Mock private AdminUserService adminUserService; // Nếu UserController gọi AdminUserService
-    @Mock private Authentication authentication;
+    @Mock private AdminUserService adminUserService;
+    @Mock private Authentication authentication; // Vẫn giữ mock Authentication ở đây
 
     @InjectMocks
     private UserController userController;
@@ -44,19 +44,35 @@ class UserControllerUnitTest {
 
     @BeforeEach
     void setUp() {
-        userProfileResponse = new UserProfileResponse(); /* ... khởi tạo ... */
-        userResponse = new UserResponse(); /* ... khởi tạo ... */
+        userProfileResponse = new UserProfileResponse();
+        userProfileResponse.setId(1L);
+        userProfileResponse.setEmail("user@example.com");
+        userProfileResponse.setFullName("Test User Profile");
+        // ... khởi tạo các trường khác cho userProfileResponse
 
-        when(authentication.getName()).thenReturn("user@example.com"); // Giả lập tên user
+        userResponse = new UserResponse();
+        userResponse.setId(1L);
+        userResponse.setEmail("user@example.com");
+        userResponse.setFullName("Test User Response");
+        // ... khởi tạo các trường khác cho userResponse
+
+        // *** BỎ STUBBING CHUNG NÀY KHỎI setUp() ***
+        // when(authentication.getName()).thenReturn("user@example.com");
     }
 
     @Test
     void getCurrentUserProfile_success_returnsOkWithProfile() {
+        // Arrange
+        // Mock authentication.getName() CHỈ cho test này
+        //when(authentication.getName()).thenReturn("user@example.com");
         when(userService.getCurrentUserProfile(authentication)).thenReturn(userProfileResponse);
 
+        // Act
         ResponseEntity<ApiResponse<UserProfileResponse>> responseEntity = userController.getCurrentUserProfile(authentication);
 
+        // Assert
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
+        assertNotNull(responseEntity.getBody());
         assertTrue(responseEntity.getBody().isSuccess());
         assertEquals(userProfileResponse, responseEntity.getBody().getData());
         verify(userService).getCurrentUserProfile(authentication);
@@ -64,14 +80,20 @@ class UserControllerUnitTest {
 
     @Test
     void changePassword_success_returnsOk() {
+        // Arrange
+        // Mock authentication.getName() CHỈ cho test này (nếu service cần)
+        //when(authentication.getName()).thenReturn("user@example.com");
         PasswordChangeRequest request = new PasswordChangeRequest();
         request.setCurrentPassword("oldPass");
         request.setNewPassword("newPass");
         doNothing().when(userService).changePassword(authentication, request);
 
+        // Act
         ResponseEntity<ApiResponse<Void>> responseEntity = userController.changePassword(authentication, request);
 
+        // Assert
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
+        assertNotNull(responseEntity.getBody());
         assertTrue(responseEntity.getBody().isSuccess());
         assertEquals("Password changed successfully", responseEntity.getBody().getMessage());
         verify(userService).changePassword(authentication, request);
@@ -79,35 +101,48 @@ class UserControllerUnitTest {
 
     @Test
     void updateMyProfile_success_returnsOkWithUpdatedUser() {
+        // Arrange
+        // Mock authentication.getName() CHỈ cho test này
+        //when(authentication.getName()).thenReturn("user@example.com");
         UserUpdateRequest request = new UserUpdateRequest();
         request.setFullName("New Full Name");
         when(userService.updateCurrentUserProfile(authentication, request)).thenReturn(userResponse);
 
+        // Act
         ResponseEntity<ApiResponse<UserResponse>> responseEntity = userController.updateMyProfile(authentication, request);
 
+        // Assert
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
+        assertNotNull(responseEntity.getBody());
         assertTrue(responseEntity.getBody().isSuccess());
         assertEquals(userResponse, responseEntity.getBody().getData());
         assertEquals("Profile updated successfully", responseEntity.getBody().getMessage());
         verify(userService).updateCurrentUserProfile(authentication, request);
     }
 
-    // --- Admin Endpoints (Ví dụ) ---
     @Test
     void getAllUsersForAdmin_success_returnsPageOfUsers() {
+        // Arrange
         Pageable pageable = PageRequest.of(0, 10);
         Page<UserResponse> userPage = new PageImpl<>(List.of(userResponse), pageable, 1);
-        when(adminUserService.getAllUsers(eq(pageable), any(), any(), any())).thenReturn(userPage);
+        // Phương thức này không dùng authentication, nên không cần mock authentication.getName()
+        when(adminUserService.getAllUsers(eq(pageable), isNull(), isNull(), isNull())).thenReturn(userPage);
 
+        // Act
         ResponseEntity<ApiResponse<Page<UserResponse>>> responseEntity =
                 userController.getAllUsersForAdmin(null, null, null, pageable);
 
+        // Assert
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
+        assertNotNull(responseEntity.getBody());
         assertTrue(responseEntity.getBody().isSuccess());
         assertEquals(userPage, responseEntity.getBody().getData());
-        verify(adminUserService).getAllUsers(eq(pageable), any(), any(), any());
+        verify(adminUserService).getAllUsers(eq(pageable), isNull(), isNull(), isNull());
     }
 
-    // TODO: Thêm test cho các endpoint khác của UserController (getUserProfileById, updateUserStatus, updateUserRoles)
-    // và các kịch bản lỗi.
+    // TODO: Thêm test cho các endpoint admin khác của UserController:
+    // - getUserProfileById (Admin)
+    // - updateUserStatus (Admin)
+    // - updateUserRoles (Admin)
+    // và các kịch bản lỗi cho tất cả các phương thức.
 }

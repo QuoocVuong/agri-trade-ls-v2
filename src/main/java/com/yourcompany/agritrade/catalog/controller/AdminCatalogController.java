@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +34,7 @@ public class AdminCatalogController {
       @Valid @RequestBody CategoryRequest request) {
     CategoryResponse createdCategory = categoryService.createCategory(request);
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.created(createdCategory, "Category created successfully"));
+            .body(ApiResponse.created(createdCategory, "Category created successfully"));
   }
 
   @PutMapping("/categories/{id}")
@@ -75,7 +76,9 @@ public class AdminCatalogController {
   public ResponseEntity<ApiResponse<ProductDetailResponse>> approveProduct(@PathVariable Long id) {
     // Gọi phương thức đã implement trong ProductService
     ProductDetailResponse product = productService.approveProduct(id);
-    return ResponseEntity.ok(ApiResponse.success(product, "Product approved successfully"));
+    return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_JSON) // Thêm Content-Type
+            .body(ApiResponse.success(product, "Product approved successfully"));
   }
 
   @PostMapping("/products/{id}/reject")

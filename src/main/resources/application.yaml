@@ -27,7 +27,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update # Để Flyway quản lý schema
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
@@ -107,8 +107,7 @@ logging:
     com.yourcompany.agritradels: DEBUG # Log chi tiết hơn cho package của bạn
     org.springframework.web: INFO
     org.springframework.security: INFO
-    org.hibernate.SQL: DEBUG # Log câu lệnh SQL (nếu spring.jpa.show-sql=false)
-    org.hibernate.type.descriptor.sql: TRACE # Log tham số của câu lệnh SQL
+
 
 # --- Cấu hình cho các môi trường khác (ví dụ: dev) ---
 # Tạo file application-dev.yaml nếu cần cấu hình riêng cho dev

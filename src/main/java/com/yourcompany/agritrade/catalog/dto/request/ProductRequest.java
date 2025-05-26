@@ -34,7 +34,7 @@ public class ProductRequest {
   private Integer stockQuantity;
 
   // Farmer có thể chỉ được set DRAFT hoặc UNPUBLISHED ban đầu
-  private ProductStatus status = ProductStatus.DRAFT;
+  private ProductStatus status = ProductStatus.PENDING_APPROVAL;
 
   private boolean b2bEnabled = false;
 

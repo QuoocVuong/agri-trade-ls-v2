@@ -2,6 +2,8 @@ package com.yourcompany.agritrade.catalog.domain;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -12,6 +14,7 @@ import org.hibernate.annotations.CreationTimestamp;
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
 public class ProductImage {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,7 +24,7 @@ public class ProductImage {
   @JoinColumn(name = "product_id", nullable = false)
   private Product product;
 
-  @Transient // <<<< QUAN TRỌNG: Không lưu vào DB, sẽ được tạo động
+  @Column(nullable = true)
   private String imageUrl;
 
   @Column(nullable = false)
@@ -37,11 +40,11 @@ public class ProductImage {
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
-  // Constructor cập nhật
-  public ProductImage(String blobPath, boolean isDefault, int displayOrder) {
-    // this.imageUrl = imageUrl;
-    this.blobPath = blobPath;
-    this.isDefault = isDefault;
-    this.displayOrder = displayOrder;
-  }
+//  // Constructor cập nhật
+//  public ProductImage(String blobPath, boolean isDefault, int displayOrder) {
+//    // this.imageUrl = imageUrl;
+//    this.blobPath = blobPath;
+//    this.isDefault = isDefault;
+//    this.displayOrder = displayOrder;
+//  }
 }

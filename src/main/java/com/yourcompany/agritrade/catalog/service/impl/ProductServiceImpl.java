@@ -163,6 +163,33 @@ public class ProductServiceImpl implements ProductService {
     String slug = generateUniqueSlug(request.getName(), null); // Tạo slug unique
 
     Product product = productMapper.requestToProduct(request);
+
+    // ***** THÊM ĐOẠN NÀY ĐỂ ĐẢM BẢO COLLECTIONS KHÔNG NULL *****
+    if (product.getImages() == null) {
+      product.setImages(new HashSet<>());
+    }
+    if (product.getPricingTiers() == null) { // Làm tương tự cho các collection khác nếu cần
+      product.setPricingTiers(new HashSet<>());
+    }
+    // ***********************************************************
+
+    // ***** Đảm bảo các giá trị mặc định cho các trường NOT NULL *****
+    if (product.getAverageRating() == null) { // Mặc dù bạn đã có = 0.0f trong entity
+      product.setAverageRating(0.0f);
+    }
+    if (product.getRatingCount() == null) { // Giả sử ratingCount cũng là NOT NULL
+      product.setRatingCount(0);
+    }
+    if (product.getFavoriteCount() == null) { // Giả sử favoriteCount cũng là NOT NULL
+      product.setFavoriteCount(0);
+    }
+// isDeleted đã được khởi tạo là false
+// status đã được khởi tạo
+// stockQuantity đã được khởi tạo là 0
+// B2bEnabled đã được khởi tạo là false
+// ... kiểm tra các trường NOT NULL khác nếu cần ...
+// ************************************************************
+
     product.setSlug(slug);
     product.setFarmer(farmer);
     product.setCategory(category);
@@ -179,7 +206,8 @@ public class ProductServiceImpl implements ProductService {
     Product savedProduct = productRepository.save(product);
     log.info("Product created with id: {} by farmer: {}", savedProduct.getId(), farmer.getId());
     // Cần load lại product để có ID ảnh (nếu ảnh được save cùng lúc)
-    Product reloadedProduct = productRepository.findById(savedProduct.getId()).get();
+    Product reloadedProduct = productRepository.findByIdWithDetails(savedProduct.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("Product", "id", savedProduct.getId()));
     return productMapper.toProductDetailResponse(reloadedProduct);
   }
 
@@ -808,6 +836,13 @@ public class ProductServiceImpl implements ProductService {
   // --- Helper mới xử lý ảnh từ DTO ---
   private void updateProductImagesFromRequest(
       Product product, List<ProductImageRequest> imageRequests) {
+
+    // ***** ĐẢM BẢO product.getImages() KHÔNG NULL *****
+    if (product.getImages() == null) {
+      product.setImages(new HashSet<>());
+    }
+    // **************************************************
+
     if (imageRequests == null) {
       // Nếu request không có trường images -> không thay đổi ảnh hiện có
       return;
