@@ -2,10 +2,7 @@ package com.yourcompany.agritrade.notification.service.impl;
 
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.notification.service.EmailService;
-import com.yourcompany.agritrade.ordering.domain.Order;
-import com.yourcompany.agritrade.ordering.domain.OrderStatus;
-import com.yourcompany.agritrade.ordering.domain.Payment;
-import com.yourcompany.agritrade.ordering.domain.PaymentTransactionStatus;
+import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -19,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
+
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -281,6 +281,82 @@ public class EmailServiceImpl implements EmailService {
           "Error sending product rejected email to {}: {}", farmer.getEmail(), e.getMessage(), e);
     }
   }
+
+  // --- Invoice Related ---
+  @Override
+  @Async("taskExecutor")
+  public void sendOverdueInvoiceReminderEmail(Invoice invoice) {
+    if (invoice == null || invoice.getOrder() == null || invoice.getOrder().getBuyer() == null) {
+      log.warn("Cannot send overdue invoice email: invoice, order, or buyer is null.");
+      return;
+    }
+    User buyer = invoice.getOrder().getBuyer();
+    String subject = String.format("[%s] Nhắc nhở: Hóa đơn #%s đã quá hạn thanh toán", appName, invoice.getInvoiceNumber());
+    Context context = new Context();
+    context.setVariable("buyerName", buyer.getFullName());
+    context.setVariable("invoiceNumber", invoice.getInvoiceNumber());
+    context.setVariable("orderCode", invoice.getOrder().getOrderCode());
+    context.setVariable("dueDate", invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+    context.setVariable("totalAmount", invoice.getTotalAmount());
+    context.setVariable("orderUrl", frontendUrl + "/user/orders/" + invoice.getOrder().getId());
+    context.setVariable("appName", appName);
+    // Cần tạo template: templates/mail/invoice-overdue-reminder.html
+    String htmlBody = thymeleafTemplateEngine.process("mail/invoice-overdue-reminder", context);
+    sendHtmlEmail(subject, buyer.getEmail(), htmlBody);
+    log.info("Sent overdue invoice reminder email for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+  }
+
+  @Override
+  @Async("taskExecutor")
+  public void sendDueSoonInvoiceReminderEmail(Invoice invoice) {
+    if (invoice == null || invoice.getOrder() == null || invoice.getOrder().getBuyer() == null) {
+      log.warn("Cannot send due soon invoice email: invoice, order, or buyer is null.");
+      return;
+    }
+    User buyer = invoice.getOrder().getBuyer();
+    String subject = String.format("[%s] Nhắc nhở: Hóa đơn #%s sắp đến hạn thanh toán", appName, invoice.getInvoiceNumber());
+    Context context = new Context();
+    context.setVariable("buyerName", buyer.getFullName());
+    context.setVariable("invoiceNumber", invoice.getInvoiceNumber());
+    context.setVariable("orderCode", invoice.getOrder().getOrderCode());
+    context.setVariable("dueDate", invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+    context.setVariable("totalAmount", invoice.getTotalAmount());
+    context.setVariable("orderUrl", frontendUrl + "/user/orders/" + invoice.getOrder().getId());
+    context.setVariable("appName", appName);
+    // Cần tạo template: templates/mail/invoice-due-soon-reminder.html
+    String htmlBody = thymeleafTemplateEngine.process("mail/invoice-due-soon-reminder", context);
+    sendHtmlEmail(subject, buyer.getEmail(), htmlBody);
+    log.info("Sent due soon invoice reminder email for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+  }
+
+  @Override
+  @Async("taskExecutor")
+  public void sendOverdueInvoiceAdminEmail(Invoice invoice, List<User> adminUsers) {
+    if (invoice == null || adminUsers == null || adminUsers.isEmpty()) {
+      log.warn("Cannot send overdue invoice admin email: invoice or adminUsers list is null/empty.");
+      return;
+    }
+    String subject = String.format("[%s] Cảnh báo: Hóa đơn #%s đã quá hạn", appName, invoice.getInvoiceNumber());
+    Context context = new Context();
+    context.setVariable("invoiceNumber", invoice.getInvoiceNumber());
+    context.setVariable("orderCode", invoice.getOrder() != null ? invoice.getOrder().getOrderCode() : "N/A");
+    context.setVariable("buyerName", invoice.getOrder() != null && invoice.getOrder().getBuyer() != null ? invoice.getOrder().getBuyer().getFullName() : "N/A");
+    context.setVariable("dueDate", invoice.getDueDate() != null ? invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A");
+    context.setVariable("totalAmount", invoice.getTotalAmount());
+    context.setVariable("adminOrderUrl", frontendUrl + "/admin/orders/" + (invoice.getOrder() != null ? invoice.getOrder().getId() : ""));
+    context.setVariable("appName", appName);
+    // Cần tạo template: templates/mail/invoice-overdue-admin-alert.html
+    String htmlBody = thymeleafTemplateEngine.process("mail/invoice-overdue-admin-alert", context);
+
+    for (User admin : adminUsers) {
+      if (admin != null && StringUtils.hasText(admin.getEmail())) {
+        sendHtmlEmail(subject, admin.getEmail(), htmlBody);
+        log.info("Sent overdue invoice admin alert for invoice {} to admin {}", invoice.getInvoiceNumber(), admin.getEmail());
+      }
+    }
+  }
+
+
 
   // --- Private Helper Method ---
   private void sendHtmlEmail(String subject, String recipientEmail, String htmlContent) {

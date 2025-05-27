@@ -77,7 +77,9 @@ public interface NotificationService {
   void sendReviewRejectedNotification(Review review); // Thêm mới
 
 
-  void sendOverdueInvoiceReminderToBuyer(Invoice invoice);
-  void sendDueSoonInvoiceReminderToBuyer(Invoice invoice);
-  void sendOverdueInvoiceNotificationToAdmin(Invoice invoice); // Gửi cho admin/kế toán
+  // --- Invoice Related ---
+  void sendOverdueInvoiceReminderToBuyer(Invoice invoice); // Mới
+  void sendDueSoonInvoiceReminderToBuyer(Invoice invoice);  // Mới
+  void sendOverdueInvoiceNotificationToAdmin(Invoice invoice); // Mới
+
 }

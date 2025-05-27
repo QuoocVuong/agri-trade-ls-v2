@@ -1,9 +1,12 @@
 package com.yourcompany.agritrade.notification.service;
 
 import com.yourcompany.agritrade.catalog.domain.Product;
+import com.yourcompany.agritrade.ordering.domain.Invoice;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.usermanagement.domain.User;
+
+import java.util.List;
 
 public interface EmailService {
 
@@ -40,4 +43,9 @@ public interface EmailService {
   void sendProductApprovedEmailToFarmer(Product product, User farmer);
 
   void sendProductRejectedEmailToFarmer(Product product, String reason, User farmer);
+
+  // --- Invoice Related ---
+  void sendOverdueInvoiceReminderEmail(Invoice invoice); // Mới
+  void sendDueSoonInvoiceReminderEmail(Invoice invoice);  // Mới
+  void sendOverdueInvoiceAdminEmail(Invoice invoice, List<User> adminUsers); // Mới
 }

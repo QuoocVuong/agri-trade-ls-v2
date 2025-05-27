@@ -10,21 +10,20 @@ import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.common.util.VnPayUtils;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
-import com.yourcompany.agritrade.ordering.dto.response.BankTransferInfoResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
+import com.yourcompany.agritrade.ordering.dto.response.*;
 import com.yourcompany.agritrade.ordering.mapper.OrderMapper;
 import com.yourcompany.agritrade.ordering.repository.*;
 import com.yourcompany.agritrade.ordering.repository.specification.OrderSpecifications;
 import com.yourcompany.agritrade.ordering.service.InvoiceService;
 import com.yourcompany.agritrade.ordering.service.OrderService;
+import com.yourcompany.agritrade.ordering.service.PaymentGatewayService;
 import com.yourcompany.agritrade.usermanagement.domain.Address;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -41,8 +40,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
@@ -102,6 +104,15 @@ public class OrderServiceImpl implements OrderService {
 
   @Value("${app.bank.qr.template:compact2}")
   private String qrTemplate;
+
+  private final @Qualifier("vnPayService") PaymentGatewayService vnPayService;
+  private final @Qualifier("moMoService") PaymentGatewayService moMoService;
+
+  @Value("${app.frontend.url}") // Đảm bảo bạn có @Value này
+  private String frontendAppUrl;
+
+  @Value("${app.backend.url}") // Đảm bảo bạn có @Value này
+  private String backendAppUrl;
 
   @Override
   @Transactional(isolation = Isolation.READ_COMMITTED) // Đảm bảo đọc dữ liệu đã commit
@@ -358,51 +369,69 @@ public class OrderServiceImpl implements OrderService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<OrderSummaryResponse> getMyOrdersAsBuyer(
-      Authentication authentication, Pageable pageable) {
+  public Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
     User buyer = getUserFromAuthentication(authentication);
-    Page<Order> orderPage = orderRepository.findByBuyerIdWithDetails(buyer.getId(), pageable);
+    Specification<Order> spec = Specification.where(OrderSpecifications.byBuyer(buyer.getId()))
+            .and(OrderSpecifications.hasStatus(status))
+            .and(OrderSpecifications.buyerSearch(keyword)); // Sử dụng buyerSearch
+
+    // Không cần fetch chi tiết ở đây nếu OrderSummaryResponse không yêu cầu nhiều
+    // Page<Order> orderPage = orderRepository.findByBuyerIdWithDetails(buyer.getId(), pageable);
+    Page<Order> orderPage = orderRepository.findAll(spec, pageable);
     return orderMapper.toOrderSummaryResponsePage(orderPage);
   }
 
-  @Override
-  @Transactional(readOnly = true)
-  public Page<OrderSummaryResponse> getMyOrdersAsFarmer(
-      Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
-    User farmer = getUserFromAuthentication(authentication);
-    //        Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(),
-    // pageable);
-    //        return orderMapper.toOrderSummaryResponsePage(orderPage);
-    //    }
-    Specification<Order> spec =
-        Specification.where(OrderSpecifications.byFarmer(farmer.getId())); // Luôn lọc theo farmerId
+//  @Override
+//  @Transactional(readOnly = true)
+//  public Page<OrderSummaryResponse> getMyOrdersAsFarmer(
+//      Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
+//    User farmer = getUserFromAuthentication(authentication);
+//    //        Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(),
+//    // pageable);
+//    //        return orderMapper.toOrderSummaryResponsePage(orderPage);
+//    //    }
+//    Specification<Order> spec =
+//        Specification.where(OrderSpecifications.byFarmer(farmer.getId())); // Luôn lọc theo farmerId
+//
+//    if (StringUtils.hasText(keyword)) {
+//      // Giả sử keyword có thể là mã đơn hàng hoặc tên người mua
+//      spec =
+//          spec.and(
+//              Specification.anyOf( // Sử dụng OR
+//                  OrderSpecifications.hasOrderCode(keyword), // Cần tạo spec này
+//                  OrderSpecifications.hasBuyerName(keyword) // Cần tạo spec này
+//                  ));
+//    }
+//    if (status != null) {
+//      spec = spec.and(OrderSpecifications.hasStatus(status)); // Dùng lại spec đã có
+//    }
+//
+//    // Fetch các thông tin cần thiết cho OrderSummaryResponse để tránh N+1
+//    // Ví dụ: fetch buyer, farmer (nếu OrderSummaryResponse cần tên của họ)
+//    // spec = spec.and(OrderSpecifications.fetchBuyerAndFarmerSummary()); // Cần tạo spec này
+//
+//    Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+//
+//    // QUAN TRỌNG: Gọi populateProductImageUrlsInOrder nếu OrderSummaryResponse
+//    // hoặc bất kỳ DTO con nào của nó cần imageUrl từ ProductImage
+//    // Nếu OrderSummaryResponse không hiển thị ảnh sản phẩm thì không cần dòng này.
+//    // orderPage.getContent().forEach(this::populateProductImageUrlsInOrder);
+//
+//    return orderPage.map(orderMapper::toOrderSummaryResponse);
+//  }
+@Override
+@Transactional(readOnly = true)
+public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
+  User farmer = getUserFromAuthentication(authentication);
+  Specification<Order> spec = Specification.where(OrderSpecifications.byFarmer(farmer.getId()))
+          .and(OrderSpecifications.hasStatus(status))
+          .and(OrderSpecifications.farmerSearch(keyword)); // Sử dụng farmerSearch
 
-    if (StringUtils.hasText(keyword)) {
-      // Giả sử keyword có thể là mã đơn hàng hoặc tên người mua
-      spec =
-          spec.and(
-              Specification.anyOf( // Sử dụng OR
-                  OrderSpecifications.hasOrderCode(keyword), // Cần tạo spec này
-                  OrderSpecifications.hasBuyerName(keyword) // Cần tạo spec này
-                  ));
-    }
-    if (status != null) {
-      spec = spec.and(OrderSpecifications.hasStatus(status)); // Dùng lại spec đã có
-    }
+  // Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(), pageable);
+  Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+  return orderMapper.toOrderSummaryResponsePage(orderPage);
+}
 
-    // Fetch các thông tin cần thiết cho OrderSummaryResponse để tránh N+1
-    // Ví dụ: fetch buyer, farmer (nếu OrderSummaryResponse cần tên của họ)
-    // spec = spec.and(OrderSpecifications.fetchBuyerAndFarmerSummary()); // Cần tạo spec này
-
-    Page<Order> orderPage = orderRepository.findAll(spec, pageable);
-
-    // QUAN TRỌNG: Gọi populateProductImageUrlsInOrder nếu OrderSummaryResponse
-    // hoặc bất kỳ DTO con nào của nó cần imageUrl từ ProductImage
-    // Nếu OrderSummaryResponse không hiển thị ảnh sản phẩm thì không cần dòng này.
-    // orderPage.getContent().forEach(this::populateProductImageUrlsInOrder);
-
-    return orderPage.map(orderMapper::toOrderSummaryResponse);
-  }
 
   @Override
   @Transactional(readOnly = true)
@@ -1373,4 +1402,97 @@ public class OrderServiceImpl implements OrderService {
       }
     }
   }
+
+  // *** IMPLEMENT PHƯƠ_THỨC MỚI ***
+  @Override
+  @Transactional // Có thể cần @Transactional nếu bạn cập nhật trạng thái Order
+  public PaymentUrlResponse createPaymentUrl(Authentication authentication, Long orderId, PaymentMethod paymentMethod, HttpServletRequest httpServletRequest) {
+    User user = getUserFromAuthentication(authentication); // Sử dụng lại helper method
+    Order order = orderRepository
+            .findByIdAndBuyerId(orderId, user.getId()) // Đảm bảo đúng order của user
+            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+    // Kiểm tra trạng thái đơn hàng và thanh toán
+    if (order.getPaymentStatus() == PaymentStatus.PAID) {
+      throw new BadRequestException("Đơn hàng này đã được thanh toán.");
+    }
+    if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
+      throw new BadRequestException("Không thể thanh toán cho đơn hàng đã hủy hoặc đã hoàn thành.");
+    }
+
+    PaymentUrlResponse paymentUrlResponse;
+    String clientIp = VnPayUtils.getIpAddress(httpServletRequest);
+    String frontendReturnUrl; // Sẽ được gán trong switch
+
+    switch (paymentMethod) {
+      case VNPAY:
+        frontendReturnUrl = frontendAppUrl + "/payment/vnpay/result"; // Hoặc lấy từ config
+        // Cập nhật paymentMethod của Order nếu người dùng chọn lại hoặc thanh toán lại sau khi FAILED
+        if (order.getPaymentMethod() != PaymentMethod.VNPAY || order.getPaymentStatus() == PaymentStatus.FAILED) {
+          order.setPaymentMethod(PaymentMethod.VNPAY);
+          order.setPaymentStatus(PaymentStatus.PENDING); // Reset về PENDING
+          // Cân nhắc tạo Payment record mới nếu thử lại, hoặc cập nhật payment record cũ
+          orderRepository.save(order);
+        }
+        paymentUrlResponse = vnPayService.createVnPayPaymentUrl(order, clientIp, frontendReturnUrl);
+        break;
+      case MOMO:
+        frontendReturnUrl = frontendAppUrl + "/payment/momo/result";
+        String backendIpnUrl = backendAppUrl + "/api/payments/callback/momo/ipn";
+        if (order.getPaymentMethod() != PaymentMethod.MOMO || order.getPaymentStatus() == PaymentStatus.FAILED) {
+          order.setPaymentMethod(PaymentMethod.MOMO);
+          order.setPaymentStatus(PaymentStatus.PENDING);
+          orderRepository.save(order);
+        }
+        paymentUrlResponse = moMoService.createMoMoPaymentUrl(order, frontendReturnUrl, backendIpnUrl);
+        break;
+      // Thêm các case cho ZALOPAY, OTHER nếu cần
+      default:
+        throw new BadRequestException(
+                "Phương thức thanh toán không được hỗ trợ hoặc không hợp lệ cho việc tạo URL: " + paymentMethod);
+    }
+
+    if (paymentUrlResponse == null || paymentUrlResponse.getPaymentUrl() == null) {
+      log.error("Không thể tạo URL thanh toán cho đơn hàng {} với phương thức {}", order.getOrderCode(), paymentMethod);
+      throw new RuntimeException("Không thể tạo URL thanh toán cho " + paymentMethod.name());
+    }
+
+    log.info("Tạo URL thanh toán thành công cho đơn hàng {}, phương thức {}: {}", order.getOrderCode(), paymentMethod, paymentUrlResponse.getPaymentUrl());
+    return paymentUrlResponse;
+  }
+
+
+//  // Helper method getUserFromAuthentication (đảm bảo nó tồn tại và đúng)
+//  private User getUserFromAuthentication(Authentication authentication) {
+//    if (authentication == null
+//            || !authentication.isAuthenticated()
+//            || authentication.getPrincipal() == null) {
+//      throw new AccessDeniedException(
+//              "User is not authenticated or authentication details are missing.");
+//    }
+//
+//    Object principal = authentication.getPrincipal();
+//    String userIdentifier;
+//
+//    if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+//      userIdentifier =
+//              ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+//    } else if (principal instanceof String) {
+//      userIdentifier = (String) principal;
+//      if ("anonymousUser".equals(userIdentifier)) {
+//        throw new AccessDeniedException("Anonymous user cannot perform this action.");
+//      }
+//    } else {
+//      throw new AccessDeniedException("Cannot identify user from authentication principal.");
+//    }
+//
+//    return userRepository
+//            .findByEmail(userIdentifier)
+//            .orElseThrow(
+//                    () -> new UsernameNotFoundException(
+//                            "Authenticated user not found: " + userIdentifier));
+//  }
+
+
+
 }

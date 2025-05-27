@@ -1,28 +1,22 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080} # Biến môi trường: SERVER_PORT, giá trị mặc định: 8080
 
 spring:
   application:
-    name: agri-trade-ls # Tên ứng dụng
+    name: agri-trade # Tên ứng dụng
 
   datasource:
-    url: jdbc:mysql://localhost:3306/agri_trade_ls_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: root # Thay đổi
-    password: root # Thay đổi
+    url:  ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/agri_trade_ls_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
-      host: localhost # Hoặc địa chỉ Redis server của bạn
-      port: 6379
-      # password: your-redis-password # Nếu có
-      # database: 0 # Nếu cần
-      # timeout: 3000ms # Thời gian chờ kết nối
-      # lettuce:
-      #   pool:
-      #     max-active: 8
-      #     max-idle: 8
-      #     min-idle: 0
-      #     max-wait: -1ms # Chờ vô hạn nếu không có kết nối sẵn
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:} # Để trống nếu không có mật khẩu, hoặc đặt giá trị mặc định nếu muốn
+      # database: ${SPRING_REDIS_DATABASE:0}
+      # timeout: ${SPRING_REDIS_TIMEOUT:3000ms}
 
   jpa:
     hibernate:
@@ -35,48 +29,12 @@ spring:
 
   flyway:
     enabled: false
-    # baseline-on-migrate: true # Chỉ dùng lần đầu nếu DB đã có bảng
 
-  # Cấu hình Mail (Ví dụ với Gmail - Cần bật Less Secure App hoặc dùng App Password)
-#  mail:
-#    host: smtp.gmail.com
-#    port: 587
-#    username: your-email@gmail.com # Thay đổi
-#    password: your-gmail-app-password # Thay đổi
-#    properties:
-#      mail:
-#        smtp:
-#          auth: true
-#          starttls:
-#            enable: true
-#          # connectiontimeout: 5000
-#          # timeout: 5000
-#          # writetimeout: 5000
-#  mail:
-#    host: sandbox.smtp.mailtrap.io # Hoặc host Mailtrap cung cấp
-#    port: 2525           # Hoặc port Mailtrap cung cấp (thường là 25, 465, 587, 2525)
-#    username: dabd14f1bb39bf  # Username từ Mailtrap
-#    password: 2502b8b827ca4a # Password từ Mailtrap
-#    properties:
-#      mail:
-#        smtp:
-#          auth: true
-#          starttls:
-#            enable: true # Hoặc false tùy theo port
-#  mail:
-#    host: smtp-relay.brevo.com
-#    port: 587
-#    username: "8d147c001@smtp-brevo.com"  # THAY THẾ BẰNG EMAIL ĐĂNG NHẬP BREVO CỦA BẠN
-#    password: "xsmtpsib-1c54f8948c50c2e24c7cc068716afec00a72f8f3785353a777270e6779737d1e-mZrz9pyhsn1JSxEH"               # THAY THẾ BẰNG SMTP KEY (API KEY V3) CỦA BẠN
-#    properties:
-#      mail.smtp.auth: true
-#      mail.smtp.starttls.enable: true
-#      # mail.debug: true # Bật nếu muốn xem log chi tiết khi gửi mail (chỉ cho dev)
   mail:
-    host: smtp.sendgrid.net
-    port: 587
-    username: "apikey"                         # GIÁ TRỊ CỐ ĐỊNH
-    password: "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"          # THAY THẾ BẰNG API KEY CỦA BẠN
+    host: ${SPRING_MAIL_HOST:smtp.sendgrid.net}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:apikey}                         # GIÁ TRỊ CỐ ĐỊNH
+    password: ${SPRING_MAIL_PASSWORD}         # THAY THẾ BẰNG API KEY CỦA BẠN
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
@@ -85,7 +43,7 @@ spring:
   # Cấu hình cho JWT (Sẽ dùng ở Bước 10)
   security:
     jwt:
-      secret: be7aa243bf7c384f2714e9e11316da6cb659ab0a0c63bc0db96f1c543e9bbeec38ded28c9aa9055e11c385a83882b81417e32675e3bc9ef2d615309fea3bc1d2f742a1ac90c2e410656c18cbaf0b33b97bd48f12cb8daa85d36e091767805a11dfabe5bf92c324f56d3bee63f04d501a538ebb7f300098dca28a6db4780830e0e6efc513f1b7472a1dcda8df1c92f9391a4944a91a46877a44896c52a0f0dd902f785742e0d3af5404327aacf95927830de3a2764fa72538f9a586261a1fcf4a50721156ff43ef8eaeb66bdd3261c6e12bf971cbbfe9d20621380afdc7021eefdd034e5f1d6faad989e45eb3ee765f6dc24f1859f58c17d336cb3cc8824268d2 # Thay bằng key bí mật thực sự dài và an toàn
+      secret: ${JWT_SECRET}  # Thay bằng key bí mật thực sự dài và an toàn
       expiration-ms:  3600000 # 1 giờ cho access token
       refresh-token:
         expiration-ms: 604800000 # 7 ngày cho refresh token
@@ -109,16 +67,6 @@ logging:
     org.springframework.security: INFO
 
 
-# --- Cấu hình cho các môi trường khác (ví dụ: dev) ---
-# Tạo file application-dev.yaml nếu cần cấu hình riêng cho dev
-# --- Cấu hình cho môi trường production ---
-# Tạo file application-prod.yaml nếu cần cấu hình riêng cho prod
-
-#app:
-#  admin:
-#    email: admin@agritradels.com
-#    password: 123456
-#    fullname: Quản Trị Viên
 
 # File Storage Configuration
 storage:
@@ -127,22 +75,22 @@ storage:
 
 google:
   auth:
-    client-id: 1078646222149-c5k0i6kq80cm24ttoq2rjt4er44ao1if.apps.googleusercontent.com # Thay bằng Client ID của bạn
+    client-id: ${GOOGLE_CLIENT_ID}  # Thay bằng Client ID của bạn
     # issuer: https://accounts.google.com # Issuer mặc định
 
 
 firebase:
   storage:
-    bucket-name: agritrade-5eb84.firebasestorage.app # <<< THAY BẰNG TÊN BUCKET CỦA BẠN
-    service-account-key-path: classpath:firebase-service-account-key.json # Đường dẫn tới file key
+    bucket-name: ${FIREBASE_STORAGE_BUCKET_NAME} # <<< THAY BẰNG TÊN BUCKET CỦA BẠN
+    service-account-key-path: ${FIREBASE_SERVICE_ACCOUNT_KEY_PATH:classpath:firebase-service-account-key.json} # Đường dẫn tới file key
     # (Tùy chọn) Base URL công khai nếu bucket của bạn public hoặc bạn muốn tạo URL không cần ký
     # public-base-url: https://storage.googleapis.com/your-project-id.appspot.com
 
 payment:
   vnpay:
     version: "2.1.0"
-    tmnCode: "J02TTCB1" # Lấy từ VNPay Portal
-    hashSecret: "DULJDLKQYYCB8EZDPPH27EYUA5NEVFFI" # Lấy từ VNPay Portal
+    tmnCode: ${VNPAY_TMN_CODE} # Lấy từ VNPay Portal
+    hashSecret: ${VNPAY_HASH_SECRET} # Lấy từ VNPay Portal
     url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html" # URL cổng thanh toán TEST
     apiUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction" # URL API truy vấn (nếu cần)
   momo:
@@ -183,9 +131,17 @@ app:
       url: http://localhost:4200  # URL Frontend
 
   mail:
-    from: "lanhquocvuong26@gmail.com" # THAY THẾ BẰNG EMAIL NGƯỜI GỬI ĐÃ XÁC MINH VỚI SENDGRID
+    from: ${APP_MAIL_FROM:lanhquocvuong26@gmail.com} # THAY THẾ BẰNG EMAIL NGƯỜI GỬI ĐÃ XÁC MINH VỚI SENDGRID
     sender-name: "AgriTrade Platform"
 #    frontend:
 #      url: http://localhost:4200
+  scheduler:
+    invoice:
+      cron: "0 0 1 * * ?"        # Chạy vào 1:00 AM hàng ngày
+      #cron: "0 */2 * * * ?"   # Để test: Chạy mỗi 2 phút
+      due_soon_days_before: 3  # Số ngày nhắc trước khi hóa đơn đến hạn
+      overdue_admin_notify_after_days: 7 # Số ngày quá hạn thì báo Admin (tùy chọn)
+      payment_terms_days: 30 # Hoặc 2, hoặc -1 để test
+      # payment_terms_days: 30 # Giá trị mặc định cho production
 
 

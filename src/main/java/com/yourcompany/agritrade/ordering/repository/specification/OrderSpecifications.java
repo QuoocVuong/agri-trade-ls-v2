@@ -82,6 +82,45 @@ public class OrderSpecifications {
       return criteriaBuilder.like(criteriaBuilder.lower(buyerJoin.get("fullName")), namePattern);
     };
   }
+  public static Specification<Order> hasFarmerNameOrFarmName(String farmerKeyword) {
+    return (root, query, criteriaBuilder) -> {
+      if (!StringUtils.hasText(farmerKeyword)) {
+        return criteriaBuilder.conjunction();
+      }
+      String pattern = "%" + farmerKeyword.toLowerCase() + "%";
+      Join<Order, User> farmerUserJoin = root.join("farmer", JoinType.INNER);
+      // Join với FarmerProfile để tìm theo farmName
+      Join<User, FarmerProfile> farmerProfileJoin = farmerUserJoin.join("farmerProfile", JoinType.LEFT); // LEFT JOIN phòng trường hợp chưa có profile
+
+      Predicate farmerFullNameLike = criteriaBuilder.like(criteriaBuilder.lower(farmerUserJoin.get("fullName")), pattern);
+      Predicate farmNameLike = criteriaBuilder.like(criteriaBuilder.lower(farmerProfileJoin.get("farmName")), pattern);
+
+      return criteriaBuilder.or(farmerFullNameLike, farmNameLike);
+    };
+  }
+
+  // Specification tổng hợp cho tìm kiếm của Buyer
+  public static Specification<Order> buyerSearch(String keyword) {
+    if (!StringUtils.hasText(keyword)) {
+      return Specification.where(null); // Hoặc cb.conjunction()
+    }
+    // Buyer có thể tìm theo mã đơn hàng hoặc tên người bán/tên trang trại
+    return Specification.anyOf(
+            hasOrderCode(keyword),
+            hasFarmerNameOrFarmName(keyword)
+    );
+  }
+  // Specification tổng hợp cho tìm kiếm của Farmer
+  public static Specification<Order> farmerSearch(String keyword) {
+    if (!StringUtils.hasText(keyword)) {
+      return Specification.where(null);
+    }
+    // Farmer có thể tìm theo mã đơn hàng hoặc tên người mua
+    return Specification.anyOf(
+            hasOrderCode(keyword),
+            hasBuyerName(keyword)
+    );
+  }
 
   // (Tùy chọn) Specification để fetch thông tin cho Summary
   public static Specification<Order> fetchBuyerAndFarmerSummary() {

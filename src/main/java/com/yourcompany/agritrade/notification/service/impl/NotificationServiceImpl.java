@@ -415,41 +415,63 @@ public class NotificationServiceImpl implements NotificationService {
   }
 
 
-  // Trong NotificationServiceImpl.java
+  // --- Invoice Related ---
   @Override
   public void sendOverdueInvoiceReminderToBuyer(Invoice invoice) {
+    if (invoice == null || invoice.getOrder() == null || invoice.getOrder().getBuyer() == null) {
+      log.warn("Cannot send overdue invoice reminder: invoice, order, or buyer is null.");
+      return;
+    }
     User buyer = invoice.getOrder().getBuyer();
-    String message = String.format("Nhắc nhở: Hóa đơn #%s (Đơn hàng #%s) của bạn đã quá hạn thanh toán (Ngày đáo hạn: %s). Vui lòng thanh toán sớm.",
-            invoice.getInvoiceNumber(), invoice.getOrder().getOrderCode(), invoice.getDueDate().format(DateTimeFormatter.ISO_DATE));
-    String link = frontendUrl + "/user/orders/" + invoice.getOrder().getId(); // Link đến chi tiết đơn hàng
-    inAppNotificationService.createAndSendInAppNotification(buyer, message, NotificationType.INVOICE_OVERDUE, link); // Cần thêm NotificationType này
-    // emailService.sendOverdueInvoiceReminderEmail(invoice); // Gửi cả email
-    log.info("Sent overdue reminder for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+    String message = String.format("Hóa đơn #%s (Đơn hàng #%s) của bạn đã quá hạn thanh toán (Ngày đáo hạn: %s). Vui lòng thanh toán sớm.",
+            invoice.getInvoiceNumber(),
+            invoice.getOrder().getOrderCode(),
+            invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+    String link = frontendUrl + "/user/orders/" + invoice.getOrder().getId();
+    inAppNotificationService.createAndSendInAppNotification(buyer, message, NotificationType.INVOICE_OVERDUE, link);
+    // emailService.sendOverdueInvoiceReminderEmail(invoice); // Đã gọi từ Scheduler
   }
 
   @Override
   public void sendDueSoonInvoiceReminderToBuyer(Invoice invoice) {
+    if (invoice == null || invoice.getOrder() == null || invoice.getOrder().getBuyer() == null) {
+      log.warn("Cannot send due soon invoice reminder: invoice, order, or buyer is null.");
+      return;
+    }
     User buyer = invoice.getOrder().getBuyer();
-    String message = String.format("Nhắc nhở: Hóa đơn #%s (Đơn hàng #%s) của bạn sắp đến hạn thanh toán vào ngày %s.",
-            invoice.getInvoiceNumber(), invoice.getOrder().getOrderCode(), invoice.getDueDate().format(DateTimeFormatter.ISO_DATE));
+    String message = String.format("Hóa đơn #%s (Đơn hàng #%s) của bạn sắp đến hạn thanh toán vào ngày %s.",
+            invoice.getInvoiceNumber(),
+            invoice.getOrder().getOrderCode(),
+            invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
     String link = frontendUrl + "/user/orders/" + invoice.getOrder().getId();
-    inAppNotificationService.createAndSendInAppNotification(buyer, message, NotificationType.INVOICE_DUE_SOON, link); // Cần thêm NotificationType này
-    // emailService.sendDueSoonInvoiceReminderEmail(invoice);
-    log.info("Sent due soon reminder for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+    inAppNotificationService.createAndSendInAppNotification(buyer, message, NotificationType.INVOICE_DUE_SOON, link);
+    // emailService.sendDueSoonInvoiceReminderEmail(invoice); // Đã gọi từ Scheduler
   }
 
   @Override
   public void sendOverdueInvoiceNotificationToAdmin(Invoice invoice) {
-    // Logic tìm user admin hoặc gửi đến một email cố định của bộ phận kế toán
-    // Ví dụ:
-     List<User> admins = userRepository.findByRoles_Name(RoleType.ROLE_ADMIN);
-     for (User admin : admins) {
-        String message = String.format("Hóa đơn #%s (Đơn hàng #%s, Khách hàng: %s) đã QUÁ HẠN.",
-                invoice.getInvoiceNumber(), invoice.getOrder().getOrderCode(), invoice.getOrder().getBuyer().getFullName());
-        String link = frontendUrl + "/admin/orders/" + invoice.getOrder().getId(); // Link cho admin
-        inAppNotificationService.createAndSendInAppNotification(admin, message, NotificationType.ADMIN_ALERT, link);
-     }
-    log.info("Admin notified about overdue invoice {}", invoice.getInvoiceNumber());
+    if (invoice == null) {
+      log.warn("Cannot send overdue invoice admin notification: invoice is null.");
+      return;
+    }
+    List<User> admins = userRepository.findByRoles_Name(RoleType.ROLE_ADMIN);
+    if (admins.isEmpty()) {
+      log.warn("No admin users found to send overdue invoice notification for invoice {}", invoice.getInvoiceNumber());
+      return;
+    }
+    String buyerInfo = (invoice.getOrder() != null && invoice.getOrder().getBuyer() != null)
+            ? invoice.getOrder().getBuyer().getFullName() + " (ID: " + invoice.getOrder().getBuyer().getId() + ")"
+            : "Không rõ";
+    String message = String.format("CẢNH BÁO: Hóa đơn #%s (Đơn hàng #%s, Khách hàng: %s) đã QUÁ HẠN thanh toán.",
+            invoice.getInvoiceNumber(),
+            invoice.getOrder() != null ? invoice.getOrder().getOrderCode() : "N/A",
+            buyerInfo);
+    String link = frontendUrl + "/admin/invoices?invoiceNumber=" + invoice.getInvoiceNumber(); // Link tới trang quản lý hóa đơn của admin
+
+    for (User admin : admins) {
+      inAppNotificationService.createAndSendInAppNotification(admin, message, NotificationType.ADMIN_ALERT, link);
+    }
+    // emailService.sendOverdueInvoiceAdminEmail(invoice, admins); // Đã gọi từ Scheduler
   }
 
 

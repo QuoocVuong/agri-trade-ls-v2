@@ -1,0 +1,27 @@
+-- V5__create_notification_table.sql
+
+CREATE TABLE notifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    recipient_id BIGINT NOT NULL,
+    message TEXT NOT NULL,
+    type ENUM(
+        'ORDER_PLACED', 'ORDER_STATUS_UPDATE', 'ORDER_CANCELLED',
+        'PAYMENT_SUCCESS', 'PAYMENT_FAILURE',
+        'NEW_MESSAGE',
+        'NEW_FOLLOWER',
+        'PRODUCT_APPROVED', 'PRODUCT_REJECTED',
+        'REVIEW_APPROVED', 'REVIEW_REJECTED',
+        'WELCOME', 'PASSWORD_RESET', 'EMAIL_VERIFIED',
+        'SYSTEM_ANNOUNCEMENT', 'PROMOTION',
+        'REVIEW_PENDING', 'FARMER_PROFILE_APPROVED', 'FARMER_PROFILE_REJECTED',
+        'INVOICE_ISSUED', 'INVOICE_PAID', 'INVOICE_OVERDUE', 'INVOICE_DUE_SOON',
+        'ADMIN_ALERT',
+        'OTHER'
+    ) NOT NULL DEFAULT 'OTHER',
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    read_at TIMESTAMP NULL,
+    link VARCHAR(512) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_notifications_recipient_read_created ON notifications(recipient_id, is_read, created_at);

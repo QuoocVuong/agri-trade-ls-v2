@@ -31,6 +31,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -39,18 +40,8 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("isAuthenticated()") // Yêu cầu đăng nhập cho các API đơn hàng của người dùng
 public class OrderController {
 
-  private final @Qualifier("vnPayService") PaymentGatewayService vnPayService;
-  private final @Qualifier("moMoService") PaymentGatewayService moMoService; // Nếu có
-
-  @Value("${app.frontend.url}")
-  private String frontendAppUrl; // URL của frontend
-
-  @Value("${app.backend.url}")
-  private String backendAppUrl; // URL của backend (cho IPN)
 
   private final OrderService orderService;
-  private final OrderRepository orderRepository;
-  private final UserRepository userRepository;
 
   @PostMapping("/checkout")
   // Chỉ Consumer hoặc Business Buyer mới được checkout
@@ -67,8 +58,20 @@ public class OrderController {
   @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')")
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsBuyer(
       Authentication authentication,
-      @PageableDefault(size = 10, sort = "createdAt,desc") Pageable pageable) {
-    Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsBuyer(authentication, pageable);
+      @RequestParam(required = false) String keyword, // THÊM
+      @RequestParam(required = false) String status, // THÊM (nhận là String)
+      @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
+
+    OrderStatus statusEnum = null;
+    if (StringUtils.hasText(status)) {
+      try {
+        statusEnum = OrderStatus.valueOf(status.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        // log.warn("Invalid order status value received: {}", status);
+        // Có thể trả về lỗi BadRequest hoặc bỏ qua filter này
+      }
+    }
+    Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsBuyer(authentication,keyword,statusEnum, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 
@@ -115,116 +118,13 @@ public class OrderController {
   @PostMapping("/{orderId}/create-payment-url")
   @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')")
   public ResponseEntity<ApiResponse<PaymentUrlResponse>> createPaymentUrl(
-      Authentication authentication,
-      @PathVariable Long orderId,
-      @RequestParam PaymentMethod paymentMethod, // Frontend gửi lên phương thức muốn dùng
-      HttpServletRequest httpServletRequest // Inject HttpServletRequest
-      ) {
-    User user = getUserFromAuthentication(authentication); // Hàm helper của bạn
-    Order order =
-        orderRepository
-            .findByIdAndBuyerId(orderId, user.getId()) // Đảm bảo đúng order của user
-            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-
-    // Kiểm tra trạng thái đơn hàng và thanh toán
-    if (order.getPaymentStatus() == PaymentStatus.PAID) {
-      throw new BadRequestException("Đơn hàng này đã được thanh toán.");
-    }
-    if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.DELIVERED) {
-      throw new BadRequestException("Không thể thanh toán cho đơn hàng đã hủy hoặc đã hoàn thành.");
-    }
-
-    PaymentUrlResponse paymentUrlResponse = null;
-    String clientIp = VnPayUtils.getIpAddress(httpServletRequest); // Sử dụng VnPayUtils
-    String frontendReturnUrl = frontendAppUrl + "/payment/result"; // URL Frontend xử lý sau khi thanh toán
-
-    switch (paymentMethod) {
-      case VNPAY:
-        frontendReturnUrl = frontendAppUrl + "/payment/vnpay/result"; // Hoặc lấy từ config
-        // Cập nhật paymentMethod của Order nếu người dùng chọn lại
-        if (order.getPaymentMethod() != PaymentMethod.VNPAY ||
-                order.getPaymentStatus() == PaymentStatus.FAILED ) {
-          order.setPaymentMethod(PaymentMethod.VNPAY);
-          order.setPaymentStatus(PaymentStatus.PENDING); // Reset về PENDING
-          // Cân nhắc tạo Payment record mới nếu thử lại
-          orderRepository.save(order); // Lưu lại
-        }
-        paymentUrlResponse = vnPayService.createVnPayPaymentUrl(order, clientIp, frontendReturnUrl);
-        break;
-      case MOMO:
-        frontendReturnUrl = frontendAppUrl + "/payment/momo/result"; // Hoặc lấy từ config
-        String backendIpnUrl =
-            backendAppUrl + "/api/payments/callback/momo/ipn"; // URL IPN cho MoMo
-        if (order.getPaymentMethod() != PaymentMethod.MOMO) {
-          order.setPaymentMethod(PaymentMethod.MOMO);
-          orderRepository.save(order);
-        }
-
-        paymentUrlResponse =
-            moMoService.createMoMoPaymentUrl(order, frontendReturnUrl, backendIpnUrl);
-        break;
-        // Các case khác nếu có
-      default:
-        throw new BadRequestException(
-            "Phương thức thanh toán không được hỗ trợ hoặc không hợp lệ cho việc tạo URL.");
-    }
-
-    if (paymentUrlResponse == null || paymentUrlResponse.getPaymentUrl() == null) {
-      throw new RuntimeException("Không thể tạo URL thanh toán cho " + paymentMethod.name());
-    }
-
+          Authentication authentication,
+          @PathVariable Long orderId,
+          @RequestParam PaymentMethod paymentMethod,
+          HttpServletRequest httpServletRequest) { // Vẫn cần HttpServletRequest để truyền xuống service
+    // Gọi phương thức mới trong OrderService
+    PaymentUrlResponse paymentUrlResponse = orderService.createPaymentUrl(authentication, orderId, paymentMethod, httpServletRequest);
     return ResponseEntity.ok(ApiResponse.success(paymentUrlResponse));
-  }
-
-  private String getClientIp(HttpServletRequest request) {
-    // Logic lấy IP client (cẩn thận với proxy)
-    String remoteAddr = "";
-    if (request != null) {
-      remoteAddr = request.getHeader("X-FORWARDED-FOR");
-      if (remoteAddr == null || "".equals(remoteAddr)) {
-        remoteAddr = request.getRemoteAddr();
-      }
-    }
-    return remoteAddr;
-  }
-
-  // ****** SAO CHÉP PHƯƠNG THỨC HELPER VÀO ĐÂY ******
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || authentication.getPrincipal() == null) {
-      // log.warn("Attempted to get user from null or unauthenticated Authentication object."); //
-      // Cần inject Logger nếu muốn log
-      throw new AccessDeniedException(
-          "User is not authenticated or authentication details are missing.");
-    }
-
-    Object principal = authentication.getPrincipal();
-    String userIdentifier;
-
-    if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
-      userIdentifier =
-          ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
-    } else if (principal instanceof String) {
-      userIdentifier = (String) principal;
-      if ("anonymousUser".equals(userIdentifier)) {
-        // log.warn("Attempted operation by anonymous user.");
-        throw new AccessDeniedException("Anonymous user cannot perform this action.");
-      }
-    } else {
-      // log.error("Unexpected principal type: {}", principal.getClass().getName());
-      throw new AccessDeniedException("Cannot identify user from authentication principal.");
-    }
-
-    return userRepository
-        .findByEmail(userIdentifier)
-        .orElseThrow(
-            () -> {
-              // log.error("Authenticated user not found in database with identifier: {}",
-              // userIdentifier);
-              return new UsernameNotFoundException(
-                  "Authenticated user not found: " + userIdentifier);
-            });
   }
 
   @GetMapping("/{orderId}/bank-transfer-info")

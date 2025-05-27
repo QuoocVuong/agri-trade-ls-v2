@@ -5,11 +5,11 @@ import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
-import com.yourcompany.agritrade.ordering.dto.response.BankTransferInfoResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderCalculationResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
-import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
+import com.yourcompany.agritrade.ordering.dto.response.*;
+
 import java.util.List;
+
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -20,7 +20,7 @@ public interface OrderService {
   List<OrderResponse> checkout(Authentication authentication, CheckoutRequest request);
 
   /** Lấy danh sách đơn hàng của người mua hiện tại (phân trang) */
-  Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, Pageable pageable);
+  Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable);
 
   /** Lấy danh sách đơn hàng của nông dân hiện tại (phân trang) */
   Page<OrderSummaryResponse> getMyOrdersAsFarmer(
@@ -60,4 +60,6 @@ public interface OrderService {
       String adminNotes);
 
   String generateOrderCode();
+
+  PaymentUrlResponse createPaymentUrl(Authentication authentication, Long orderId, PaymentMethod paymentMethod, HttpServletRequest httpServletRequest);
 }

@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -39,6 +40,9 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   private final InvoiceMapper invoiceMapper;
 
+  @Value("${app.invoice.payment_terms_days:7}") // Giá trị mặc định là 30
+  private int invoicePaymentTermsDays;
+
   @Override
   @Transactional
   public Invoice getOrCreateInvoiceForOrder(Order order) {
@@ -54,7 +58,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     // Logic set dueDate, status tùy theo loại đơn/phương thức thanh toán
     if (order.getPaymentMethod() == PaymentMethod.INVOICE) {
       // Ví dụ: Công nợ 30 ngày
-      invoice.setDueDate(invoice.getIssueDate().plusDays(30));
+      invoice.setDueDate(invoice.getIssueDate().plusDays(invoicePaymentTermsDays));
       invoice.setStatus(InvoiceStatus.ISSUED); // Hóa đơn công nợ được phát hành
     } else {
       // Đối với các phương thức thanh toán khác, hóa đơn có thể là DRAFT hoặc ISSUED ngay
