@@ -68,10 +68,7 @@ logging:
 
 
 
-# File Storage Configuration
-storage:
-  location: upload-dir # Tên thư mục gốc để lưu file (sẽ tạo trong thư mục chạy ứng dụng)
-  base-url: /api/files/download # Đường dẫn cơ sở để truy cập file qua API
+
 
 google:
   auth:
@@ -99,6 +96,7 @@ payment:
     secretKey: YOUR_MOMO_SECRET_KEY
     endpoint: https://test-payment.momo.vn/v2/gateway/api/create
     queryUrl: https://test-payment.momo.vn/v2/gateway/api/query
+    refundUrl: ${MOMO_REFUND_URL:https://test-payment.momo.vn/v2/gateway/api/refund}
 
 app:
   frontend:

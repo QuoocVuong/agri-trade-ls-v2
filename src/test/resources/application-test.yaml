@@ -1,4 +1,11 @@
 spring:
+  security:
+    jwt:
+      secret: "c29tZXRoaW5nZWxzZWdldGhpbmdzZWxzZWdldGhpbmdzZWxzZWdldGhpbmdzZWxzZWdldGhpbmdzZWxzZQ==" # Ví dụ một secret base64 hợp lệ
+      expiration-ms: 3600000
+      refresh-token:
+        expiration-ms: 604800000
+
   # Rất quan trọng: Ngăn Spring Boot tự động cấu hình DataSource nhúng (như H2)
   # Điều này cho phép Testcontainers cung cấp DataSource một cách chính xác.
   autoconfigure:

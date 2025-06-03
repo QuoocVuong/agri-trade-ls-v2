@@ -18,6 +18,8 @@ import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
 import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
+import com.yourcompany.agritrade.interaction.service.ReviewService;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
@@ -35,12 +37,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization; // SỬA LẠI IMPORT NÀY
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 @Service
@@ -59,6 +64,7 @@ public class ProductServiceImpl implements ProductService {
   private final Slugify slugify = Slugify.builder().build();
   private final ProductImageMapper productImageMapper;
   private final FileStorageService fileStorageService;
+  private final ReviewService reviewService;
   private static final int RELATED_PRODUCTS_LIMIT = 4; // Số lượng sản phẩm liên quan muốn hiển thị
 
   private final ProductPricingTierMapper productPricingTierMapper;
@@ -586,6 +592,18 @@ public class ProductServiceImpl implements ProductService {
     ProductDetailResponse response = productMapper.toProductDetailResponse(product);
     // Lấy và gán sản phẩm liên quan
     response.setRelatedProducts(findRelatedProducts(product));
+
+    // *** LẤY VÀ GÁN ĐÁNH GIÁ CHO SẢN PHẨM ***
+    // Quyết định có phân trang ở đây không, hoặc lấy một số lượng nhất định
+    Pageable reviewPageable = PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")); // Ví dụ: lấy 5 review mới nhất
+    Page<ReviewResponse> productReviewsPage = reviewService.getApprovedReviewsByProduct(product.getId(), reviewPageable);
+    if (productReviewsPage != null) {
+      response.setReviews(productReviewsPage.getContent());
+    } else {
+      response.setReviews(Collections.emptyList());
+    }
+    // *****************************************
+
     return response;
   }
 
@@ -604,6 +622,17 @@ public class ProductServiceImpl implements ProductService {
 
     ProductDetailResponse response = productMapper.toProductDetailResponse(product);
     response.setRelatedProducts(findRelatedProducts(product));
+
+    // *** LẤY VÀ GÁN ĐÁNH GIÁ CHO SẢN PHẨM ***
+    Pageable reviewPageable = PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt"));
+    Page<ReviewResponse> productReviewsPage = reviewService.getApprovedReviewsByProduct(product.getId(), reviewPageable);
+    if (productReviewsPage != null) {
+      response.setReviews(productReviewsPage.getContent());
+    } else {
+      response.setReviews(Collections.emptyList());
+    }
+    // *****************************************
+
     return response;
   }
 
@@ -834,17 +863,29 @@ public class ProductServiceImpl implements ProductService {
   }
 
   // --- Helper mới xử lý ảnh từ DTO ---
-  private void updateProductImagesFromRequest(
-      Product product, List<ProductImageRequest> imageRequests) {
+  private void updateProductImagesFromRequest(Product product, List<ProductImageRequest> imageRequests) {
 
-    // ***** ĐẢM BẢO product.getImages() KHÔNG NULL *****
+
     if (product.getImages() == null) {
       product.setImages(new HashSet<>());
     }
-    // **************************************************
+
 
     if (imageRequests == null) {
-      // Nếu request không có trường images -> không thay đổi ảnh hiện có
+      // Nếu request không có trường images, không thay đổi ảnh hiện có
+      // Tuy nhiên, nếu logic của bạn là "nếu không gửi gì thì xóa hết", cần xử lý ở đây
+      // Ví dụ: nếu imageRequests là null và product.getImages() không rỗng, thì xóa hết ảnh cũ
+      // if (!product.getImages().isEmpty()) {
+      //     List<String> blobPathsToDeleteAfterCommit = new ArrayList<>();
+      //     product.getImages().forEach(img -> {
+      //         if (StringUtils.hasText(img.getBlobPath())) {
+      //             blobPathsToDeleteAfterCommit.add(img.getBlobPath());
+      //         }
+      //     });
+      //     productImageRepository.deleteAll(product.getImages()); // Xóa entity khỏi DB
+      //     product.getImages().clear(); // Xóa khỏi collection trong product
+      //     registerBlobsForDeletionAfterCommit(blobPathsToDeleteAfterCommit);
+      // }
       return;
     }
 
@@ -854,10 +895,14 @@ public class ProductServiceImpl implements ProductService {
             .collect(Collectors.toMap(ProductImage::getId, Function.identity()));
 
     Set<ProductImage> updatedImages = new HashSet<>();
-    Set<Long> requestImageIds = new HashSet<>();
+    Set<Long> requestImageIds = new HashSet<>(); // Lưu ID của các ảnh có trong request (để biết ảnh nào cần xóa)
+    boolean hasDefaultInRequest = false;
     boolean hasDefault = false;
 
     int order = 0;
+
+    // Danh sách các blobPath của ảnh cũ cần xóa sau khi transaction thành công
+    List<String> blobPathsToDeleteAfterCommit = new ArrayList<>();
 
     // Duyệt qua danh sách ảnh từ request
     for (ProductImageRequest imgReq : imageRequests) {
@@ -865,97 +910,131 @@ public class ProductServiceImpl implements ProductService {
       if (imgReq.getId() != null && existingImagesMap.containsKey(imgReq.getId())) {
         // Nếu là ảnh đã có -> cập nhật thông tin (order, isDefault)
         image = existingImagesMap.get(imgReq.getId());
-        // Chỉ cập nhật isDefault và displayOrder cho ảnh đã có
+
+        String oldBlobPathThisImage = image.getBlobPath();
+
+        // Chỉ cập nhật isDefault và displayOrder, blobPath nếu nó thay đổi
         image.setDefault(imgReq.getIsDefault() != null && imgReq.getIsDefault());
         image.setDisplayOrder(imgReq.getDisplayOrder() != null ? imgReq.getDisplayOrder() : order);
-        requestImageIds.add(imgReq.getId());
-      } else { // Ảnh mới
+
+        // Nếu blobPath trong request khác với blobPath hiện tại của ảnh -> ảnh đã được thay thế
+        if (StringUtils.hasText(imgReq.getBlobPath()) && !imgReq.getBlobPath().equals(oldBlobPathThisImage)) {
+          if (StringUtils.hasText(oldBlobPathThisImage)) {
+            blobPathsToDeleteAfterCommit.add(oldBlobPathThisImage); // Đánh dấu blob cũ để xóa
+          }
+          image.setBlobPath(imgReq.getBlobPath()); // Cập nhật blob mới
+        }
+        requestImageIds.add(imgReq.getId()); // Đánh dấu ảnh này được giữ lại/cập nhật
+      } else {
+        // Ảnh mới
         image = new ProductImage();
         image.setProduct(product);
-
-        String blobPathFromRequest = imgReq.getBlobPath(); // Lấy blobPath từ request
-
-        if (StringUtils.hasText(blobPathFromRequest)) {
-          image.setBlobPath(blobPathFromRequest); // <<<< Chỉ lưu BLOB PATH vào entity
-          // KHÔNG CẦN: image.setImageUrl(fileStorageService.getFileUrl(blobPathFromRequest));
-          log.info("Processing new image. BlobPath from request: {}", blobPathFromRequest);
-        } else {
-          // Nếu blobPath rỗng trong request -> Lỗi nghiêm trọng
-          log.error(
-              "blobPath is missing in ProductImageRequest for new image during update. Request data: {}",
-              imgReq);
-          continue; // Bỏ qua ảnh này
+        if (!StringUtils.hasText(imgReq.getBlobPath())) {
+          log.warn("New product image request is missing blobPath. Skipping image: {}", imgReq);
+          continue; // Bỏ qua ảnh này nếu không có blobPath
         }
-        image.setDisplayOrder(order); // Gán displayOrder
+        image.setBlobPath(imgReq.getBlobPath());
+        image.setDisplayOrder(order);
         image.setDefault(imgReq.getIsDefault() != null && imgReq.getIsDefault());
       }
-      order++; // Luôn tăng order
-      //                if (imgReq.getIsDefault() != null && imgReq.getIsDefault()) {
-      //                    if (hasDefault) {
-      //                        image.setDefault(false); // Chỉ cho phép 1 default
-      //                    } else {
-      //                        image.setDefault(true);
-      //                        hasDefault = true;
-      //                    }
-      //                } else if (!hasDefault && imageRequests.indexOf(imgReq) ==
-      // imageRequests.size() - 1) {
-      //                    // Nếu duyệt hết mà chưa có default -> set cái cuối cùng là default
-      // (hoặc cái đầu tiên)
-      //                    image.setDefault(true);
-      //                } else {
-      //                    image.setDefault(false); // Các trường hợp còn lại không phải default
-      //                }
+      order++;
       if (image.isDefault()) {
-        if (hasDefault) image.setDefault(false);
+        if (hasDefault) image.setDefault(false); // Chỉ cho phép 1 default
         else hasDefault = true;
       }
 
       updatedImages.add(image);
     }
     // Đảm bảo có ảnh default nếu list không rỗng và chưa có default nào được set từ request
-    if (!updatedImages.isEmpty() && !hasDefault) {
+    if (!updatedImages.isEmpty() && !hasDefaultInRequest) {
       updatedImages.stream()
-          .min(Comparator.comparingInt(ProductImage::getDisplayOrder))
-          .ifPresent(img -> img.setDefault(true));
+              .min(Comparator.comparingInt(ProductImage::getDisplayOrder).thenComparing(ProductImage::getId)) // Thêm thenComparing để ổn định nếu displayOrder bằng nhau
+              .ifPresent(img -> img.setDefault(true));
     }
 
-    // Xóa những ảnh cũ không có trong request mới
-    // Xóa ảnh cũ
-    List<ProductImage> imagesToDelete =
-        existingImagesMap.entrySet().stream()
-            .filter(entry -> !requestImageIds.contains(entry.getKey()))
-            .map(Map.Entry::getValue)
-            .collect(Collectors.toList());
-
-    if (!imagesToDelete.isEmpty()) {
-      // ****** SỬA LOGIC XÓA FILE ******
-      for (ProductImage imgToDelete : imagesToDelete) {
-        // ****** LẤY blobPath ĐÃ LƯU ĐỂ XÓA ******
-        String blobPathToDelete = imgToDelete.getBlobPath();
-
-        if (StringUtils.hasText(blobPathToDelete)) {
-
-          try {
-            // ****** GỌI DELETE VỚI 1 THAM SỐ ******
-            fileStorageService.delete(blobPathToDelete);
-            // ************************************
-          } catch (Exception e) {
-            log.error("Failed to delete image file from storage: {}", blobPathToDelete, e);
-          }
-        } else {
-          log.warn(
-              "blobPath is missing for image entity id: {}, cannot delete from storage.",
-              imgToDelete.getId());
+    // Xác định các ảnh cũ cần xóa khỏi DB và storage
+    List<ProductImage> imagesToRemoveFromDb = new ArrayList<>();
+    for (Map.Entry<Long, ProductImage> entry : existingImagesMap.entrySet()) {
+      if (!requestImageIds.contains(entry.getKey())) { // Nếu ảnh cũ không có trong request mới
+        imagesToRemoveFromDb.add(entry.getValue());
+        if (StringUtils.hasText(entry.getValue().getBlobPath())) {
+          blobPathsToDeleteAfterCommit.add(entry.getValue().getBlobPath());
         }
       }
-      productImageRepository.deleteAll(imagesToDelete); // Xóa entity
-      log.debug("Deleted {} image entities for product {}", imagesToDelete.size(), product.getId());
-      // ******************************
     }
 
-    // Cập nhật lại collection trong product entity
+    // Xóa các entity ProductImage khỏi DB (orphanRemoval=true sẽ xử lý nếu ProductImage là owned-side)
+    // Hoặc xóa trực tiếp nếu cần
+    if (!imagesToRemoveFromDb.isEmpty()) {
+      productImageRepository.deleteAll(imagesToRemoveFromDb);
+      log.debug("Marked {} old image entities for deletion from DB for product {}", imagesToRemoveFromDb.size(), product.getId());
+    }
+
+    // Cập nhật collection trong product entity (quan trọng cho orphanRemoval và để Hibernate quản lý)
     product.getImages().clear();
     product.getImages().addAll(updatedImages);
+    // Việc lưu các ProductImage mới hoặc cập nhật sẽ được thực hiện khi product được lưu (do CascadeType.ALL)
+
+    // Đăng ký việc xóa các blob cũ sau khi transaction commit thành công
+    if (!blobPathsToDeleteAfterCommit.isEmpty()) {
+      registerBlobsForDeletionAfterCommit(blobPathsToDeleteAfterCommit);
+    }
+  }
+
+
+  /**
+   * Đăng ký một danh sách các blobPath để xóa khỏi storage sau khi transaction hiện tại commit thành công.
+   * Nếu không có transaction nào đang active, việc xóa sẽ được thực hiện ngay lập tức (cẩn thận).
+   *
+   * @param blobPaths Danh sách các blobPath cần xóa.
+   */
+  private void registerBlobsForDeletionAfterCommit(List<String> blobPaths) {
+    if (blobPaths == null || blobPaths.isEmpty()) {
+      return;
+    }
+
+    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override
+        public void afterCommit() {
+          log.info("Transaction committed. Proceeding to delete {} blob(s) from storage.", blobPaths.size());
+          deleteBlobsFromStorage(blobPaths);
+        }
+        // Bạn cũng có thể implement afterCompletion để xử lý trường hợp rollback nếu cần
+        // @Override
+        // public void afterCompletion(int status) {
+        //     if (status == STATUS_ROLLED_BACK) {
+        //         log.warn("Transaction rolled back. Blobs scheduled for deletion will not be deleted: {}", blobPaths);
+        //     }
+        // }
+      });
+    } else {
+      // Không có transaction active, có thể là môi trường test hoặc một luồng không được quản lý transaction.
+      // Trong trường hợp này, xóa ngay lập tức có thể rủi ro nếu có lỗi sau đó.
+      // Hoặc bạn có thể quyết định không xóa và log lại.
+      log.warn("No active transaction. Deleting {} blob(s) immediately. This might be risky if subsequent operations fail. Blobs: {}", blobPaths.size(), blobPaths);
+      deleteBlobsFromStorage(blobPaths);
+    }
+  }
+
+
+  /**
+   * Thực hiện xóa các blob từ storage.
+   * @param blobPaths Danh sách blobPath cần xóa.
+   */
+  private void deleteBlobsFromStorage(List<String> blobPaths) {
+    for (String blobPath : blobPaths) {
+      try {
+        fileStorageService.delete(blobPath);
+        log.info("Successfully deleted blob from storage: {}", blobPath);
+      } catch (Exception e) {
+        // Quan trọng: Log lỗi nhưng KHÔNG NÉM LẠI EXCEPTION ở đây
+        // để không làm ảnh hưởng đến flow chính nếu việc xóa file thất bại.
+        // Việc xóa file thất bại có thể được xử lý bằng một cơ chế dọn dẹp định kỳ khác.
+        log.error("Failed to delete blob from storage after commit: {}. Error: {}", blobPath, e.getMessage(), e);
+        // Có thể gửi thông báo cho admin hoặc ghi vào một hàng đợi lỗi để xử lý sau.
+      }
+    }
   }
 
   // ****** HÀM HELPER TRÍCH XUẤT SUBFOLDER TỪ BLOBPATH ******

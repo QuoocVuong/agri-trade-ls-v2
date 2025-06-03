@@ -5,6 +5,8 @@ import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
 import lombok.Data;
 
 // DTO đầy đủ cho trang chi tiết
@@ -37,6 +39,8 @@ public class ProductDetailResponse { // Hoặc kế thừa ProductSummaryRespons
   private Integer minB2bQuantity;
   private BigDecimal b2bBasePrice;
   private List<ProductPricingTierResponse> pricingTiers; // Dùng List
+
+  private List<ReviewResponse> reviews;
 
   // Thêm trường mới cho sản phẩm liên quan
   private List<ProductSummaryResponse>

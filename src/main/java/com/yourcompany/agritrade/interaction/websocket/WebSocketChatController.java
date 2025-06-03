@@ -150,7 +150,7 @@ public class WebSocketChatController {
   }
 
   // Helper lấy Authentication an toàn
-  private Authentication getAuthentication(SimpMessageHeaderAccessor headerAccessor) {
+  public Authentication getAuthentication(SimpMessageHeaderAccessor headerAccessor) {
     Principal principal = headerAccessor.getUser();
     if (principal instanceof Authentication) {
       return (Authentication) principal;

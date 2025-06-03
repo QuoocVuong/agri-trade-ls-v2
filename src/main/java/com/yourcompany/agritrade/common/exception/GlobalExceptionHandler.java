@@ -284,6 +284,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return new ResponseEntity<>(apiResponse, HttpStatus.CONFLICT);
   }
 
+  @ExceptionHandler(StorageFileNotFoundException.class) // Handler cụ thể cho StorageFileNotFoundException
+  public ResponseEntity<ApiResponse<Object>> handleStorageFileNotFound(
+          StorageFileNotFoundException ex, WebRequest request) {
+    log.warn("Storage File Not Found: {} for request: {}", ex.getMessage(), request.getDescription(false));
+    ApiResponse<Object> apiResponse =
+            ApiResponse.error(
+                    HttpStatus.NOT_FOUND.value(), // Trả về 404
+                    ex.getMessage(), // Message từ exception
+                    null // Không có details cụ thể
+            );
+    return new ResponseEntity<>(apiResponse, HttpStatus.NOT_FOUND);
+  }
+
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<Object>> handleGlobalException(
       Exception ex, WebRequest request) { // Đổi kiểu trả về

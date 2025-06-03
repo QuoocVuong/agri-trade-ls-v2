@@ -78,4 +78,6 @@ public interface ReviewRepository
   // Hoặc: Page<Review> findByProduct_Farmer_IdAndStatus(Long farmerId, ReviewStatus status,
   // Pageable pageable);
 
+  long countByProductIdAndStatus(Long productId, ReviewStatus status);
+
 }

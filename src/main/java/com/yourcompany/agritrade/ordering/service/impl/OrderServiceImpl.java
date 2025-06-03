@@ -10,6 +10,7 @@ import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.common.util.VnPayUtils;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
@@ -68,14 +69,14 @@ import org.springframework.util.StringUtils;
 public class OrderServiceImpl implements OrderService {
 
   private final OrderRepository orderRepository;
-  private final OrderItemRepository orderItemRepository; // Inject OrderItemRepository
+  private final OrderItemRepository orderItemRepository;
   private final PaymentRepository paymentRepository;
   private final CartItemRepository cartItemRepository;
   private final ProductRepository productRepository;
   private final UserRepository userRepository;
   private final AddressRepository addressRepository;
   private final OrderMapper orderMapper;
-  private final EmailService emailService; // Inject EmailService
+  private final EmailService emailService;
   private final NotificationService notificationService;
   private final FarmerProfileRepository farmerProfileRepository;
 
@@ -84,8 +85,8 @@ public class OrderServiceImpl implements OrderService {
   private final InvoiceRepository invoiceRepository;
 
   private final FileStorageService fileStorageService;
-  // private final LockProvider lockProvider; // Bỏ qua nếu dùng Optimistic Lock
-  private static final String LANG_SON_PROVINCE_CODE = "20";
+
+
 
   @Value("${app.bank.accountName}")
   private String appBankAccountName;
@@ -100,7 +101,7 @@ public class OrderServiceImpl implements OrderService {
   private String appBankBin; // Mã BIN ngân hàng
 
   @Value("${app.bank.qr.serviceUrlBase:#{null}}")
-  private String qrServiceUrlBase; // Ví dụ: https://img.vietqr.io/image
+  private String qrServiceUrlBase;
 
   @Value("${app.bank.qr.template:compact2}")
   private String qrTemplate;
@@ -108,10 +109,10 @@ public class OrderServiceImpl implements OrderService {
   private final @Qualifier("vnPayService") PaymentGatewayService vnPayService;
   private final @Qualifier("moMoService") PaymentGatewayService moMoService;
 
-  @Value("${app.frontend.url}") // Đảm bảo bạn có @Value này
+  @Value("${app.frontend.url}")
   private String frontendAppUrl;
 
-  @Value("${app.backend.url}") // Đảm bảo bạn có @Value này
+  @Value("${app.backend.url}")
   private String backendAppUrl;
 
   @Override
@@ -125,7 +126,7 @@ public class OrderServiceImpl implements OrderService {
       backoff = @Backoff(delay = 100))
   // Thử lại nếu có xung đột optimistic lock
   public List<OrderResponse> checkout(Authentication authentication, CheckoutRequest request) {
-    User buyer = getUserFromAuthentication(authentication);
+    User buyer = SecurityUtils.getCurrentAuthenticatedUser();
     Address shippingAddress =
         addressRepository
             .findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
@@ -197,11 +198,11 @@ public class OrderServiceImpl implements OrderService {
       order.setPaymentStatus(PaymentStatus.PENDING);
       order.setStatus(OrderStatus.PENDING);
       order.setNotes(request.getNotes());
-      // *** GÁN PO NUMBER NẾU LÀ ĐƠN B2B ***
+
       if (order.getOrderType() == OrderType.B2B) {
         order.setPurchaseOrderNumber(request.getPurchaseOrderNumber());
       }
-      // ************************************
+
       copyShippingAddress(order, shippingAddress);
 
       BigDecimal subTotal = BigDecimal.ZERO;
@@ -247,8 +248,7 @@ public class OrderServiceImpl implements OrderService {
 
           // Trừ kho
           product.setStockQuantity(currentStock - requestedQuantity);
-          // Không cần save product ngay ở đây nếu transaction thành công
-          // productRepository.save(product); // Save sẽ được thực hiện cuối transaction
+
 
           // Tạo OrderItem
           OrderItem orderItem = new OrderItem();
@@ -294,7 +294,7 @@ public class OrderServiceImpl implements OrderService {
       if (farmerOrderHasValidItems) {
 
         order.setSubTotal(subTotal);
-        // *** GỌI HÀM TÍNH PHÍ SHIP VÀ DISCOUNT ĐÃ CẬP NHẬT ***
+
         BigDecimal shippingFee =
             calculateShippingFee(
                 shippingAddress,
@@ -305,7 +305,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal discount = calculateDiscount(buyer, subTotal); // Truyền subTotal
         order.setDiscountAmount(discount);
         order.setTotalAmount(subTotal.add(shippingFee).subtract(discount));
-        // ****************************************************
+
 
         // Lưu Order (bao gồm OrderItems nhờ CascadeType.ALL)
         Order savedOrder = orderRepository.save(order);
@@ -315,20 +315,11 @@ public class OrderServiceImpl implements OrderService {
 
         createInitialPaymentRecord(savedOrder); // Helper tạo paymentcalculateShippingFee
 
-        // *** TẠO INVOICE NẾU LÀ ĐƠN HÀNG CÔNG NỢ ***
+
         if (savedOrder.getPaymentMethod() == PaymentMethod.INVOICE) {
           invoiceService.getOrCreateInvoiceForOrder(savedOrder); // Gọi InvoiceService
           // InvoiceService sẽ tạo Invoice với status là ISSUED và tính dueDate nếu cần
         }
-// *****************************************
-
-        // Tạo Payment PENDING
-        //            Payment initialPayment = new Payment();
-        //            initialPayment.setOrder(savedOrder);
-        //            initialPayment.setAmount(savedOrder.getTotalAmount());
-        //            initialPayment.setPaymentGateway(savedOrder.getPaymentMethod().name());
-        //            initialPayment.setStatus(PaymentTransactionStatus.PENDING);
-        //            paymentRepository.save(initialPayment);
 
         createdOrders.add(savedOrder);
         // Cuối vòng lặp for trong checkout, sau khi save order và payment
@@ -337,7 +328,7 @@ public class OrderServiceImpl implements OrderService {
             "Order {} created successfully for farmer {}", savedOrder.getOrderCode(), farmerId);
 
         // Gửi email xác nhận (bất đồng bộ)
-        // emailService.sendOrderConfirmationEmail(savedOrder); // Cần tạo hàm này trong
+        // emailService.sendOrderConfirmationEmail(savedOrder);
         // EmailService
       } else {
         log.info(
@@ -370,64 +361,25 @@ public class OrderServiceImpl implements OrderService {
   @Override
   @Transactional(readOnly = true)
   public Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
-    User buyer = getUserFromAuthentication(authentication);
+    User buyer = SecurityUtils.getCurrentAuthenticatedUser();
     Specification<Order> spec = Specification.where(OrderSpecifications.byBuyer(buyer.getId()))
             .and(OrderSpecifications.hasStatus(status))
-            .and(OrderSpecifications.buyerSearch(keyword)); // Sử dụng buyerSearch
+            .and(OrderSpecifications.buyerSearch(keyword));
 
-    // Không cần fetch chi tiết ở đây nếu OrderSummaryResponse không yêu cầu nhiều
-    // Page<Order> orderPage = orderRepository.findByBuyerIdWithDetails(buyer.getId(), pageable);
     Page<Order> orderPage = orderRepository.findAll(spec, pageable);
     return orderMapper.toOrderSummaryResponsePage(orderPage);
   }
 
-//  @Override
-//  @Transactional(readOnly = true)
-//  public Page<OrderSummaryResponse> getMyOrdersAsFarmer(
-//      Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
-//    User farmer = getUserFromAuthentication(authentication);
-//    //        Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(),
-//    // pageable);
-//    //        return orderMapper.toOrderSummaryResponsePage(orderPage);
-//    //    }
-//    Specification<Order> spec =
-//        Specification.where(OrderSpecifications.byFarmer(farmer.getId())); // Luôn lọc theo farmerId
-//
-//    if (StringUtils.hasText(keyword)) {
-//      // Giả sử keyword có thể là mã đơn hàng hoặc tên người mua
-//      spec =
-//          spec.and(
-//              Specification.anyOf( // Sử dụng OR
-//                  OrderSpecifications.hasOrderCode(keyword), // Cần tạo spec này
-//                  OrderSpecifications.hasBuyerName(keyword) // Cần tạo spec này
-//                  ));
-//    }
-//    if (status != null) {
-//      spec = spec.and(OrderSpecifications.hasStatus(status)); // Dùng lại spec đã có
-//    }
-//
-//    // Fetch các thông tin cần thiết cho OrderSummaryResponse để tránh N+1
-//    // Ví dụ: fetch buyer, farmer (nếu OrderSummaryResponse cần tên của họ)
-//    // spec = spec.and(OrderSpecifications.fetchBuyerAndFarmerSummary()); // Cần tạo spec này
-//
-//    Page<Order> orderPage = orderRepository.findAll(spec, pageable);
-//
-//    // QUAN TRỌNG: Gọi populateProductImageUrlsInOrder nếu OrderSummaryResponse
-//    // hoặc bất kỳ DTO con nào của nó cần imageUrl từ ProductImage
-//    // Nếu OrderSummaryResponse không hiển thị ảnh sản phẩm thì không cần dòng này.
-//    // orderPage.getContent().forEach(this::populateProductImageUrlsInOrder);
-//
-//    return orderPage.map(orderMapper::toOrderSummaryResponse);
-//  }
+
 @Override
 @Transactional(readOnly = true)
 public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
-  User farmer = getUserFromAuthentication(authentication);
+  User farmer = SecurityUtils.getCurrentAuthenticatedUser();
   Specification<Order> spec = Specification.where(OrderSpecifications.byFarmer(farmer.getId()))
           .and(OrderSpecifications.hasStatus(status))
           .and(OrderSpecifications.farmerSearch(keyword)); // Sử dụng farmerSearch
 
-  // Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(), pageable);
+
   Page<Order> orderPage = orderRepository.findAll(spec, pageable);
   return orderMapper.toOrderSummaryResponsePage(orderPage);
 }
@@ -463,7 +415,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   @Override
   @Transactional(readOnly = true)
   public OrderResponse getOrderDetails(Authentication authentication, Long orderId) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     Order order =
         orderRepository
             .findByIdWithDetails(orderId)
@@ -488,7 +440,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   @Override
   @Transactional(readOnly = true)
   public OrderResponse getOrderDetailsByCode(Authentication authentication, String orderCode) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     Order order =
         orderRepository
             .findByOrderCodeWithDetails(orderCode)
@@ -523,7 +475,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   @Transactional
   public OrderResponse updateOrderStatus(
       Authentication authentication, Long orderId, OrderStatusUpdateRequest request) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     Order order =
         orderRepository
             .findById(orderId)
@@ -570,174 +522,333 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     return getOrderDetailsForAdmin(orderId); // Load lại đầy đủ để trả về
   }
 
+//  @Override
+//  @Transactional
+//  @Retryable(
+//      retryFor = {
+//        OptimisticLockingFailureException.class,
+//        ObjectOptimisticLockingFailureException.class
+//      },
+//      maxAttempts = 3,
+//      backoff = @Backoff(delay = 100))
+//  public OrderResponse cancelOrder(Authentication authentication, Long orderId) {
+//    User user = SecurityUtils.getCurrentAuthenticatedUser();
+//    Order order =
+//        orderRepository
+//            .findById(orderId)
+//            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+//
+//    boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_ADMIN);
+//    // Buyer có thể là Consumer hoặc Business Buyer
+//    boolean isBuyer =
+//        user.getRoles().stream()
+//            .anyMatch(
+//                r ->
+//                    r.getName() == RoleType.ROLE_CONSUMER
+//                        || r.getName() == RoleType.ROLE_BUSINESS_BUYER);
+//
+//    // Kiểm tra quyền hủy
+//    if (!isAdmin && !(isBuyer && order.getBuyer().getId().equals(user.getId()))) {
+//      throw new AccessDeniedException("User does not have permission to cancel this order");
+//    }
+//
+//    // Kiểm tra trạng thái cho phép hủy
+//    if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
+//      throw new BadRequestException(
+//          "Order cannot be cancelled in its current status: " + order.getStatus());
+//    }
+//
+//    //        // Hoàn trả tồn kho (Cần xử lý cẩn thận race condition)
+//    //        // Load lại OrderItems nếu là LAZY fetch
+//    //        List<OrderItem> itemsToRestore = orderItemRepository.findByOrderId(orderId);
+//    //        for (OrderItem item : itemsToRestore) {
+//    //            Product product = productRepository.findById(item.getProduct().getId())
+//    //                    .orElse(null); // Lấy lại product mới nhất
+//    //            if (product != null) {
+//    //                product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+//    //                productRepository.save(product); // Save lại product
+//    //            } else {
+//    //                log.warn("Product with id {} not found while trying to restore stock for
+//    // cancelled order {}", item.getProduct().getId(), orderId);
+//    //            }
+//    //        }
+//
+//    // *** Hoàn trả tồn kho (Cải thiện với Optimistic Lock) ***
+//    List<OrderItem> itemsToRestore =
+//        orderItemRepository.findByOrderId(orderId); // Lấy các item của đơn hàng
+//    for (OrderItem item : itemsToRestore) {
+//      // Lấy product ID và số lượng cần hoàn trả
+//      Long productId = item.getProduct().getId();
+//      int quantityToRestore = item.getQuantity();
+//
+//      // Tải lại Product trong transaction để lấy version mới nhất
+//      Product product =
+//          productRepository.findById(productId).orElse(null); // Có thể sản phẩm đã bị xóa vật lý?
+//
+//      if (product != null) {
+//        log.debug(
+//            "Restoring stock for product {}: current={}, restoring={}",
+//            productId,
+//            product.getStockQuantity(),
+//            quantityToRestore);
+//        product.setStockQuantity(product.getStockQuantity() + quantityToRestore);
+//        try {
+//          productRepository.saveAndFlush(
+//              product); // Save và flush ngay để phát hiện xung đột sớm (nếu có)
+//        } catch (OptimisticLockingFailureException e) {
+//          log.warn(
+//              "Optimistic lock failed while restoring stock for product {} in order {}. Retrying...",
+//              productId,
+//              orderId);
+//          throw e; // Ném lại exception để @Retryable bắt và thử lại
+//        } catch (Exception e) {
+//          log.error(
+//              "Error saving product {} while restoring stock for order {}", productId, orderId, e);
+//          // Quyết định xử lý tiếp hay dừng lại? Có thể throw lỗi nghiêm trọng hơn.
+//          throw new RuntimeException("Failed to restore stock for product " + productId, e);
+//        }
+//      } else {
+//        log.warn(
+//            "Product with id {} not found while trying to restore stock for cancelled order {}",
+//            productId,
+//            orderId);
+//        // Cần quyết định: Bỏ qua hay báo lỗi?
+//      }
+//    }
+//
+//    order.setStatus(OrderStatus.CANCELLED);
+//    // Cập nhật trạng thái thanh toán
+//    if (order.getPaymentStatus() == PaymentStatus.PAID) {
+//      order.setPaymentStatus(PaymentStatus.REFUNDED);
+//      // TODO: Xử lý hoàn tiền thực tế
+//      log.info(
+//          "Order {} cancelled, payment status set to REFUNDED. Manual refund may be required.",
+//          orderId);
+//    } else if (order.getPaymentStatus() == PaymentStatus.PENDING
+//        || order.getPaymentStatus() == PaymentStatus.AWAITING_PAYMENT_TERM) {
+//      order.setPaymentStatus(PaymentStatus.FAILED); // Hoặc một trạng thái hủy khác
+//    }
+//
+//    //        Order cancelledOrder = orderRepository.save(order);
+//    orderRepository.save(order); // Lưu trạng thái cuối cùng của Order
+//    log.info("Order {} cancelled by user {}", orderId, user.getId());
+//    //        // TODO: Gửi thông báo hủy đơn
+//    //
+//    //        return getOrderDetailsForAdmin(orderId); // Load lại đầy đủ
+//    // Gửi thông báo hủy đơn
+//    notificationService.sendOrderCancellationNotification(order); // Gọi hàm gửi thông báo
+//
+//    // Load lại đầy đủ thông tin và map để trả về
+//    Order cancelledOrderFull = orderRepository.findByIdWithDetails(orderId).orElseThrow();
+//    return orderMapper.toOrderResponse(cancelledOrderFull);
+//  }
+
   @Override
-  @Transactional
+  @Transactional // Giữ transaction mặc định (REQUIRED)
   @Retryable(
-      retryFor = {
-        OptimisticLockingFailureException.class,
-        ObjectOptimisticLockingFailureException.class
-      },
-      maxAttempts = 3,
-      backoff = @Backoff(delay = 100))
+          retryFor = {
+                  OptimisticLockingFailureException.class,
+                  ObjectOptimisticLockingFailureException.class
+          },
+          maxAttempts = 3,
+          backoff = @Backoff(delay = 100, multiplier = 2) // Tăng thời gian chờ giữa các lần thử lại
+  )
   public OrderResponse cancelOrder(Authentication authentication, Long orderId) {
-    User user = getUserFromAuthentication(authentication);
-    Order order =
-        orderRepository
-            .findById(orderId)
+    User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
+
+    // Bước 1: Lấy thông tin đơn hàng cùng với các mục hàng và người mua/bán
+    // Sử dụng một phương thức repository có JOIN FETCH để tối ưu
+    Order order = orderRepository.findByIdWithDetails(orderId) // Giả sử findByIdWithDetails fetch cả orderItems, buyer, farmer
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
-    boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_ADMIN);
-    // Buyer có thể là Consumer hoặc Business Buyer
-    boolean isBuyer =
-        user.getRoles().stream()
-            .anyMatch(
-                r ->
-                    r.getName() == RoleType.ROLE_CONSUMER
-                        || r.getName() == RoleType.ROLE_BUSINESS_BUYER);
+    // Bước 2: Kiểm tra quyền hủy đơn hàng
+    validateCancellationPermission(currentUser, order);
 
-    // Kiểm tra quyền hủy
-    if (!isAdmin && !(isBuyer && order.getBuyer().getId().equals(user.getId()))) {
-      throw new AccessDeniedException("User does not have permission to cancel this order");
+    // Bước 3: Kiểm tra trạng thái đơn hàng có cho phép hủy không
+    validateCancellableStatus(order);
+
+    // Bước 4: Hoàn trả tồn kho cho các sản phẩm trong đơn hàng
+    // Tách ra một phương thức riêng để xử lý logic này, có thể với transaction riêng nếu cần độ phức tạp cao hơn
+    restoreStockForCancelledOrder(order);
+
+    // Bước 5: Cập nhật trạng thái đơn hàng và trạng thái thanh toán
+    OrderStatus previousOrderStatus = order.getStatus(); // Lưu lại trạng thái cũ để gửi thông báo
+    order.setStatus(OrderStatus.CANCELLED);
+    updatePaymentStatusForCancelledOrder(order);
+
+    Order cancelledOrder = orderRepository.save(order); // Lưu lại đơn hàng đã hủy
+    log.info("Order {} cancelled by user {}. Previous status: {}",
+            cancelledOrder.getOrderCode(), currentUser.getEmail(), previousOrderStatus);
+
+    // Bước 6: Gửi thông báo hủy đơn
+    // (NotificationService nên tự xử lý việc gửi cho buyer và farmer nếu cần)
+    notificationService.sendOrderCancellationNotification(cancelledOrder);
+
+    // Bước 7: Load lại đầy đủ thông tin (nếu cần, hoặc mapper đã xử lý) và trả về
+    // Nếu findByIdWithDetails ở trên đã fetch đủ, có thể không cần load lại
+    // Tuy nhiên, để chắc chắn, có thể load lại hoặc đảm bảo mapper xử lý đúng
+    Order finalCancelledOrder = orderRepository.findByIdWithDetails(cancelledOrder.getId())
+            .orElseThrow(() -> new IllegalStateException("Cancelled order not found after saving: " + cancelledOrder.getId()));
+    // Đảm bảo hình ảnh sản phẩm được populate nếu OrderResponse cần
+    populateProductImageUrlsInOrder(finalCancelledOrder);
+    return orderMapper.toOrderResponse(finalCancelledOrder);
+  }
+
+  private void validateCancellationPermission(User currentUser, Order order) {
+    boolean isAdmin = SecurityUtils.hasRole(RoleType.ROLE_ADMIN.name()); // Sử dụng SecurityUtils
+    boolean isBuyer = currentUser.getRoles().stream()
+            .anyMatch(r -> r.getName() == RoleType.ROLE_CONSUMER || r.getName() == RoleType.ROLE_BUSINESS_BUYER);
+
+    if (!isAdmin && !(isBuyer && order.getBuyer().getId().equals(currentUser.getId()))) {
+      throw new AccessDeniedException("User does not have permission to cancel this order: " + order.getOrderCode());
     }
+  }
 
-    // Kiểm tra trạng thái cho phép hủy
-    if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
+  private void validateCancellableStatus(Order order) {
+    if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED && order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+      // Thêm AWAITING_PAYMENT vào các trạng thái có thể hủy
       throw new BadRequestException(
-          "Order cannot be cancelled in its current status: " + order.getStatus());
+              "Order " + order.getOrderCode() + " cannot be cancelled in its current status: " + order.getStatus());
+    }
+  }
+
+  // Đánh dấu phương thức này với @Transactional(propagation = Propagation.REQUIRES_NEW)
+  // nếu bạn muốn việc hoàn kho là một transaction độc lập và commit ngay cả khi
+  // transaction chính của cancelOrder rollback (tuy nhiên, điều này thường không mong muốn).
+  // Thông thường, để mặc định (Propagation.REQUIRED) là đủ.
+  @Transactional // Sẽ tham gia vào transaction của cancelOrder
+  protected void restoreStockForCancelledOrder(Order order) {
+    if (order.getOrderItems() == null || order.getOrderItems().isEmpty()) {
+      log.warn("No items found in order {} to restore stock.", order.getOrderCode());
+      return;
     }
 
-    //        // Hoàn trả tồn kho (Cần xử lý cẩn thận race condition)
-    //        // Load lại OrderItems nếu là LAZY fetch
-    //        List<OrderItem> itemsToRestore = orderItemRepository.findByOrderId(orderId);
-    //        for (OrderItem item : itemsToRestore) {
-    //            Product product = productRepository.findById(item.getProduct().getId())
-    //                    .orElse(null); // Lấy lại product mới nhất
-    //            if (product != null) {
-    //                product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
-    //                productRepository.save(product); // Save lại product
-    //            } else {
-    //                log.warn("Product with id {} not found while trying to restore stock for
-    // cancelled order {}", item.getProduct().getId(), orderId);
-    //            }
-    //        }
-
-    // *** Hoàn trả tồn kho (Cải thiện với Optimistic Lock) ***
-    List<OrderItem> itemsToRestore =
-        orderItemRepository.findByOrderId(orderId); // Lấy các item của đơn hàng
-    for (OrderItem item : itemsToRestore) {
-      // Lấy product ID và số lượng cần hoàn trả
+    for (OrderItem item : order.getOrderItems()) {
+      if (item.getProduct() == null) {
+        log.warn("OrderItem {} in order {} has no associated product. Skipping stock restoration.", item.getId(), order.getOrderCode());
+        continue;
+      }
       Long productId = item.getProduct().getId();
       int quantityToRestore = item.getQuantity();
 
-      // Tải lại Product trong transaction để lấy version mới nhất
-      Product product =
-          productRepository.findById(productId).orElse(null); // Có thể sản phẩm đã bị xóa vật lý?
+      // Tải lại Product trong transaction để lấy version mới nhất và khóa (nếu dùng pessimistic lock)
+      // Hoặc dựa vào optimistic lock với @Version trên Product entity
+      Product product = productRepository.findById(productId)
+              .orElse(null); // Không ném lỗi ngay, xử lý ở dưới
 
       if (product != null) {
-        log.debug(
-            "Restoring stock for product {}: current={}, restoring={}",
-            productId,
-            product.getStockQuantity(),
-            quantityToRestore);
+        // Chỉ hoàn kho nếu sản phẩm chưa bị xóa vĩnh viễn
+        if (product.isDeleted()) {
+          log.warn("Product ID {} for order item {} is soft-deleted. Stock will not be restored.", productId, item.getId());
+          continue;
+        }
+
+        log.debug("Restoring stock for product {}: current={}, restoring={}",
+                productId, product.getStockQuantity(), quantityToRestore);
         product.setStockQuantity(product.getStockQuantity() + quantityToRestore);
         try {
-          productRepository.saveAndFlush(
-              product); // Save và flush ngay để phát hiện xung đột sớm (nếu có)
+          productRepository.saveAndFlush(product); // Flush để phát hiện lỗi sớm
         } catch (OptimisticLockingFailureException e) {
-          log.warn(
-              "Optimistic lock failed while restoring stock for product {} in order {}. Retrying...",
-              productId,
-              orderId);
-          throw e; // Ném lại exception để @Retryable bắt và thử lại
+          log.warn("Optimistic lock failed while restoring stock for product {} in order {}. Retrying (handled by @Retryable)...",
+                  productId, order.getOrderCode());
+          throw e; // Ném lại để @Retryable xử lý
         } catch (Exception e) {
-          log.error(
-              "Error saving product {} while restoring stock for order {}", productId, orderId, e);
-          // Quyết định xử lý tiếp hay dừng lại? Có thể throw lỗi nghiêm trọng hơn.
-          throw new RuntimeException("Failed to restore stock for product " + productId, e);
+          log.error("Error saving product {} while restoring stock for order {}: {}",
+                  productId, order.getOrderCode(), e.getMessage(), e);
+          // Quyết định nghiệp vụ:
+          // 1. Ném lỗi, rollback toàn bộ cancelOrder:
+          throw new RuntimeException("Failed to restore stock for product " + productId + ". Order cancellation failed.", e);
+          // 2. Log lỗi và tiếp tục (có thể dẫn đến tồn kho không nhất quán):
+          // log.error("Critical: Failed to restore stock for product {}, but order cancellation will proceed.", productId);
         }
       } else {
-        log.warn(
-            "Product with id {} not found while trying to restore stock for cancelled order {}",
-            productId,
-            orderId);
-        // Cần quyết định: Bỏ qua hay báo lỗi?
+        log.warn("Product with id {} not found while trying to restore stock for cancelled order {}. Stock for this item cannot be restored.",
+                productId, order.getOrderCode());
+        // Quyết định nghiệp vụ:
+        // 1. Ném lỗi, rollback toàn bộ cancelOrder:
+         throw new IllegalStateException("Product " + productId + " associated with order item " + item.getId() + " not found. Cannot cancel order.");
+        // 2. Log lỗi và tiếp tục (chấp nhận rủi ro tồn kho không được hoàn trả cho sản phẩm này):
+        // log.error("Critical: Product {} not found. Stock for item {} in order {} will not be restored.", productId, item.getId(), order.getOrderCode());
       }
     }
+  }
 
-    order.setStatus(OrderStatus.CANCELLED);
-    // Cập nhật trạng thái thanh toán
+  private void updatePaymentStatusForCancelledOrder(Order order) {
     if (order.getPaymentStatus() == PaymentStatus.PAID) {
-      order.setPaymentStatus(PaymentStatus.REFUNDED);
-      // TODO: Xử lý hoàn tiền thực tế
-      log.info(
-          "Order {} cancelled, payment status set to REFUNDED. Manual refund may be required.",
-          orderId);
-    } else if (order.getPaymentStatus() == PaymentStatus.PENDING
-        || order.getPaymentStatus() == PaymentStatus.AWAITING_PAYMENT_TERM) {
-      order.setPaymentStatus(PaymentStatus.FAILED); // Hoặc một trạng thái hủy khác
-    }
+      Payment successfulPayment = findSuccessfulPaymentForOrder(order); // Tìm giao dịch thanh toán thành công
 
-    //        Order cancelledOrder = orderRepository.save(order);
-    orderRepository.save(order); // Lưu trạng thái cuối cùng của Order
-    log.info("Order {} cancelled by user {}", orderId, user.getId());
-    //        // TODO: Gửi thông báo hủy đơn
-    //
-    //        return getOrderDetailsForAdmin(orderId); // Load lại đầy đủ
-    // Gửi thông báo hủy đơn
-    notificationService.sendOrderCancellationNotification(order); // Gọi hàm gửi thông báo
+      if (successfulPayment != null) {
+        boolean refundRequested = false;
+        try {
+          PaymentGatewayService gatewayService = getPaymentGatewayService(successfulPayment.getPaymentGateway()); // Lấy service tương ứng
+          if (gatewayService != null) {
+            // Số tiền hoàn có thể là toàn bộ hoặc một phần (nếu chính sách cho phép)
+            refundRequested = gatewayService.requestRefund(
+                    successfulPayment.getTransactionCode(),
+                    successfulPayment.getAmount(), // Hoàn toàn bộ số tiền của giao dịch đó
+                    "Order " + order.getOrderCode() + " cancelled by " + SecurityUtils.getCurrentAuthenticatedUser().getFullName()
+            );
+          } else {
+            log.warn("No payment gateway service found for gateway: {}", successfulPayment.getPaymentGateway());
+          }
+        } catch (Exception e) {
+          log.error("Error requesting refund for order {} via gateway {}: {}",
+                  order.getOrderCode(), successfulPayment.getPaymentGateway(), e.getMessage(), e);
+          // Xử lý lỗi khi gọi API hoàn tiền (ví dụ: lưu lại để thử lại, thông báo admin)
+        }
 
-    // Load lại đầy đủ thông tin và map để trả về
-    Order cancelledOrderFull = orderRepository.findByIdWithDetails(orderId).orElseThrow();
-    return orderMapper.toOrderResponse(cancelledOrderFull);
-  }
-
-  // --- Helper Methods ---
-  private User getUserFromAuthentication(Authentication authentication) {
-    // 1. Kiểm tra xem authentication có hợp lệ không
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || authentication.getPrincipal() == null) {
-      log.warn("Attempted to get user from null or unauthenticated Authentication object.");
-      throw new AccessDeniedException(
-          "User is not authenticated or authentication details are missing.");
-    }
-
-    // 2. Lấy principal (thông tin định danh chính)
-    Object principal = authentication.getPrincipal();
-    String userIdentifier; // Sẽ lưu email hoặc username
-
-    // Kiểm tra kiểu của principal
-    if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
-      // Nếu principal là UserDetails (trường hợp phổ biến khi dùng UserDetailsService)
-      userIdentifier =
-          ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
-    } else if (principal instanceof String) {
-      // Nếu principal chỉ là String (ví dụ: khi lấy từ JWT Filter mà không load lại UserDetails)
-      userIdentifier = (String) principal;
-      // Kiểm tra xem có phải là "anonymousUser" không
-      if ("anonymousUser".equals(userIdentifier)) {
-        log.warn("Attempted operation by anonymous user.");
-        throw new AccessDeniedException("Anonymous user cannot perform this action.");
+        if (refundRequested) {
+          order.setPaymentStatus(PaymentStatus.REFUND_PENDING); // Hoặc REFUND_REQUESTED
+          successfulPayment.setStatus(PaymentTransactionStatus.REFUND_REQUESTED); // Cập nhật trạng thái giao dịch gốc
+          log.info("Refund requested for order {}. Payment status set to REFUND_PENDING.", order.getOrderCode());
+        } else {
+          // Nếu không thể yêu cầu hoàn tiền tự động (lỗi API, cổng không hỗ trợ)
+          order.setPaymentStatus(PaymentStatus.REFUND_MANUAL_REQUIRED); // Một trạng thái mới để admin xử lý
+          log.warn("Failed to automatically request refund for order {}. Manual refund required.", order.getOrderCode());
+        }
+        paymentRepository.save(successfulPayment);
+      } else {
+        log.warn("No successful payment record found for PAID order {} to refund.", order.getOrderCode());
+        order.setPaymentStatus(PaymentStatus.REFUND_MANUAL_REQUIRED); // Cần admin kiểm tra
       }
-    } else {
-      // Trường hợp principal không xác định được
-      log.error("Unexpected principal type: {}", principal.getClass().getName());
-      throw new AccessDeniedException("Cannot identify user from authentication principal.");
-    }
 
-    // 3. Tìm User trong database bằng email (hoặc username)
-    // findByEmail đã tự động lọc is_deleted=false nhờ @Where trên User entity
-    return userRepository
-        .findByEmail(userIdentifier)
-        .orElseThrow(
-            () -> {
-              // Lỗi này không nên xảy ra nếu JWT hợp lệ và user chưa bị xóa/inactive sau khi login
-              log.error(
-                  "Authenticated user not found in database with identifier: {}", userIdentifier);
-              return new UsernameNotFoundException(
-                  "Authenticated user not found: " + userIdentifier);
-            });
+    } else if (order.getPaymentStatus() == PaymentStatus.PENDING ||
+            order.getPaymentStatus() == PaymentStatus.AWAITING_PAYMENT_TERM) {
+      order.setPaymentStatus(PaymentStatus.FAILED); // Hoặc một trạng thái hủy cụ thể hơn như CANCELLED
+      // Cập nhật các Payment record liên quan (nếu có) sang CANCELLED hoặc FAILED
+      order.getPayments().stream()
+              .filter(p -> p.getStatus() == PaymentTransactionStatus.PENDING)
+              .forEach(p -> {
+                p.setStatus(PaymentTransactionStatus.CANCELLED); // Hoặc FAILED
+                p.setGatewayMessage("Payment cancelled due to order cancellation.");
+                paymentRepository.save(p);
+              });
+      log.info("Order {} cancelled. Payment status set to FAILED as it was pending or awaiting term.", order.getOrderCode());
+    }
+    // Các trường hợp khác (ví dụ: FAILED sẵn rồi) thì có thể không cần thay đổi PaymentStatus của Order.
   }
+
+  // Helper để lấy PaymentGatewayService tương ứng
+  private PaymentGatewayService getPaymentGatewayService(String gatewayName) {
+    if (PaymentMethod.VNPAY.name().equalsIgnoreCase(gatewayName)) {
+      return vnPayService; // Đã inject
+    } else if (PaymentMethod.MOMO.name().equalsIgnoreCase(gatewayName)) {
+      return moMoService; // Đã inject
+    }
+    // Thêm các cổng khác nếu có
+    return null;
+  }
+
+  // Helper để tìm giao dịch thanh toán thành công của đơn hàng
+  private Payment findSuccessfulPaymentForOrder(Order order) {
+    return order.getPayments().stream()
+            .filter(p -> p.getStatus() == PaymentTransactionStatus.SUCCESS)
+            .findFirst()
+            .orElse(null);
+  }
+
+
+
 
   @Override
   public String generateOrderCode() {
@@ -904,7 +1015,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   }
 
   private BigDecimal calculateDiscount(
-      User buyer, BigDecimal subTotal /*, String voucherCode - nếu dùng */) { // Chữ ký mới
+      User buyer, BigDecimal subTotal ) {
 
     BigDecimal discount = BigDecimal.ZERO;
     BigDecimal percentageDiscount = BigDecimal.ZERO;
@@ -934,72 +1045,19 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
       }
     }
 
-    // --- Xử lý Voucher (Ví dụ cơ bản) ---
-    /*
-    if (StringUtils.hasText(voucherCode)) {
-        Optional<Voucher> voucherOpt = voucherRepository.findByCodeAndIsActiveTrue(voucherCode);
-        if (voucherOpt.isPresent()) {
-            Voucher voucher = voucherOpt.get();
-            // Kiểm tra điều kiện áp dụng voucher (ngày hết hạn, giá trị đơn tối thiểu, số lượt dùng...)
-            if (isValidVoucher(voucher, buyer, subTotal)) {
-                if (voucher.getDiscountType() == DiscountType.FIXED_AMOUNT) {
-                    fixedDiscount = voucher.getDiscountValue();
-                } else if (voucher.getDiscountType() == DiscountType.PERCENTAGE) {
-                    BigDecimal calculatedPercentDiscount = subTotal.multiply(voucher.getDiscountValue().divide(BigDecimal.valueOf(100)));
-                    // Áp dụng mức giảm tối đa nếu có
-                    if (voucher.getMaxDiscountAmount() != null && calculatedPercentDiscount.compareTo(voucher.getMaxDiscountAmount()) > 0) {
-                        fixedDiscount = voucher.getMaxDiscountAmount();
-                    } else {
-                        fixedDiscount = calculatedPercentDiscount;
-                    }
-                }
-                // TODO: Tăng số lượt đã sử dụng voucher
-                // voucher.setCurrentUsage(voucher.getCurrentUsage() + 1);
-                // voucherRepository.save(voucher);
-                log.info("Applied voucher {} for user {}", voucherCode, buyer.getId());
-            } else {
-                log.warn("Voucher {} is not valid for this order/user.", voucherCode);
-                // Có thể ném lỗi hoặc chỉ bỏ qua voucher
-                // throw new BadRequestException("Mã giảm giá không hợp lệ hoặc không đủ điều kiện áp dụng.");
-            }
-        } else {
-             log.warn("Voucher code {} not found.", voucherCode);
-             // throw new BadRequestException("Mã giảm giá không tồn tại.");
-        }
-    }
-    */
 
-    // Kết hợp các loại giảm giá (ví dụ: lấy giá trị lớn hơn)
+    // Kết hợp các loại giảm giá
     discount = percentageDiscount.max(fixedDiscount);
 
-    // Làm tròn tiền giảm giá (ví dụ: làm tròn đến đơn vị nghìn đồng)
+    // Làm tròn tiền giảm giá
     if (discount.compareTo(BigDecimal.ZERO) > 0) {
       discount = discount.setScale(0, RoundingMode.DOWN); // Làm tròn xuống đơn vị đồng
       log.info("Applied discount of {} for order subtotal {}", discount, subTotal);
     }
 
-    // TODO: Thêm logic xử lý voucher code nếu có
-    // String voucherCode = request.getVoucherCode(); // Cần thêm vào CheckoutRequest
-    // if (StringUtils.hasText(voucherCode)) {
-    //    BigDecimal voucherDiscount = applyVoucher(voucherCode, subTotal, buyer);
-    //    discount = discount.add(voucherDiscount); // Cộng dồn hoặc lấy max tùy chính sách
-    // }
 
     return discount;
 
-    // Helper kiểm tra voucher (cần hoàn thiện)
-    /*
-    private boolean isValidVoucher(Voucher voucher, User buyer, BigDecimal subTotal) {
-        // Kiểm tra ngày hiệu lực
-        // Kiểm tra giá trị đơn tối thiểu
-        // Kiểm tra số lượt sử dụng còn lại
-        // Kiểm tra xem voucher có áp dụng cho user/nhóm user này không
-        return true; // Tạm thời
-    }
-    */
-
-    // Cập nhật lời gọi trong hàm checkout:
-    // BigDecimal discount = calculateDiscount(buyer, subTotal /*, request.getVoucherCode()*/);
   }
 
   private boolean isValidStatusTransition(
@@ -1028,7 +1086,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
         return next == OrderStatus.SHIPPING && (isAdmin || isFarmer);
       case SHIPPING:
         // Từ SHIPPING: Farmer/Admin có thể DELIVERED
-        // Có thể thêm trạng thái RETURNED nếu cần
+
         return next == OrderStatus.DELIVERED && (isAdmin || isFarmer);
       default:
         return false; // Các trường hợp khác không hợp lệ
@@ -1052,9 +1110,8 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     initialPayment.setOrder(order);
     initialPayment.setAmount(order.getTotalAmount());
     initialPayment.setPaymentGateway(order.getPaymentMethod().name());
-    // ****** ĐẶT TRẠNG THÁI THANH TOÁN BAN ĐẦU ******
     PaymentTransactionStatus initialStatus;
-    PaymentStatus orderPaymentStatus = PaymentStatus.PENDING; // Mặc định
+    PaymentStatus orderPaymentStatus = PaymentStatus.PENDING;
 
     switch (order.getPaymentMethod()) {
       case COD:
@@ -1078,17 +1135,16 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
         orderPaymentStatus = PaymentStatus.PENDING;
     }
     initialPayment.setStatus(initialStatus);
-    order.setPaymentStatus(orderPaymentStatus); // <<< CẬP NHẬT TRẠNG THÁI THANH TOÁN CỦA ORDER
-    // ***********************************************
+    order.setPaymentStatus(orderPaymentStatus);
 
     paymentRepository.save(initialPayment);
   }
 
   @Override
-  @Transactional(readOnly = true) // Chỉ đọc, không thay đổi dữ liệu
+  @Transactional(readOnly = true)
   public OrderCalculationResponse calculateOrderTotals(
       Authentication authentication, OrderCalculationRequest request) {
-    User buyer = getUserFromAuthentication(authentication);
+    User buyer = SecurityUtils.getCurrentAuthenticatedUser();
     List<CartItem> cartItems = cartItemRepository.findByUserId(buyer.getId());
     if (cartItems.isEmpty()) {
       // Trả về giá trị 0 nếu giỏ hàng trống
@@ -1101,14 +1157,14 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
       shippingAddress =
           addressRepository
               .findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
-              .orElse(null); // Lấy địa chỉ nếu có ID, không thì bỏ qua (phí ship sẽ là mặc định)
+              .orElse(null);
     }
     // Nếu không có addressId, có thể lấy địa chỉ mặc định của user
     if (shippingAddress == null) {
       shippingAddress = addressRepository.findByUserIdAndIsDefaultTrue(buyer.getId()).orElse(null);
     }
 
-    // Phân nhóm theo farmer (cần farmer profile để tính ship)
+    // Phân nhóm theo farmer
     Map<Long, List<CartItem>> itemsByFarmer =
         cartItems.stream()
             .collect(Collectors.groupingBy(item -> item.getProduct().getFarmer().getId()));
@@ -1116,28 +1172,28 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     BigDecimal totalSubTotal = BigDecimal.ZERO;
     BigDecimal totalShippingFee = BigDecimal.ZERO;
     BigDecimal totalDiscount = BigDecimal.ZERO;
-    OrderType finalOrderType = OrderType.B2C; // Mặc định là B2C
+    OrderType finalOrderType = OrderType.B2C;
 
     for (Map.Entry<Long, List<CartItem>> entry : itemsByFarmer.entrySet()) {
       Long farmerId = entry.getKey();
       List<CartItem> farmerCartItems = entry.getValue();
       FarmerProfile farmerProfile =
-          farmerProfileRepository.findById(farmerId).orElse(null); // Lấy profile
+          farmerProfileRepository.findById(farmerId).orElse(null);
 
-      // Xác định OrderType (chỉ cần làm 1 lần dựa trên buyer)
+      // Xác định OrderType
       finalOrderType =
-          determineOrderType(buyer, farmerCartItems); // Giả sử hàm này chỉ dựa vào buyer
+          determineOrderType(buyer, farmerCartItems);
 
       BigDecimal farmerSubTotal = BigDecimal.ZERO;
       for (CartItem cartItem : farmerCartItems) {
-        Product product = cartItem.getProduct(); // Giả sử đã được fetch EAGER hoặc LAZY load ok
+        Product product = cartItem.getProduct();
         if (product == null) continue;
         int quantity = cartItem.getQuantity();
         BigDecimal price = determinePrice(product, quantity, finalOrderType);
         farmerSubTotal = farmerSubTotal.add(price.multiply(BigDecimal.valueOf(quantity)));
       }
 
-      // Tính phí ship cho farmer này (cần địa chỉ người nhận và profile farmer)
+      // Tính phí ship cho farmer này
       BigDecimal farmerShippingFee = BigDecimal.ZERO;
       if (shippingAddress != null && farmerProfile != null) {
         farmerShippingFee =
@@ -1146,7 +1202,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
         log.warn(
             "Cannot calculate shipping fee for farmer {} due to missing address or profile",
             farmerId);
-        // Có thể đặt phí mặc định hoặc báo lỗi tùy logic
+
       }
 
       totalSubTotal = totalSubTotal.add(farmerSubTotal);
@@ -1178,8 +1234,8 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
 
     order.setPaymentStatus(PaymentStatus.PAID);
     if (order.getStatus() == OrderStatus.PENDING
-        || order.getStatus() == OrderStatus.AWAITING_PAYMENT) { // Giả sử có AWAITING_PAYMENT
-      order.setStatus(OrderStatus.CONFIRMED); // Hoặc PROCESSING
+        || order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
+      order.setStatus(OrderStatus.CONFIRMED);
     }
 
     // Tạo bản ghi Payment
@@ -1189,7 +1245,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     payment.setPaymentGateway(PaymentMethod.BANK_TRANSFER.name());
     payment.setStatus(PaymentTransactionStatus.SUCCESS);
     payment.setPaymentTime(LocalDateTime.now());
-    payment.setTransactionCode(bankTransactionCode); // Lưu mã giao dịch ngân hàng nếu có
+    payment.setTransactionCode(bankTransactionCode); // Lưu mã giao dịch ngân hàng
     payment.setGatewayMessage("Payment confirmed manually by admin.");
     paymentRepository.save(payment);
 
@@ -1208,16 +1264,8 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
       String adminNotes) {
     Order order =
         orderRepository
-            .findById(orderId) // Admin có thể xem mọi đơn hàng
+            .findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-    // Kiểm tra xem phương thức thanh toán của đơn hàng có khớp với phương thức admin xác nhận không
-    // (tùy chọn)
-    // if (order.getPaymentMethod() != paymentMethodConfirmed) {
-    // log.warn("Admin attempted to confirm payment for order {} with method {}, but order was
-    // placed with {}",
-    // orderId, paymentMethodConfirmed, order.getPaymentMethod());
-    // // Có thể throw lỗi hoặc cho phép ghi đè paymentMethod nếu cần
-    // }
     if (order.getPaymentStatus() == PaymentStatus.PAID) {
       throw new BadRequestException("Đơn hàng này đã được ghi nhận thanh toán.");
     }
@@ -1226,22 +1274,22 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
           "Không thể xác nhận thanh toán cho đơn hàng đã hủy.");
     }
 
-    PaymentStatus originalPaymentStatus = order.getPaymentStatus(); // Lưu lại để so sánh
+    PaymentStatus originalPaymentStatus = order.getPaymentStatus();
 
 
     order.setPaymentStatus(PaymentStatus.PAID);
 
 
     // Đối với đơn hàng INVOICE, trạng thái đơn hàng (PROCESSING, SHIPPING, DELIVERED)
-    // thường đã được cập nhật trước đó. Việc xác nhận thanh toán công nợ chủ yếu cập nhật PaymentStatus.
+    // thường đã được cập nhật trước . Việc xác nhận thanh toán công nợ chủ yếu cập nhật PaymentStatus.
     // Nếu đơn hàng là loại khác (ví dụ BANK_TRANSFER) và đang PENDING, thì mới chuyển OrderStatus.
-    OrderStatus originalOrderStatus = order.getStatus(); // Lưu lại để gửi thông báo nếu thay đổi
+    OrderStatus originalOrderStatus = order.getStatus();
     if (order.getPaymentMethod() != PaymentMethod.INVOICE &&
             (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.AWAITING_PAYMENT)) {
-      order.setStatus(OrderStatus.CONFIRMED); // Hoặc PROCESSING tùy quy trình
+      order.setStatus(OrderStatus.CONFIRMED);
     }
 
-    // Cập nhật trạng thái Invoice liên quan (nếu có)
+    // Cập nhật trạng thái Invoice liên quan
     if (order.getPaymentMethod() == PaymentMethod.INVOICE) {
       invoiceRepository.findByOrderId(order.getId()).ifPresent(invoice -> {
         invoice.setStatus(InvoiceStatus.PAID);
@@ -1251,19 +1299,15 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
       });
     }
 
-//    // Khi Admin xác nhận thanh toán, chuyển đơn hàng sang trạng thái phù hợp
-//    if (order.getStatus() == OrderStatus.PENDING
-//        || order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
-//      order.setStatus(OrderStatus.CONFIRMED); // Hoặc PROCESSING tùy quy trình
-//    }
+
     // Tạo bản ghi Payment
     Payment payment = new Payment();
     payment.setOrder(order);
     payment.setAmount(order.getTotalAmount());
-    payment.setPaymentGateway(paymentMethodConfirmedByAdmin.name()); // Phương thức mà Admin xác nhận
+    payment.setPaymentGateway(paymentMethodConfirmedByAdmin.name());
     payment.setStatus(PaymentTransactionStatus.SUCCESS);
     payment.setPaymentTime(LocalDateTime.now());
-    payment.setTransactionCode(transactionReference); // Mã giao dịch do Admin nhập (nếu có)
+    payment.setTransactionCode(transactionReference);
     payment.setGatewayMessage(
             "Payment confirmed by Admin for " + order.getPaymentMethod().name() + " order."
                     + (StringUtils.hasText(adminNotes) ? " Notes: " + adminNotes : ""));
@@ -1274,7 +1318,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
             "Admin confirmed {} payment for order {}. Original payment method: {}. Order payment status changed from {} to PAID.",
             paymentMethodConfirmedByAdmin.name(),
             order.getOrderCode(),
-            order.getPaymentMethod().name(), // Log cả phương thức gốc của đơn hàng
+            order.getPaymentMethod().name(),
             originalPaymentStatus);
     // Gửi thông báo cho người mua rằng thanh toán đã được xác nhận
     notificationService.sendPaymentSuccessNotification(savedOrder);
@@ -1282,7 +1326,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     if (originalOrderStatus != savedOrder.getStatus()) {
       notificationService.sendOrderStatusUpdateNotification(savedOrder, originalOrderStatus);
     }
-    // (Tùy chọn) Gửi thông báo cho Farmer rằng đơn hàng đã được thanh toán và có thể chuẩn bị hàng
+    //  Gửi thông báo cho Farmer rằng đơn hàng đã được thanh toán và có thể chuẩn bị hàng
     // notificationService.sendOrderPaidNotificationToFarmer(savedOrder);
     return orderMapper.toOrderResponse(savedOrder);
   }
@@ -1291,7 +1335,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   @Transactional(readOnly = true)
   public BankTransferInfoResponse getBankTransferInfoForOrder(
       Long orderId, Authentication authentication) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     Order order =
         orderRepository
             .findByIdWithDetails(orderId) // Dùng query có fetch
@@ -1318,7 +1362,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     String qrCodeDataString;
 
     // Tạo chuỗi cho QR code
-    // Lựa chọn 1: Tạo URL đến dịch vụ tạo ảnh QR (như VietQR.io)
+    //  Tạo URL đến dịch vụ tạo ảnh QR
     if (StringUtils.hasText(qrServiceUrlBase)
         && StringUtils.hasText(appBankBin)
         && StringUtils.hasText(appBankAccountNumber)) {
@@ -1344,37 +1388,10 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
         qrCodeDataString = "Lỗi tạo mã QR (URL)";
       }
     } else {
-      // Lựa chọn 2: Tạo chuỗi dữ liệu thô theo chuẩn VietQR (để frontend tự render)
-      // Đây là một ví dụ đơn giản hóa, bạn cần tham khảo chuẩn VietQR/Napas247 để có chuỗi chính
-      // xác
-      // Payload version 000201, Point of Initiation 010212 (static QR with beneficiary)
-      // Merchant Account Info (tag 38)
-      //   GUID (tag 00) - A000000727 (NAPAS247 by VNPAY)
-      //   Beneficiary Organization (tag 01) - Bank BIN (tag 00) + Account Number (tag 01)
-      //     Bank BIN (tag 00) - appBankBin
-      //     Account Number (tag 01) - appBankAccountNumber
-      // Transaction Currency (tag 53) - 03704 (VND)
-      // Transaction Amount (tag 54) - order.getTotalAmount()
-      // Country Code (tag 58) - 02VN
-      // Additional Data (tag 62)
-      //   Purpose of Transaction (tag 08) - transferContent
-      // CRC (tag 63) - 04XXXX
-
-      // Ví dụ tạo chuỗi data đơn giản hơn mà nhiều thư viện QR có thể hiểu
-      // (Không hoàn toàn theo chuẩn VietQR nhưng chứa đủ thông tin cơ bản)
-      // Hoặc bạn có thể tìm thư viện Java để tạo chuỗi VietQR đầy đủ.
-      // String data = "STK: " + appBankAccountNumber + "\n" +
-      //               "Ngân hàng: " + appBankNameDisplay + "\n" +
-      //               "Số tiền: " + order.getTotalAmount().toPlainString() + "\n" +
-      //               "Nội dung: " + transferContent;
-      // qrCodeDataString = data;
-
-      // Để nhất quán với ví dụ trước, nếu không có qrServiceUrlBase, ta sẽ báo lỗi
-      // hoặc trả về null/chuỗi rỗng cho qrCodeDataString
       log.warn(
           "QR Service URL Base not configured. Cannot generate QR image URL for order {}",
           order.getOrderCode());
-      qrCodeDataString = null; // Hoặc một thông báo lỗi
+      qrCodeDataString = null;
     }
 
     return new BankTransferInfoResponse(
@@ -1403,11 +1420,10 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     }
   }
 
-  // *** IMPLEMENT PHƯƠ_THỨC MỚI ***
   @Override
   @Transactional // Có thể cần @Transactional nếu bạn cập nhật trạng thái Order
   public PaymentUrlResponse createPaymentUrl(Authentication authentication, Long orderId, PaymentMethod paymentMethod, HttpServletRequest httpServletRequest) {
-    User user = getUserFromAuthentication(authentication); // Sử dụng lại helper method
+    User user = SecurityUtils.getCurrentAuthenticatedUser(); // Sử dụng lại helper method
     Order order = orderRepository
             .findByIdAndBuyerId(orderId, user.getId()) // Đảm bảo đúng order của user
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -1422,16 +1438,16 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
 
     PaymentUrlResponse paymentUrlResponse;
     String clientIp = VnPayUtils.getIpAddress(httpServletRequest);
-    String frontendReturnUrl; // Sẽ được gán trong switch
+    String frontendReturnUrl;
 
     switch (paymentMethod) {
       case VNPAY:
-        frontendReturnUrl = frontendAppUrl + "/payment/vnpay/result"; // Hoặc lấy từ config
+        frontendReturnUrl = frontendAppUrl + "/payment/vnpay/result";
         // Cập nhật paymentMethod của Order nếu người dùng chọn lại hoặc thanh toán lại sau khi FAILED
         if (order.getPaymentMethod() != PaymentMethod.VNPAY || order.getPaymentStatus() == PaymentStatus.FAILED) {
           order.setPaymentMethod(PaymentMethod.VNPAY);
           order.setPaymentStatus(PaymentStatus.PENDING); // Reset về PENDING
-          // Cân nhắc tạo Payment record mới nếu thử lại, hoặc cập nhật payment record cũ
+
           orderRepository.save(order);
         }
         paymentUrlResponse = vnPayService.createVnPayPaymentUrl(order, clientIp, frontendReturnUrl);
@@ -1446,7 +1462,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
         }
         paymentUrlResponse = moMoService.createMoMoPaymentUrl(order, frontendReturnUrl, backendIpnUrl);
         break;
-      // Thêm các case cho ZALOPAY, OTHER nếu cần
+      // Thêm các case cho ZALOPAY, OTHER
       default:
         throw new BadRequestException(
                 "Phương thức thanh toán không được hỗ trợ hoặc không hợp lệ cho việc tạo URL: " + paymentMethod);
@@ -1460,39 +1476,4 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     log.info("Tạo URL thanh toán thành công cho đơn hàng {}, phương thức {}: {}", order.getOrderCode(), paymentMethod, paymentUrlResponse.getPaymentUrl());
     return paymentUrlResponse;
   }
-
-
-//  // Helper method getUserFromAuthentication (đảm bảo nó tồn tại và đúng)
-//  private User getUserFromAuthentication(Authentication authentication) {
-//    if (authentication == null
-//            || !authentication.isAuthenticated()
-//            || authentication.getPrincipal() == null) {
-//      throw new AccessDeniedException(
-//              "User is not authenticated or authentication details are missing.");
-//    }
-//
-//    Object principal = authentication.getPrincipal();
-//    String userIdentifier;
-//
-//    if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
-//      userIdentifier =
-//              ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
-//    } else if (principal instanceof String) {
-//      userIdentifier = (String) principal;
-//      if ("anonymousUser".equals(userIdentifier)) {
-//        throw new AccessDeniedException("Anonymous user cannot perform this action.");
-//      }
-//    } else {
-//      throw new AccessDeniedException("Cannot identify user from authentication principal.");
-//    }
-//
-//    return userRepository
-//            .findByEmail(userIdentifier)
-//            .orElseThrow(
-//                    () -> new UsernameNotFoundException(
-//                            "Authenticated user not found: " + userIdentifier));
-//  }
-
-
-
 }

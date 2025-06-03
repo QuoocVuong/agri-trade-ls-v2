@@ -35,8 +35,8 @@ public class WebSocketEventListener {
   private final Map<Long, Set<String>> onlineUsers = new ConcurrentHashMap<>();
 
   // *** INJECT USER REPOSITORY ***
-  @Autowired // Hoặc inject qua constructor nếu bỏ @RequiredArgsConstructor
-  private UserRepository userRepository;
+ // Hoặc inject qua constructor nếu bỏ @RequiredArgsConstructor
+  private final UserRepository userRepository;
   // ****************************
 
   // Map lưu trạng thái online (UserId -> isOnline) - Đơn giản hóa
