@@ -15,7 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 @Mapper(
     componentModel = "spring",
     uses = {ProductMapper.class})
-public abstract class CartItemMapper { // Đổi thành abstract class để inject
+public abstract class CartItemMapper {
 
   @Autowired // Inject ProductMapper để lấy thông tin tóm tắt
   protected ProductMapper productMapper;

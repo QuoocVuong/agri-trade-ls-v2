@@ -22,7 +22,7 @@ public class AdminReviewController {
   private final ReviewService reviewService;
 
   // Lấy review theo trạng thái
-  @GetMapping // <<< Không cần /admin/pending nữa
+  @GetMapping
   public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getReviewsByStatus(
       @RequestParam(required = true) ReviewStatus status,
       @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
@@ -32,21 +32,21 @@ public class AdminReviewController {
   }
 
   // Admin duyệt review
-  @PostMapping("/{reviewId}/approve") // <<< Giữ nguyên
+  @PostMapping("/{reviewId}/approve")
   public ResponseEntity<ApiResponse<ReviewResponse>> approveReview(@PathVariable Long reviewId) {
     ReviewResponse review = reviewService.approveReview(reviewId);
     return ResponseEntity.ok(ApiResponse.success(review, "Review approved"));
   }
 
   // Admin từ chối review
-  @PostMapping("/{reviewId}/reject") // <<< Giữ nguyên
+  @PostMapping("/{reviewId}/reject")
   public ResponseEntity<ApiResponse<ReviewResponse>> rejectReview(@PathVariable Long reviewId) {
     ReviewResponse review = reviewService.rejectReview(reviewId);
     return ResponseEntity.ok(ApiResponse.success(review, "Review rejected"));
   }
 
   // Admin xóa review
-  @DeleteMapping("/{reviewId}") // <<< Giữ nguyên
+  @DeleteMapping("/{reviewId}")
   public ResponseEntity<ApiResponse<Void>> deleteReview(@PathVariable Long reviewId) {
     reviewService.deleteReview(reviewId);
     return ResponseEntity.ok(ApiResponse.success("Review deleted"));

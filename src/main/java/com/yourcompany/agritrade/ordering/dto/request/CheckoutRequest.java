@@ -10,8 +10,6 @@ public class CheckoutRequest {
   @NotNull(message = "Shipping address ID is required")
   private Long shippingAddressId; // ID của địa chỉ đã lưu
 
-  // Hoặc có thể cho phép nhập địa chỉ mới trực tiếp ở đây (cần thêm các trường address)
-  // private AddressRequest newShippingAddress;
 
   @NotNull(message = "Payment method is required")
   private PaymentMethod paymentMethod;

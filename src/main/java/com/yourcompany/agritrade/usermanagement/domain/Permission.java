@@ -17,7 +17,7 @@ public class Permission {
   private Integer id;
 
   @Column(length = 100, unique = true, nullable = false)
-  private String name; // Ví dụ: "USER_READ", "USER_MANAGE", "PRODUCT_CREATE", "ORDER_APPROVE"
+  private String name;
 
   @Column(length = 255)
   private String description;

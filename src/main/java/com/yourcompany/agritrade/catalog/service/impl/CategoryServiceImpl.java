@@ -35,29 +35,22 @@ public class CategoryServiceImpl implements CategoryService {
   @Transactional(readOnly = true)
   public List<CategoryResponse> getAllCategoriesForDropdown() {
     log.debug("Fetching all categories for dropdown");
-    // Lấy tất cả category, sắp xếp theo tên cho dễ nhìn trong dropdown
-    // Bạn có thể thêm điều kiện lọc (ví dụ: chỉ lấy active) nếu cần
-    // List<Category> categories = categoryRepository.findByIsActiveTrueOrderByNameAsc(); // Nếu có
-    // trường isActive
     List<Category> categories =
         categoryRepository.findAll(
             Sort.by(Sort.Direction.ASC, "name")); // Lấy tất cả, sắp xếp theo tên
 
-    // Map sang DTO. CategoryResponse có thể hơi nặng nếu chỉ cần id/name.
-    // Cân nhắc tạo CategoryDropdownDto riêng nếu cần tối ưu.
+
     return categoryMapper.toCategoryResponseList(categories); // Sử dụng MapStruct mapper
   }
 
   @Override
   @Transactional(readOnly = true)
   public List<CategoryResponse> getCategoryTree() {
-    // Lấy các category gốc và map đệ quy (cách đơn giản, có thể tối ưu nếu cây sâu)
+    // Lấy các category gốc và map đệ quy
     List<Category> rootCategories = categoryRepository.findByParentIsNull();
     return rootCategories.stream()
         .map(categoryMapper::toCategoryResponse) // MapStruct sẽ tự xử lý children nếu cấu hình đúng
         .collect(Collectors.toList());
-    // Lưu ý: FetchType.EAGER cho children trong Category Entity có thể gây N+1 query.
-    // Cân nhắc dùng JOIN FETCH hoặc EntityGraph nếu hiệu năng là vấn đề.
   }
 
   @Override
@@ -175,14 +168,14 @@ public class CategoryServiceImpl implements CategoryService {
 
     Category updatedCategory = categoryRepository.save(category);
 
-    // *** Xử lý xóa ảnh cũ trên storage SAU KHI đã lưu thành công ***
+    //  xóa ảnh cũ trên storage SAU KHI đã lưu thành công
     if ((imageChanged || imageRemoved) && StringUtils.hasText(oldBlobPath)) {
       try {
         log.info("Deleting old category image: {}", oldBlobPath);
         fileStorageService.delete(oldBlobPath);
       } catch (Exception e) {
         log.error("Failed to delete old category image file from storage: {}", oldBlobPath, e);
-        // Không nên throw lỗi ở đây để tránh rollback transaction đã thành công
+
       }
     }
 
@@ -210,11 +203,11 @@ public class CategoryServiceImpl implements CategoryService {
               + " products.");
     }
 
-    // Kiểm tra xem có danh mục con không (nếu logic yêu cầu không cho xóa khi có con)
+    // Kiểm tra xem có danh mục con không
     if (!category.getChildren().isEmpty()) {
       throw new BadRequestException(
           "Cannot delete category with id " + id + " because it has subcategories.");
-      // Hoặc xử lý chuyển các danh mục con lên cấp cha / xóa đệ quy tùy yêu cầu
+
     }
 
     String blobPathToDelete = category.getBlobPath(); // Lấy blobPath trước khi xóa entity

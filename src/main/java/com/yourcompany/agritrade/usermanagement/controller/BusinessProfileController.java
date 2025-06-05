@@ -20,7 +20,7 @@ public class BusinessProfileController {
 
   // Endpoint để Business Buyer tạo hoặc cập nhật profile của chính mình
   @PutMapping("/me")
-  // @PreAuthorize("hasRole('BUSINESS_BUYER')") // Chỉ Business Buyer mới được gọi
+
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<BusinessProfileResponse>> createOrUpdateMyProfile(
       Authentication authentication, @Valid @RequestBody BusinessProfileRequest request) {
@@ -40,5 +40,5 @@ public class BusinessProfileController {
     return ResponseEntity.ok(ApiResponse.success(response));
   }
 
-  // Có thể thêm các API cho Admin nếu cần (ví dụ: xem danh sách business profiles...)
+
 }

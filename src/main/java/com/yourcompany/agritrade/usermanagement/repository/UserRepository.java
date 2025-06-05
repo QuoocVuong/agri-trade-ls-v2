@@ -17,7 +17,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
   Boolean existsByPhoneNumber(String phoneNumber);
 
-  // Optional<User> findByEmailAndIsActiveTrue(String email);
+
 
   // Nếu cần tìm user bất kể trạng thái isDeleted (ví dụ: kiểm tra email tồn tại tuyệt đối)
   @Query(
@@ -51,7 +51,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
   List<User> findByRoles_Name(RoleType roleName);
 
-  // ===== PHƯƠNG THỨC MỚI =====
   /**
    * Tìm top N Users có vai trò là FARMER, sắp xếp theo followerCount giảm dần. Sử dụng Pageable để
    * giới hạn số lượng (limit).
@@ -61,11 +60,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
    * @return Danh sách các User là Farmer nổi bật.
    */
   List<User> findTopByRoles_NameOrderByFollowerCountDesc(RoleType roleType, Pageable pageable);
-  // Hoặc dùng @Query nếu cần join phức tạp hơn hoặc tối ưu hơn
-  /*
-  @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName ORDER BY u.followerCount DESC")
-  List<User> findTopFarmersByFollowerCount(@Param("roleName") RoleType roleType, Pageable pageable);
-  */
-  // ===========================
+
 
 }

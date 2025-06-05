@@ -28,14 +28,13 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-// **********************************
+
 
 @RestControllerAdvice
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-  // --- Các phương thức handle* được override từ ResponseEntityExceptionHandler ---
 
   @Override
   protected ResponseEntity<Object> handleMethodArgumentNotValid(
@@ -68,8 +67,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Validation Failed", // Message chung
             fieldErrors // Đưa map lỗi field vào details
             );
-    // Chuyển đổi HttpStatusCode sang HttpStatus nếu cần, hoặc dùng status trực tiếp nếu là
-    // HttpStatus
+
     HttpStatus httpStatus = HttpStatus.valueOf(status.value());
     return new ResponseEntity<>(apiResponse, httpStatus);
   }
@@ -162,7 +160,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return new ResponseEntity<>(apiResponse, httpStatus);
   }
 
-  // --- Các phương thức @ExceptionHandler ---
+
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ApiResponse<Object>> handleMethodArgumentTypeMismatch( // Đổi kiểu trả về

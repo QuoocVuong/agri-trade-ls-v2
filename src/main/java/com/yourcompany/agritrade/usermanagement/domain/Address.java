@@ -47,7 +47,7 @@ public class Address {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private AddressType type = AddressType.SHIPPING; // Tạo Enum này
+  private AddressType type = AddressType.SHIPPING;
 
   @Column(nullable = false)
   private boolean isDefault = false; // Là địa chỉ mặc định không?

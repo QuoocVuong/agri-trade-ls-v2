@@ -28,14 +28,14 @@ import org.springframework.data.domain.Page;
       UserMapper.class, // Để map buyer
       FarmerInfoMapper.class // Để map farmer
     })
-public abstract class OrderMapper { // Đổi thành abstract class
+public abstract class OrderMapper {
 
   @Autowired // Inject các mapper cần thiết
   protected UserMapper userMapper;
   @Autowired protected FarmerInfoMapper farmerInfoMapper;
   @Autowired protected OrderItemMapper orderItemMapper;
   @Autowired protected PaymentMapper paymentMapper;
-  @Autowired // << INJECT INVOICEREPOSITORY
+  @Autowired
   protected InvoiceRepository invoiceRepository;
 
 
@@ -116,7 +116,7 @@ public abstract class OrderMapper { // Đổi thành abstract class
     return info;
   }
 
-  // Helper method để lấy tên farm (ví dụ)
+  // Helper method để lấy tên farm
   @Named("mapUserToBestFarmerName")
   protected String mapUserToBestFarmerName(User farmer) {
     if (farmer == null) return null;

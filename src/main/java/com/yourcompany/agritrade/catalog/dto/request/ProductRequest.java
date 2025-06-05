@@ -34,7 +34,7 @@ public class ProductRequest {
   @PositiveOrZero(message = "Stock quantity must be non-negative")
   private Integer stockQuantity;
 
-  // Farmer có thể chỉ được set DRAFT hoặc UNPUBLISHED ban đầu
+  //  PENDING_APPROVAL ban đầu
   private ProductStatus status = ProductStatus.PENDING_APPROVAL;
 
   private boolean b2bEnabled = false;
@@ -49,22 +49,19 @@ public class ProductRequest {
   private BigDecimal b2bBasePrice;
 
 
-  // ... các trường hiện có ...
+
   private LocalDate harvestDate;
-  // lastStockUpdate không cần trong request
-  private Boolean negotiablePrice; // Cho phép null để nếu không gửi thì dùng default của entity
+
+  private Boolean negotiablePrice;
   private String wholesaleUnit;
   private BigDecimal referenceWholesalePrice;
 
-  // Danh sách URL ảnh, ảnh đầu tiên sẽ là default nếu không có ảnh nào isDefault=true
-  //    private List<String> imageUrls;
-  // Hoặc dùng DTO riêng cho ảnh nếu cần isDefault
-  // private List<ProductImageRequest> images;
 
-  @Valid // Validate các phần tử trong list
-  private List<ProductImageRequest> images; // Sử dụng DTO mới
 
-  // Danh sách bậc giá B2B (nếu dùng)
+  @Valid
+  private List<ProductImageRequest> images;
+
+  // Danh sách bậc giá B2B
   @Valid // Validate các phần tử trong list
   private List<ProductPricingTierRequest> pricingTiers;
 }

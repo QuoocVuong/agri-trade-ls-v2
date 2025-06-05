@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-// uses UserMapper và ChatMessageMapper
+
 @Mapper(
     componentModel = "spring",
     uses = {UserMapper.class, ChatMessageMapper.class})
@@ -23,10 +23,10 @@ public abstract class ChatRoomMapper {
   @Autowired protected UserMapper userMapper; // Để map user1, user2
   @Autowired protected ChatMessageMapper chatMessageMapper; // Để map lastMessage
 
-  // ****** INJECT UserRepository ĐỂ LẤY currentUserId ******
+
   @Autowired protected UserRepository userRepository;
 
-  // ****************************************************
+
 
   // Map các trường cơ bản
   @Mapping(target = "user1", source = "user1") // Dùng UserMapper -> UserInfoSimpleResponse
@@ -64,13 +64,13 @@ public abstract class ChatRoomMapper {
     }
   }
 
-  // Hàm helper để lấy currentUserId (giờ đã có UserRepository)
+  // Hàm helper để lấy currentUserId
   private Long getCurrentUserId(Authentication authentication) {
     if (authentication == null
         || !authentication.isAuthenticated()
         || "anonymousUser".equals(authentication.getPrincipal())) return null;
     String email = authentication.getName();
-    // Dùng UserRepository đã inject
+
     return userRepository.findByEmail(email).map(User::getId).orElse(null);
   }
 }

@@ -26,7 +26,7 @@ public class DataInitializer implements CommandLineRunner {
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
   private final PasswordEncoder passwordEncoder;
-  private final PermissionRepository permissionRepository; // Inject PermissionRepository
+  private final PermissionRepository permissionRepository;
 
   @Value("${app.admin.email}")
   private String adminEmail;
@@ -50,8 +50,7 @@ public class DataInitializer implements CommandLineRunner {
           new PermissionData("ORDER_READ_ALL", "Quyền xem tất cả đơn hàng (Admin)"),
           new PermissionData("ORDER_UPDATE_STATUS_OWN", "Quyền cập nhật trạng thái đơn hàng của mình (Farmer)"),
           new PermissionData("ORDER_UPDATE_STATUS_ALL", "Quyền cập nhật trạng thái mọi đơn hàng (Admin)"),
-          new PermissionData("PERMISSION_MANAGE", "Quyền quản lý các quyền hạn khác") // Ví dụ quyền quản lý quyền
-          // Thêm các quyền khác nếu cần
+          new PermissionData("PERMISSION_MANAGE", "Quyền quản lý các quyền hạn khác")
   );
 
   // Định nghĩa việc gán quyền cho vai trò
@@ -127,7 +126,7 @@ public class DataInitializer implements CommandLineRunner {
             });
 
     // Gán permissions cho role nếu role mới được tạo hoặc chưa có permission nào
-    // Hoặc bạn có thể có logic phức tạp hơn để đồng bộ permissions
+
     List<String> expectedPermissionNames = ROLE_PERMISSION_MAPPING.get(roleType);
     if (expectedPermissionNames != null && !expectedPermissionNames.isEmpty()) {
       Set<Permission> currentPermissions = role.getPermissions();

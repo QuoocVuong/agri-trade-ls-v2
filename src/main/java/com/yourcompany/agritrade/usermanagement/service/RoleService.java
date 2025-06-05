@@ -10,5 +10,5 @@ public interface RoleService {
   RoleResponse getRoleById(Integer id);
 
   RoleResponse updateRolePermissions(Integer id, RoleUpdateRequest request);
-  // Có thể thêm tạo/xóa Role nếu cần, nhưng thường Role là cố định
+
 }

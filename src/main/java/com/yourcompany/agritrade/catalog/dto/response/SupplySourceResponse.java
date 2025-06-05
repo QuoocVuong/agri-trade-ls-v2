@@ -20,5 +20,5 @@ public class SupplySourceResponse {
     private LocalDate harvestDate;
     private LocalDateTime lastStockUpdate;
     private boolean negotiablePrice;
-    // Có thể thêm các thông tin khác của sản phẩm nếu cần
+
 }

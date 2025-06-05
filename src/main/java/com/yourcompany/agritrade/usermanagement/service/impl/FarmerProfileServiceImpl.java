@@ -36,11 +36,7 @@ public class FarmerProfileServiceImpl implements FarmerProfileService {
       Authentication authentication, FarmerProfileRequest request) {
     User user = getUserFromAuthentication(authentication);
 
-    // Kiểm tra tỉnh Lạng Sơn
-    //        if (!LANG_SON_PROVINCE_CODE.equals(request.getProvinceCode())) {
-    //            throw new BadRequestException("Farmer profile province must be Lang Son (" +
-    // LANG_SON_PROVINCE_CODE + ").");
-    //        }
+
 
     boolean isNewProfile =
         !farmerProfileRepository.existsById(user.getId()); // Kiểm tra xem có phải tạo mới không
@@ -102,6 +98,4 @@ public class FarmerProfileServiceImpl implements FarmerProfileService {
         .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
   }
 
-  // --- Implement các hàm duyệt của Admin ---
-  // ... approveFarmerProfile, rejectFarmerProfile ...
 }

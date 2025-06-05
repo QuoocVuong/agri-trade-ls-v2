@@ -26,18 +26,16 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 @Slf4j
 public class WebSocketEventListener {
 
-  // Inject messagingTemplate nếu muốn gửi thông báo online/offline
-  // private final SimpMessageSendingOperations messagingTemplate;
+
   private final SimpMessageSendingOperations messagingTemplate; // Để gửi thông báo online/offline
 
   // Lưu trạng thái online đơn giản (UserId -> Set<SessionId>)
   // Dùng ConcurrentHashMap để an toàn trong môi trường đa luồng
   private final Map<Long, Set<String>> onlineUsers = new ConcurrentHashMap<>();
 
-  // *** INJECT USER REPOSITORY ***
- // Hoặc inject qua constructor nếu bỏ @RequiredArgsConstructor
+
   private final UserRepository userRepository;
-  // ****************************
+
 
   // Map lưu trạng thái online (UserId -> isOnline) - Đơn giản hóa
   private final Map<Long, Boolean> onlineUsersStatus = new ConcurrentHashMap<>();
@@ -92,7 +90,7 @@ public class WebSocketEventListener {
   @EventListener
   public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
     StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
-    // Principal thường là null ở disconnect, phải dựa vào sessionId
+
     String sessionId = headerAccessor.getSessionId();
 
     if (sessionId != null) {
@@ -164,7 +162,6 @@ public class WebSocketEventListener {
     }
   }
 
-  // --- Helper Method (Cần inject UserRepository) ---
 
   // Hàm helper để gửi thông báo trạng thái
   private void broadcastPresenceStatus(Long userId, String username, boolean isOnline) {

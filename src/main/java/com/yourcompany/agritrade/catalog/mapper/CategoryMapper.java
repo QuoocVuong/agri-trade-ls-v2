@@ -28,11 +28,11 @@ public abstract class CategoryMapper {
       try {
         response.setImageUrl(fileStorageService.getFileUrl(category.getBlobPath()));
       } catch (Exception e) {
-        // log.error(...)
-        response.setImageUrl("assets/images/placeholder-category.png"); // Placeholder
+
+        response.setImageUrl("assets/images/placeholder-category.png");
       }
     } else {
-      response.setImageUrl("assets/images/placeholder-category.png"); // Placeholder
+      response.setImageUrl("assets/images/placeholder-category.png");
     }
   }
 
@@ -60,7 +60,7 @@ public abstract class CategoryMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "imageUrl", ignore = true) // Không cập nhật imageUrl qua đây
-  @Mapping(target = "blobPath", ignore = true) // Không cập nhật blobPath qua đây (xử lý riêng)
+  @Mapping(target = "blobPath", ignore = true) // Không cập nhật blobPath qua đây
   public abstract void updateCategoryFromRequest(
       CategoryRequest request, @MappingTarget Category category);
 }

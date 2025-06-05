@@ -10,13 +10,13 @@ import org.mapstruct.*;
 public interface FarmerProfileMapper {
 
   @Mapping(target = "userId", source = "user.id") // Lấy userId từ User entity lồng nhau
-  // *** THÊM CÁC MAPPING TỪ USER ***
+
   @Mapping(target = "fullName", source = "user.fullName") // Map fullName từ User
   @Mapping(target = "phoneNumber", source = "user.phoneNumber") // Map phoneNumber từ User
   @Mapping(target = "avatarUrl", source = "user.avatarUrl") // Map avatarUrl từ User
   @Mapping(target = "followerCount", source = "user.followerCount") // Map followerCount từ User
   @Mapping(target = "createdAt", source = "user.createdAt") // Map createdAt (ngày tham gia) từ User
-  // *** ------------------------ ***
+
   @Mapping(
       target = "verifiedByAdminName",
       source = "verifiedBy",

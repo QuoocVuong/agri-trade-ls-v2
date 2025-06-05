@@ -20,11 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class InAppNotificationServiceImpl implements InAppNotificationService {
 
   private final NotificationRepository notificationRepository;
-  private final SimpMessagingTemplate messagingTemplate; // Inject WebSocket template
-  private final NotificationMapper notificationMapper; // Inject Mapper
+  private final SimpMessagingTemplate messagingTemplate;
+  private final NotificationMapper notificationMapper;
 
   @Override
-  @Transactional // Lưu DB nên cần transactional
+  @Transactional
   @Async("taskExecutor") // Chạy bất đồng bộ
   public void createAndSendInAppNotification(
       User recipient, String message, NotificationType type, String link) {
@@ -56,7 +56,7 @@ public class InAppNotificationServiceImpl implements InAppNotificationService {
           recipient.getId(),
           e.getMessage(),
           e);
-      // Có thể thêm cơ chế retry hoặc ghi vào hàng đợi lỗi
+
     }
   }
 }

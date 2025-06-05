@@ -61,18 +61,6 @@ public interface OrderRepository
           + "WHERE o.id = :orderId")
   Optional<Order> findByIdWithDetails(@Param("orderId") Long orderId);
 
-  // Hoặc dùng @EntityGraph thay thế nếu muốn
-  //    @EntityGraph(attributePaths = {
-  //            "orderItems", "orderItems.product", "payments", "buyer", "farmer",
-  // "farmer.farmerProfile"
-  //    })
-  //    Optional<Order> findById(Long orderId); // Spring Data JPA tự tạo query
-  //
-  //    @EntityGraph(attributePaths = {
-  //            "orderItems", "orderItems.product", "payments", "buyer", "farmer",
-  // "farmer.farmerProfile"
-  //    })
-  //    Optional<Order> findByOrderCode(String orderCode); // Spring Data JPA tự tạo query
 
   // Lấy chi tiết đơn hàng theo Code (bao gồm items, payments)
   @Query(

@@ -24,13 +24,13 @@ public class PaymentController {
   private final PaymentService paymentService;
 
   @Value("${payment.vnpay.hashSecret}")
-  private String vnpHashSecret; // Inject hashSecret
+  private String vnpHashSecret;
 
   @Value("${payment.momo.secretKey}")
-  private String momoSecretKey; // Inject MoMo Secret Key
+  private String momoSecretKey;
 
   // Endpoint cho VNPay IPN (VNPay thường dùng GET cho IPN)
-  @GetMapping("/vnpay/ipn") // Đổi thành /ipn để phân biệt với return URL của frontend
+  @GetMapping("/vnpay/ipn")
   public ResponseEntity<Map<String, String>> handleVnpayIpn(
       @RequestParam Map<String, String> vnpayParams) {
     log.info("Received VNPay IPN: {}", vnpayParams);
@@ -117,31 +117,6 @@ public class PaymentController {
     return data;
   }
 
-  //    // Ví dụ endpoint cho VNPay IPN (thường là GET)
-  //    @GetMapping("/vnpay")
-  //    public ResponseEntity<String> handleVnpayCallback(@RequestParam Map<String, String>
-  // vnpayParams) {
-  //        log.info("Received VNPay IPN callback: {}", vnpayParams);
-  //        try {
-  //            // TODO: Chuyển đổi vnpayParams sang PaymentCallbackRequest
-  //            PaymentCallbackRequest callbackData = convertVnpayParams(vnpayParams);
-  //            paymentService.handlePaymentCallback("VNPAY", callbackData);
-  //
-  //            // TODO: Trả về response theo yêu cầu của VNPay để xác nhận đã nhận IPN
-  //            // Ví dụ: return ResponseEntity.ok("{\"RspCode\":\"00\",\"Message\":\"Confirm
-  // Success\"}");
-  //            return ResponseEntity.ok("OK"); // Trả về OK 200 nếu xử lý thành công cơ bản
-  //
-  //        } catch (Exception e) {
-  //            log.error("Error processing VNPay callback: {}", e.getMessage(), e);
-  //            // Vẫn nên trả về mã thành công cho VNPay để tránh họ gửi lại, nhưng log lỗi nghiêm
-  // trọng
-  //            // TODO: Trả về response lỗi theo yêu cầu của VNPay nếu có
-  //            return ResponseEntity.ok("OK BUT FAILED INTERNALLY"); // Hoặc mã lỗi phù hợp
-  //            // return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error
-  // processing callback");
-  //        }
-  //    }
 
   // Endpoint cho MoMo IPN (MoMo thường dùng POST)
   @PostMapping("/momo/ipn") // Đường dẫn khớp với ipnUrl bạn cấu hình
@@ -251,29 +226,10 @@ public class PaymentController {
     return data;
   }
 
-  //    // Ví dụ endpoint cho MoMo IPN (thường là POST)
-  //    @PostMapping("/momo")
-  //    public ResponseEntity<Void> handleMomoCallback(@RequestBody Map<String, Object> momoParams)
-  // {
-  //        log.info("Received MoMo IPN callback: {}", momoParams);
-  //        try {
-  //            // TODO: Chuyển đổi momoParams sang PaymentCallbackRequest
-  //            PaymentCallbackRequest callbackData = convertMomoParams(momoParams);
-  //            paymentService.handlePaymentCallback("MOMO", callbackData);
-  //
-  //            // MoMo thường không yêu cầu body response, chỉ cần mã 204 No Content hoặc 200 OK
-  //            return ResponseEntity.noContent().build();
-  //
-  //        } catch (Exception e) {
-  //            log.error("Error processing MoMo callback: {}", e.getMessage(), e);
-  //            // Trả về lỗi nhưng MoMo có thể sẽ thử gửi lại
-  //            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-  //        }
-  //    }
 
   // --- Helper methods để chuyển đổi params ---
   private PaymentCallbackRequest convertVnpayParams(Map<String, String> params) {
-    // TODO: Implement logic chuyển đổi dựa trên tài liệu VNPay IPN
+
     PaymentCallbackRequest data = new PaymentCallbackRequest();
     data.setOrderCode(params.get("vnp_TxnRef"));
     data.setTransactionCode(params.get("vnp_TransactionNo"));
@@ -284,7 +240,7 @@ public class PaymentController {
   }
 
   private PaymentCallbackRequest convertMomoParams(Map<String, Object> params) {
-    // TODO: Implement logic chuyển đổi dựa trên tài liệu MoMo IPN
+
     PaymentCallbackRequest data = new PaymentCallbackRequest();
     data.setOrderCode((String) params.get("orderId")); // Ví dụ
     data.setTransactionCode(String.valueOf(params.get("transId"))); // Ví dụ

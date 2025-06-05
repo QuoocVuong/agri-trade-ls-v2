@@ -16,10 +16,4 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
   // Lấy các category gốc (không có cha)
   List<Category> findByParentIsNull();
 
-  // Lấy các category con trực tiếp
-  List<Category> findByParentId(Integer parentId);
-
-  // Lấy tất cả category con (đệ quy - có thể không hiệu quả, cân nhắc query khác)
-  @Query("SELECT c FROM Category c WHERE c.parent.id = :parentId")
-  List<Category> findAllChildrenByParentId(Integer parentId);
 }

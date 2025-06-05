@@ -14,7 +14,7 @@ import org.hibernate.annotations.UpdateTimestamp;
     name = "payments",
     uniqueConstraints = {
       @UniqueConstraint(
-          columnNames = "transactionCode") // Mã giao dịch cổng thanh toán phải là duy nhất (nếu có)
+          columnNames = "transactionCode")
     })
 @Getter
 @Setter
@@ -32,14 +32,14 @@ public class Payment {
   private String transactionCode; // Mã từ cổng thanh toán
 
   @Column(nullable = false, length = 50)
-  private String paymentGateway; // Tên cổng/phương thức (COD, VNPAY...)
+  private String paymentGateway; // Tên cổng/phương thức
 
   @Column(nullable = false, precision = 15, scale = 2)
   private BigDecimal amount;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private PaymentTransactionStatus status = PaymentTransactionStatus.PENDING; // Tạo Enum này
+  private PaymentTransactionStatus status = PaymentTransactionStatus.PENDING;
 
   private LocalDateTime paymentTime; // Thời gian thanh toán thành công
 

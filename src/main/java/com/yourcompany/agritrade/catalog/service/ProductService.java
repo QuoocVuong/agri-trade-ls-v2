@@ -9,7 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
-// Interface cho ProductService
+
 public interface ProductService {
 
   // Cho Farmer
@@ -37,9 +37,9 @@ public interface ProductService {
 
   ProductDetailResponse getPublicProductBySlug(String slug);
 
-  ProductDetailResponse getPublicProductById(Long id); // Lấy theo ID nếu cần
+  ProductDetailResponse getPublicProductById(Long id);
 
-  // ===== PHƯƠNG THỨC MỚI =====
+
   /**
    * Lấy danh sách sản phẩm công khai (PUBLISHED) của một Farmer cụ thể.
    *
@@ -49,7 +49,7 @@ public interface ProductService {
    */
   Page<ProductSummaryResponse> getPublicProductsByFarmerId(Long farmerId, Pageable pageable);
 
-  // ===========================
+
 
   // Cho Admin
   Page<ProductSummaryResponse> getAllProductsForAdmin(
@@ -62,14 +62,14 @@ public interface ProductService {
 
   ProductDetailResponse rejectProduct(Long productId, String reason); // Có thể thêm lý do từ chối
 
-  void forceDeleteProduct(Long productId); // Xóa vật lý (nếu cần)
+  void forceDeleteProduct(Long productId); // Xóa vật lý
 
 
   Page<SupplySourceResponse> findSupplySources(
           String productKeyword,
           Integer categoryId,
           String provinceCode,
-          String districtCode, // Thêm districtCode
+          String districtCode,
           String wardCode,
           Integer minQuantityNeeded, // Số lượng tối thiểu người mua cần
           Pageable pageable

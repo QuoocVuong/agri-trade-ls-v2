@@ -30,8 +30,8 @@ public class AdminOrderController {
   // Lấy tất cả đơn hàng với bộ lọc
   @GetMapping
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getAllOrders(
-      @RequestParam(required = false) String keyword, // THÊM KEYWORD
-      @RequestParam(required = false) String status, // Đổi thành String để linh hoạt
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String status,
       @RequestParam(required = false) Long buyerId,
       @RequestParam(required = false) Long farmerId,
       @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
@@ -41,7 +41,7 @@ public class AdminOrderController {
       try {
         statusEnum = OrderStatus.valueOf(status.toUpperCase());
       } catch (IllegalArgumentException e) {
-        // log.warn("Invalid order status value received for admin: {}", status);
+
       }
     }
 
@@ -61,7 +61,7 @@ public class AdminOrderController {
   // Admin cập nhật trạng thái đơn hàng
   @PutMapping("/{orderId}/status")
   public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatusByAdmin(
-      Authentication authentication, // Có thể cần để ghi log admin nào thực hiện
+      Authentication authentication,
       @PathVariable Long orderId,
       @Valid @RequestBody OrderStatusUpdateRequest request) {
     OrderResponse updatedOrder =
@@ -75,7 +75,7 @@ public class AdminOrderController {
   @PostMapping("/{orderId}/cancel")
   @PreAuthorize("hasAuthority('ORDER_CANCEL_ALL') or hasRole('ADMIN')") // Ví dụ dùng permission
   public ResponseEntity<ApiResponse<OrderResponse>> cancelOrderByAdmin(
-      Authentication authentication, // Để biết admin nào hủy
+      Authentication authentication,
       @PathVariable Long orderId) {
     OrderResponse cancelledOrder = orderService.cancelOrder(authentication, orderId);
     return ResponseEntity.ok(
@@ -87,14 +87,14 @@ public class AdminOrderController {
   public ResponseEntity<ApiResponse<OrderResponse>> confirmBankTransfer(
       @PathVariable Long orderId,
       @RequestBody(required = false)
-          Map<String, String> payload) { // Có thể nhận mã giao dịch ngân hàng nếu cần
+          Map<String, String> payload) {
     String bankTransactionCode = payload != null ? payload.get("bankTransactionCode") : null;
     OrderResponse updatedOrder =
         orderService.confirmBankTransferPayment(orderId, bankTransactionCode);
     return ResponseEntity.ok(ApiResponse.success(updatedOrder, "Bank transfer confirmed."));
   }
 
-  // ****** THÊM ENDPOINT NÀY ******
+
   @PostMapping("/{orderId}/confirm-payment")
   public ResponseEntity<ApiResponse<OrderResponse>> confirmOrderPayment(
       @PathVariable Long orderId,
@@ -105,7 +105,7 @@ public class AdminOrderController {
     String transactionReference =
         payload != null
             ? payload.get("transactionReference")
-            : null; // Ví dụ: mã giao dịch ngân hàng
+            : null;
 
     OrderResponse updatedOrder =
         orderService.confirmOrderPaymentByAdmin(
@@ -114,5 +114,5 @@ public class AdminOrderController {
         ApiResponse.success(
             updatedOrder, "Xác nhận thanh toán cho đơn hàng #" + orderId + " thành công."));
   }
-  // **********************************
+
 }

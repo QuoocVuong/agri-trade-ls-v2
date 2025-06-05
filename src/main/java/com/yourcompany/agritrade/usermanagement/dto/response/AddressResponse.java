@@ -24,10 +24,4 @@ public class AddressResponse {
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
-  // Bạn có thể thêm các trường khác nếu cần, ví dụ: tên tỉnh/huyện/xã đầy đủ
-  // private String provinceName;
-  // private String districtName;
-  // private String wardName;
-  // (Việc lấy tên đầy đủ này thường được xử lý ở Frontend dựa trên code hoặc ở Backend nếu có logic
-  // phức tạp)
 }

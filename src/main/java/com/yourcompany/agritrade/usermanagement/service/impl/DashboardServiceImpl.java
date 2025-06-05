@@ -124,9 +124,7 @@ public class DashboardServiceImpl implements DashboardService {
         topProducts.stream().map(TopProductResponse::getProductId).collect(Collectors.toList());
 
     if (!productIds.isEmpty()) {
-      // Query để lấy thông tin ảnh của các product này (tránh N+1)
-      // Cần tạo phương thức trong ProductRepository hoặc ProductImageRepository
-      // Ví dụ: Map<Long, String> productThumbnails = getProductThumbnails(productIds);
+
 
       // Tạm thời query từng cái (không tối ưu)
       topProducts.forEach(
@@ -172,8 +170,7 @@ public class DashboardServiceImpl implements DashboardService {
             .collect(
                 Collectors.toMap(
                     tuple -> {
-                      // *** SỬA CÁCH LẤY DATE TỪ TUPLE ***
-                      // Lấy kiểu Date gốc từ DB (thường là java.sql.Date hoặc java.util.Date)
+
                       Object dateObject = tuple.get(0); // Lấy cột đầu tiên (ngày)
                       if (dateObject instanceof java.sql.Date) {
                         return ((java.sql.Date) dateObject).toLocalDate();
@@ -190,7 +187,7 @@ public class DashboardServiceImpl implements DashboardService {
                         // Có thể trả về một giá trị mặc định hoặc ném lỗi tùy logic
                         return LocalDate.MIN; // Ví dụ trả về ngày nhỏ nhất để dễ lọc bỏ
                       }
-                      // **********************************
+
                     },
                     tuple -> tuple.get(1, Long.class) // Lấy số lượng (cột 1)
                     ));
@@ -214,9 +211,9 @@ public class DashboardServiceImpl implements DashboardService {
         .collect(Collectors.toList());
   }
 
-  // =================================================================
 
-  // ===== IMPLEMENT PHƯƠNG THỨC MỚI CHO FARMER REVENUE CHART =====
+
+  //IMPLEMENT PHƯƠNG THỨC  CHO FARMER REVENUE CHART
   @Override
   public List<FarmerChartDataResponse> getFarmerRevenueChartData(
       Authentication authentication, LocalDate startDate, LocalDate endDate) {
@@ -242,7 +239,7 @@ public class DashboardServiceImpl implements DashboardService {
             .collect(
                 Collectors.toMap(
                     tuple -> {
-                      // *** SỬA CÁCH LẤY DATE TỪ TUPLE (TƯƠNG TỰ NHƯ TRÊN) ***
+
                       Object dateObject = tuple.get(0);
                       if (dateObject instanceof java.sql.Date) {
                         return ((java.sql.Date) dateObject).toLocalDate();
@@ -257,7 +254,7 @@ public class DashboardServiceImpl implements DashboardService {
                             dateObject != null ? dateObject.getClass() : "null");
                         return LocalDate.MIN;
                       }
-                      // *******************************************************
+
                     },
                     tuple -> tuple.get(1, BigDecimal.class) // Lấy doanh thu (cột 1)
                     ));
@@ -281,7 +278,6 @@ public class DashboardServiceImpl implements DashboardService {
         .collect(Collectors.toList());
   }
 
-  // ==============================================================
 
   @Override
   public DashboardStatsResponse getAdminDashboardStats() {
@@ -331,52 +327,6 @@ public class DashboardServiceImpl implements DashboardService {
         .build();
   }
 
-  //    @Override
-  //    public List<TimeSeriesDataPoint<BigDecimal>> getDailyRevenueForAdminChart(LocalDate
-  // startDate, LocalDate endDate) {
-  //        LocalDateTime startDateTime = startDate.atStartOfDay();
-  //        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
-  //        List<Object[]> results = orderRepository.findDailyRevenueBetween(REVENUE_ORDER_STATUSES,
-  // startDateTime, endDateTime);
-  //
-  //        return results.stream()
-  //                .map(result -> {
-  //                    LocalDate date = null; // Khởi tạo là null
-  //                    if (result != null && result.length > 0 && result[0] != null) { // Kiểm tra
-  // null an toàn hơn
-  //                        if (result[0] instanceof java.sql.Date) { // *** Kiểm tra instanceof
-  // java.sql.Date ***
-  //                            date = ((java.sql.Date) result[0]).toLocalDate(); // *** Ép kiểu
-  // sang java.sql.Date ***
-  //                        } else if (result[0] instanceof String) {
-  //                            try { // Thêm try-catch cho parse
-  //                                date = LocalDate.parse((String) result[0]);
-  //                            } catch (Exception e) {
-  //                                log.warn("Could not parse date string: {}", result[0], e);
-  //                            }
-  //                        } else if (result[0] instanceof java.util.Date) { // Xử lý trường hợp là
-  // java.util.Date (ít gặp hơn từ DB function)
-  //                            date = new java.sql.Date(((java.util.Date)
-  // result[0]).getTime()).toLocalDate();
-  //                        } else {
-  //                            log.warn("Unexpected date type returned from query: {}",
-  // result[0].getClass().getName());
-  //                        }
-  //                    }
-  //
-  //                    if (date != null && result.length > 1 && result[1] instanceof BigDecimal) {
-  // // Kiểm tra null cho date và kiểu của value
-  //                        BigDecimal revenue = (BigDecimal) result[1];
-  //                        return new TimeSeriesDataPoint<>(date, revenue);
-  //                    } else {
-  //                        log.warn("Skipping data point due to null date or invalid revenue value:
-  // date={}, value={}", date, result != null && result.length > 1 ? result[1] : "N/A");
-  //                        return null; // Trả về null nếu không hợp lệ
-  //                    }
-  //                })
-  //                .filter(Objects::nonNull) // Lọc bỏ các điểm dữ liệu null
-  //                .collect(Collectors.toList());
-  //    }
 
   @Override
   public List<TimeSeriesDataPoint<BigDecimal>> getDailyRevenueForAdminChart(
@@ -416,50 +366,6 @@ public class DashboardServiceImpl implements DashboardService {
         .collect(Collectors.toList());
   }
 
-  //    @Override
-  //    public List<TimeSeriesDataPoint<Long>> getDailyOrderCountForAdminChart(LocalDate startDate,
-  // LocalDate endDate) {
-  //        LocalDateTime startDateTime = startDate.atStartOfDay();
-  //        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
-  //        List<Object[]> results = orderRepository.findDailyOrderCountBetween(startDateTime,
-  // endDateTime);
-  //
-  //        return results.stream()
-  //                .map(result -> {
-  //                    LocalDate date = null;
-  //                    if (result != null && result.length > 0 && result[0] != null) {
-  //                        if (result[0] instanceof java.sql.Date) { // *** Kiểm tra instanceof
-  // java.sql.Date ***
-  //                            date = ((java.sql.Date) result[0]).toLocalDate(); // *** Ép kiểu
-  // sang java.sql.Date ***
-  //                        } else if (result[0] instanceof String) {
-  //                            try {
-  //                                date = LocalDate.parse((String) result[0]);
-  //                            } catch (Exception e) {
-  //                                log.warn("Could not parse date string: {}", result[0], e);
-  //                            }
-  //                        } else if (result[0] instanceof java.util.Date) {
-  //                            date = new java.sql.Date(((java.util.Date)
-  // result[0]).getTime()).toLocalDate();
-  //                        } else {
-  //                            log.warn("Unexpected date type returned from query: {}",
-  // result[0].getClass().getName());
-  //                        }
-  //                    }
-  //
-  //                    if (date != null && result.length > 1 && result[1] instanceof Long) { //
-  // Kiểm tra null và kiểu Long
-  //                        Long count = (Long) result[1];
-  //                        return new TimeSeriesDataPoint<>(date, count);
-  //                    } else {
-  //                        log.warn("Skipping data point due to null date or invalid count value:
-  // date={}, value={}", date, result != null && result.length > 1 ? result[1] : "N/A");
-  //                        return null;
-  //                    }
-  //                })
-  //                .filter(Objects::nonNull)
-  //                .collect(Collectors.toList());
-  //    }
 
   @Override
   public List<TimeSeriesDataPoint<Long>> getDailyOrderCountForAdminChart(

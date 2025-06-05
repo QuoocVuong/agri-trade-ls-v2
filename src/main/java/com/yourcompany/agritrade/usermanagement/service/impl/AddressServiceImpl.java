@@ -135,7 +135,7 @@ public class AddressServiceImpl implements AddressService {
         addressRepository.save(newDefault);
       } else {
         // Nếu đây là địa chỉ cuối cùng, không nên xóa? Hoặc cho phép xóa.
-        // throw new BadRequestException("Cannot delete the last address.");
+         throw new BadRequestException("Cannot delete the last address.");
       }
     }
 

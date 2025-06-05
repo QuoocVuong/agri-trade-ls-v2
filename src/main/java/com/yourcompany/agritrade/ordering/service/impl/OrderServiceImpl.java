@@ -67,14 +67,14 @@ import org.springframework.util.StringUtils;
 public class OrderServiceImpl implements OrderService {
 
   private final OrderRepository orderRepository;
-  private final OrderItemRepository orderItemRepository;
+
   private final PaymentRepository paymentRepository;
   private final CartItemRepository cartItemRepository;
   private final ProductRepository productRepository;
   private final UserRepository userRepository;
   private final AddressRepository addressRepository;
   private final OrderMapper orderMapper;
-  private final EmailService emailService;
+
   private final NotificationService notificationService;
   private final FarmerProfileRepository farmerProfileRepository;
 
@@ -325,9 +325,7 @@ public class OrderServiceImpl implements OrderService {
         log.info(
             "Order {} created successfully for farmer {}", savedOrder.getOrderCode(), farmerId);
 
-        // Gửi email xác nhận (bất đồng bộ)
-        // emailService.sendOrderConfirmationEmail(savedOrder);
-        // EmailService
+
       } else {
         log.info(
             "No valid items found for farmer {}. Skipping order creation for this farmer.",
@@ -399,13 +397,11 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
               Specification.anyOf(
                   OrderSpecifications.hasOrderCode(keyword),
                   OrderSpecifications.hasBuyerName(keyword),
-                  OrderSpecifications.hasFarmerName(keyword) // Cần tạo spec này
+                  OrderSpecifications.hasFarmerName(keyword)
                   ));
     }
 
-    // Fetch thông tin cần thiết cho OrderSummaryResponse
-    // spec = spec.and(OrderSpecifications.fetchBuyerAndFarmerSummary()); // Đã có trong
-    // OrderRepository
+
     Page<Order> orderPage = orderRepository.findAll(spec, pageable); // Dùng findAll với Spec
     return orderMapper.toOrderSummaryResponsePage(orderPage);
   }
@@ -520,129 +516,9 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     return getOrderDetailsForAdmin(orderId); // Load lại đầy đủ để trả về
   }
 
-//  @Override
-//  @Transactional
-//  @Retryable(
-//      retryFor = {
-//        OptimisticLockingFailureException.class,
-//        ObjectOptimisticLockingFailureException.class
-//      },
-//      maxAttempts = 3,
-//      backoff = @Backoff(delay = 100))
-//  public OrderResponse cancelOrder(Authentication authentication, Long orderId) {
-//    User user = SecurityUtils.getCurrentAuthenticatedUser();
-//    Order order =
-//        orderRepository
-//            .findById(orderId)
-//            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-//
-//    boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_ADMIN);
-//    // Buyer có thể là Consumer hoặc Business Buyer
-//    boolean isBuyer =
-//        user.getRoles().stream()
-//            .anyMatch(
-//                r ->
-//                    r.getName() == RoleType.ROLE_CONSUMER
-//                        || r.getName() == RoleType.ROLE_BUSINESS_BUYER);
-//
-//    // Kiểm tra quyền hủy
-//    if (!isAdmin && !(isBuyer && order.getBuyer().getId().equals(user.getId()))) {
-//      throw new AccessDeniedException("User does not have permission to cancel this order");
-//    }
-//
-//    // Kiểm tra trạng thái cho phép hủy
-//    if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
-//      throw new BadRequestException(
-//          "Order cannot be cancelled in its current status: " + order.getStatus());
-//    }
-//
-//    //        // Hoàn trả tồn kho (Cần xử lý cẩn thận race condition)
-//    //        // Load lại OrderItems nếu là LAZY fetch
-//    //        List<OrderItem> itemsToRestore = orderItemRepository.findByOrderId(orderId);
-//    //        for (OrderItem item : itemsToRestore) {
-//    //            Product product = productRepository.findById(item.getProduct().getId())
-//    //                    .orElse(null); // Lấy lại product mới nhất
-//    //            if (product != null) {
-//    //                product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
-//    //                productRepository.save(product); // Save lại product
-//    //            } else {
-//    //                log.warn("Product with id {} not found while trying to restore stock for
-//    // cancelled order {}", item.getProduct().getId(), orderId);
-//    //            }
-//    //        }
-//
-//    // *** Hoàn trả tồn kho (Cải thiện với Optimistic Lock) ***
-//    List<OrderItem> itemsToRestore =
-//        orderItemRepository.findByOrderId(orderId); // Lấy các item của đơn hàng
-//    for (OrderItem item : itemsToRestore) {
-//      // Lấy product ID và số lượng cần hoàn trả
-//      Long productId = item.getProduct().getId();
-//      int quantityToRestore = item.getQuantity();
-//
-//      // Tải lại Product trong transaction để lấy version mới nhất
-//      Product product =
-//          productRepository.findById(productId).orElse(null); // Có thể sản phẩm đã bị xóa vật lý?
-//
-//      if (product != null) {
-//        log.debug(
-//            "Restoring stock for product {}: current={}, restoring={}",
-//            productId,
-//            product.getStockQuantity(),
-//            quantityToRestore);
-//        product.setStockQuantity(product.getStockQuantity() + quantityToRestore);
-//        try {
-//          productRepository.saveAndFlush(
-//              product); // Save và flush ngay để phát hiện xung đột sớm (nếu có)
-//        } catch (OptimisticLockingFailureException e) {
-//          log.warn(
-//              "Optimistic lock failed while restoring stock for product {} in order {}. Retrying...",
-//              productId,
-//              orderId);
-//          throw e; // Ném lại exception để @Retryable bắt và thử lại
-//        } catch (Exception e) {
-//          log.error(
-//              "Error saving product {} while restoring stock for order {}", productId, orderId, e);
-//          // Quyết định xử lý tiếp hay dừng lại? Có thể throw lỗi nghiêm trọng hơn.
-//          throw new RuntimeException("Failed to restore stock for product " + productId, e);
-//        }
-//      } else {
-//        log.warn(
-//            "Product with id {} not found while trying to restore stock for cancelled order {}",
-//            productId,
-//            orderId);
-//        // Cần quyết định: Bỏ qua hay báo lỗi?
-//      }
-//    }
-//
-//    order.setStatus(OrderStatus.CANCELLED);
-//    // Cập nhật trạng thái thanh toán
-//    if (order.getPaymentStatus() == PaymentStatus.PAID) {
-//      order.setPaymentStatus(PaymentStatus.REFUNDED);
-//      // TODO: Xử lý hoàn tiền thực tế
-//      log.info(
-//          "Order {} cancelled, payment status set to REFUNDED. Manual refund may be required.",
-//          orderId);
-//    } else if (order.getPaymentStatus() == PaymentStatus.PENDING
-//        || order.getPaymentStatus() == PaymentStatus.AWAITING_PAYMENT_TERM) {
-//      order.setPaymentStatus(PaymentStatus.FAILED); // Hoặc một trạng thái hủy khác
-//    }
-//
-//    //        Order cancelledOrder = orderRepository.save(order);
-//    orderRepository.save(order); // Lưu trạng thái cuối cùng của Order
-//    log.info("Order {} cancelled by user {}", orderId, user.getId());
-//    //        // TODO: Gửi thông báo hủy đơn
-//    //
-//    //        return getOrderDetailsForAdmin(orderId); // Load lại đầy đủ
-//    // Gửi thông báo hủy đơn
-//    notificationService.sendOrderCancellationNotification(order); // Gọi hàm gửi thông báo
-//
-//    // Load lại đầy đủ thông tin và map để trả về
-//    Order cancelledOrderFull = orderRepository.findByIdWithDetails(orderId).orElseThrow();
-//    return orderMapper.toOrderResponse(cancelledOrderFull);
-//  }
 
   @Override
-  @Transactional // Giữ transaction mặc định (REQUIRED)
+  @Transactional
   @Retryable(
           retryFor = {
                   OptimisticLockingFailureException.class,
@@ -710,10 +586,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     }
   }
 
-  // Đánh dấu phương thức này với @Transactional(propagation = Propagation.REQUIRES_NEW)
-  // nếu bạn muốn việc hoàn kho là một transaction độc lập và commit ngay cả khi
-  // transaction chính của cancelOrder rollback (tuy nhiên, điều này thường không mong muốn).
-  // Thông thường, để mặc định (Propagation.REQUIRED) là đủ.
+
   @Transactional // Sẽ tham gia vào transaction của cancelOrder
   protected void restoreStockForCancelledOrder(Order order) {
     if (order.getOrderItems() == null || order.getOrderItems().isEmpty()) {
@@ -729,7 +602,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
       Long productId = item.getProduct().getId();
       int quantityToRestore = item.getQuantity();
 
-      // Tải lại Product trong transaction để lấy version mới nhất và khóa (nếu dùng pessimistic lock)
+      // Tải lại Product trong transaction để lấy version mới nhất và khóa
       // Hoặc dựa vào optimistic lock với @Version trên Product entity
       Product product = productRepository.findById(productId)
               .orElse(null); // Không ném lỗi ngay, xử lý ở dưới
@@ -756,8 +629,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
           // Quyết định nghiệp vụ:
           // 1. Ném lỗi, rollback toàn bộ cancelOrder:
           throw new RuntimeException("Failed to restore stock for product " + productId + ". Order cancellation failed.", e);
-          // 2. Log lỗi và tiếp tục (có thể dẫn đến tồn kho không nhất quán):
-          // log.error("Critical: Failed to restore stock for product {}, but order cancellation will proceed.", productId);
+
         }
       } else {
         log.warn("Product with id {} not found while trying to restore stock for cancelled order {}. Stock for this item cannot be restored.",
@@ -765,8 +637,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
         // Quyết định nghiệp vụ:
         // 1. Ném lỗi, rollback toàn bộ cancelOrder:
          throw new IllegalStateException("Product " + productId + " associated with order item " + item.getId() + " not found. Cannot cancel order.");
-        // 2. Log lỗi và tiếp tục (chấp nhận rủi ro tồn kho không được hoàn trả cho sản phẩm này):
-        // log.error("Critical: Product {} not found. Stock for item {} in order {} will not be restored.", productId, item.getId(), order.getOrderCode());
+
       }
     }
   }
@@ -823,7 +694,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
               });
       log.info("Order {} cancelled. Payment status set to FAILED as it was pending or awaiting term.", order.getOrderCode());
     }
-    // Các trường hợp khác (ví dụ: FAILED sẵn rồi) thì có thể không cần thay đổi PaymentStatus của Order.
+
   }
 
   // Helper để lấy PaymentGatewayService tương ứng
@@ -955,11 +826,6 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
       } else {
         // B2B nội tỉnh -> Áp dụng phí nội tỉnh
         log.debug("Calculating B2B intra-province shipping fee for order type {}", orderType);
-        // double totalWeightKg = calculateTotalWeight(items); // Tính trọng lượng nếu cần
-        // BigDecimal weightFee =
-        // FEE_PER_KG_INTRA.multiply(BigDecimal.valueOf(totalWeightKg)).setScale(0,
-        // RoundingMode.CEILING);
-        // return INTRA_PROVINCE_FEE.add(weightFee).max(BigDecimal.ZERO);
         return INTRA_PROVINCE_FEE; // Trả về phí B2B nội tỉnh
       }
     }
@@ -968,25 +834,17 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     if (isIntraProvinceShipment) {
       // B2C nội tỉnh
       log.debug("Calculating B2C intra-province shipping fee for order type {}", orderType);
-      // double totalWeightKg = calculateTotalWeight(items); // Tính trọng lượng nếu cần
-      // BigDecimal weightFee =
-      // FEE_PER_KG_INTRA.multiply(BigDecimal.valueOf(totalWeightKg)).setScale(0,
-      // RoundingMode.CEILING);
-      // return INTRA_PROVINCE_FEE.add(weightFee).max(BigDecimal.ZERO);
+
       return INTRA_PROVINCE_FEE; // Trả về phí B2C nội tỉnh
     } else {
       // B2C ngoại tỉnh
       log.debug("Calculating B2C inter-province shipping fee for order type {}", orderType);
-      // double totalWeightKg = calculateTotalWeight(items); // Tính trọng lượng nếu cần
-      // BigDecimal weightFee =
-      // FEE_PER_KG_INTER.multiply(BigDecimal.valueOf(totalWeightKg)).setScale(0,
-      // RoundingMode.CEILING);
-      // return INTER_PROVINCE_FEE.add(weightFee).max(BigDecimal.ZERO);
+
       return INTER_PROVINCE_FEE; // Trả về phí B2C ngoại tỉnh
     }
   }
 
-  // (Tùy chọn) Tách hàm tính tổng trọng lượng
+  // Tách hàm tính tổng trọng lượng
   private double calculateTotalWeight(List<CartItem> items) {
     double totalWeightKg = 0;
     for (CartItem item : items) {
@@ -998,7 +856,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     return totalWeightKg;
   }
 
-  // (Tùy chọn) Tách hàm tính subTotal
+  // Tách hàm tính subTotal
   private BigDecimal calculateSubTotal(List<CartItem> items, OrderType orderType) {
     BigDecimal subTotal = BigDecimal.ZERO;
     for (CartItem cartItem : items) {
@@ -1071,8 +929,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
 
     switch (current) {
       case PENDING:
-        // Từ PENDING: Admin/Farmer có thể CONFIRMED, Admin/Buyer có thể CANCELLED (Buyer gọi API
-        // riêng)
+        // Từ PENDING: Admin/Farmer có thể CONFIRMED, Admin/Buyer có thể CANCELLED
         return next == OrderStatus.CONFIRMED && (isAdmin || isFarmer);
         // Việc cancel sẽ xử lý ở API cancelOrder
       case CONFIRMED:

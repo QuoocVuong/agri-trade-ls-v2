@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// Khóa chính là UserFollowId (lớp lồng) nhưng JpaRepository vẫn dùng kiểu của Entity và ID class
+
 public interface UserFollowRepository extends JpaRepository<UserFollow, UserFollow.UserFollowId> {
 
   // Kiểm tra xem user A có đang follow user B không

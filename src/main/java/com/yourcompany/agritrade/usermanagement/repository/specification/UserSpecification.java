@@ -10,9 +10,8 @@ import org.springframework.util.StringUtils;
 public class UserSpecification {
 
   public static Specification<User> isNotDeleted() {
-    // Chỉ cần thiết nếu User entity không có @Where
-    // return (root, query, cb) -> cb.isFalse(root.get("isDeleted"));
-    return (root, query, cb) -> cb.conjunction(); // Trả về true nếu đã có @Where
+
+    return (root, query, cb) -> cb.conjunction();
   }
 
   public static Specification<User> hasRole(RoleType roleName) {
@@ -52,11 +51,9 @@ public class UserSpecification {
       if (status == null) {
         return cb.conjunction();
       }
-      // Cần join với FarmerProfile để lọc theo trạng thái duyệt
-      // Đảm bảo User có quan hệ @OneToOne(mappedBy="user") đến FarmerProfile
-      // Hoặc join trực tiếp từ FarmerProfile nếu query từ FarmerProfileRepo
+
       Join<User, FarmerProfile> profileJoin =
-          root.join("farmerProfile", JoinType.LEFT); // Giả sử tên field là farmerProfile
+          root.join("farmerProfile", JoinType.LEFT);
       return cb.equal(profileJoin.get("verificationStatus"), status);
     };
   }

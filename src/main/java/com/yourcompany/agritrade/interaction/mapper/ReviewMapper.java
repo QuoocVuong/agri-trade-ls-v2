@@ -17,7 +17,7 @@ import org.springframework.data.domain.Page;
 public interface ReviewMapper {
 
   // Map Review entity sang ReviewResponse DTO
-  // @Mapping(target = "productId", source = "product.id") // Lấy ID từ product entity lồng nhau
+
   @Mapping(target = "orderId", source = "order.id") // Lấy ID từ order entity lồng nhau
   @Mapping(
       target = "consumer",
@@ -45,5 +45,5 @@ public interface ReviewMapper {
   @Mapping(target = "updatedAt", ignore = true)
   Review requestToReview(ReviewRequest request);
 
-  // Có thể thêm phương thức update nếu cho phép sửa review
+
 }

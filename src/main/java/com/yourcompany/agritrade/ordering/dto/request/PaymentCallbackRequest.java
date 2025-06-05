@@ -12,5 +12,5 @@ public class PaymentCallbackRequest {
   private BigDecimal amount; // Số tiền giao dịch
   private String signature; // Chữ ký để xác thực (ví dụ)
   private String errorMessage; // Thông báo lỗi nếu thất bại
-  // Thêm các trường khác mà cổng thanh toán trả về
+
 }

@@ -59,8 +59,8 @@ public class OrderController {
   @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')")
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsBuyer(
       Authentication authentication,
-      @RequestParam(required = false) String keyword, // THÊM
-      @RequestParam(required = false) String status, // THÊM (nhận là String)
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String status,
       @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
     OrderStatus statusEnum = null;
@@ -68,8 +68,7 @@ public class OrderController {
       try {
         statusEnum = OrderStatus.valueOf(status.toUpperCase());
       } catch (IllegalArgumentException e) {
-        // log.warn("Invalid order status value received: {}", status);
-        // Có thể trả về lỗi BadRequest hoặc bỏ qua filter này
+
       }
     }
     Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsBuyer(authentication,keyword,statusEnum, pageable);
@@ -81,7 +80,7 @@ public class OrderController {
   public ResponseEntity<ApiResponse<OrderResponse>> getMyOrderDetailsById(
       Authentication authentication, @PathVariable Long orderId) {
     OrderResponse order =
-        orderService.getOrderDetails(authentication, orderId); // Service đã kiểm tra quyền
+        orderService.getOrderDetails(authentication, orderId);
     return ResponseEntity.ok(ApiResponse.success(order));
   }
 
@@ -90,7 +89,7 @@ public class OrderController {
   public ResponseEntity<ApiResponse<OrderResponse>> getMyOrderDetailsByCode(
       Authentication authentication, @PathVariable String orderCode) {
     OrderResponse order =
-        orderService.getOrderDetailsByCode(authentication, orderCode); // Service đã kiểm tra quyền
+        orderService.getOrderDetailsByCode(authentication, orderCode);
     return ResponseEntity.ok(ApiResponse.success(order));
   }
 
@@ -100,7 +99,7 @@ public class OrderController {
   public ResponseEntity<ApiResponse<OrderResponse>> cancelMyOrder(
       Authentication authentication, @PathVariable Long orderId) {
     OrderResponse cancelledOrder =
-        orderService.cancelOrder(authentication, orderId); // Service kiểm tra quyền và trạng thái
+        orderService.cancelOrder(authentication, orderId);
     return ResponseEntity.ok(ApiResponse.success(cancelledOrder, "Order cancelled successfully"));
   }
 
@@ -109,9 +108,9 @@ public class OrderController {
   public ResponseEntity<ApiResponse<OrderCalculationResponse>> calculateOrderTotals(
       Authentication authentication,
       @RequestBody(required = false)
-          OrderCalculationRequest request // DTO chứa thông tin cần thiết (vd: addressId, voucher)
+          OrderCalculationRequest request
       ) {
-    // Nếu request null, có thể lấy thông tin từ giỏ hàng mặc định
+
     OrderCalculationResponse totals = orderService.calculateOrderTotals(authentication, request);
     return ResponseEntity.ok(ApiResponse.success(totals));
   }
@@ -122,7 +121,7 @@ public class OrderController {
           Authentication authentication,
           @PathVariable Long orderId,
           @RequestParam PaymentMethod paymentMethod,
-          HttpServletRequest httpServletRequest) { // Vẫn cần HttpServletRequest để truyền xuống service
+          HttpServletRequest httpServletRequest) {
     // Gọi phương thức mới trong OrderService
     PaymentUrlResponse paymentUrlResponse = orderService.createPaymentUrl(authentication, orderId, paymentMethod, httpServletRequest);
     return ResponseEntity.ok(ApiResponse.success(paymentUrlResponse));
@@ -136,7 +135,7 @@ public class OrderController {
         orderService.getBankTransferInfoForOrder(orderId, authentication);
     return ResponseEntity.ok(ApiResponse.success(transferInfo));
   }
-  // **************************************************
+
 
   @PostMapping("/agreed-order")
   @PreAuthorize("hasAnyRole('FARMER')") // Ví dụ: Chỉ Admin hoặc Farmer được tạo

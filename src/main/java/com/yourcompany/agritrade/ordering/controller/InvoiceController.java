@@ -21,14 +21,13 @@ import org.springframework.web.bind.annotation.*;
 public class InvoiceController {
 
   private final InvoiceService invoiceService;
-  private final OrderRepository orderRepository; // Inject để lấy Order
+  private final OrderRepository orderRepository;
   private final InvoiceRepository invoiceRepository;
 
   // Endpoint tải hóa đơn theo Order ID
   @GetMapping("/orders/{orderId}/invoice/download")
   @PreAuthorize("isAuthenticated()") // Yêu cầu đăng nhập
   public ResponseEntity<InputStreamResource> downloadInvoiceByOrderId(@PathVariable Long orderId) {
-    // TODO: Thêm kiểm tra quyền truy cập vào orderId này (user là buyer/farmer hoặc admin)
 
     Order order =
         orderRepository
@@ -52,14 +51,13 @@ public class InvoiceController {
         .body(new InputStreamResource(pdfInputStream));
   }
 
-  // (Tùy chọn) Endpoint tải hóa đơn theo Invoice ID
+  //  Endpoint tải hóa đơn theo Invoice ID
   @GetMapping("/invoices/{invoiceId}/download")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<InputStreamResource> downloadInvoiceById(@PathVariable Long invoiceId) {
-    // TODO: Kiểm tra quyền truy cập invoiceId
     Invoice invoice =
         invoiceRepository
-            .findById(invoiceId) // Cần inject InvoiceRepository
+            .findById(invoiceId)
             .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", invoiceId));
 
     ByteArrayInputStream pdfInputStream = invoiceService.generateInvoicePdf(invoiceId);

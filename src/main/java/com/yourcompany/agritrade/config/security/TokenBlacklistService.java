@@ -40,8 +40,7 @@ public class TokenBlacklistService {
         log.info("JTI {} added to blacklist with TTL: {} ms", jti, ttlMillis);
       } catch (Exception e) {
         log.error("Error adding JTI {} to Redis blacklist: {}", jti, e.getMessage(), e);
-        // Cân nhắc xử lý lỗi này, ví dụ: nếu Redis không hoạt động, logout có thể không hiệu quả
-        // 100%
+
       }
     } else {
       log.warn(
@@ -65,9 +64,6 @@ public class TokenBlacklistService {
       return Boolean.TRUE.equals(isBlacklisted);
     } catch (Exception e) {
       log.error("Error checking JTI {} in Redis blacklist: {}", jti, e.getMessage(), e);
-      // Trong trường hợp lỗi kết nối Redis, để an toàn, có thể coi là không bị blacklist
-      // hoặc ném lỗi để ngăn chặn truy cập nếu chính sách bảo mật yêu cầu.
-      // Hiện tại, trả về false để không block người dùng nếu Redis lỗi.
       return false;
     }
   }

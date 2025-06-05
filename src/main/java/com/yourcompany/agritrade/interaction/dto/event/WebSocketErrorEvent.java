@@ -10,5 +10,5 @@ import lombok.NoArgsConstructor;
 public class WebSocketErrorEvent {
   private String error;
   private String message;
-  // Có thể thêm context khác nếu cần
+
 }

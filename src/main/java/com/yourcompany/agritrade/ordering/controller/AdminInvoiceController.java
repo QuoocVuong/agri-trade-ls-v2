@@ -30,5 +30,5 @@ public class AdminInvoiceController {
         return ResponseEntity.ok(ApiResponse.success(invoices));
     }
 
-    // Các endpoint khác cho admin quản lý invoice nếu cần (ví dụ: cập nhật trạng thái VOID)
+
 }

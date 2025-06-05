@@ -53,12 +53,12 @@ public class AdminCatalogController {
   // --- Product Management & Approval ---
   @GetMapping("/products")
   public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> getAllProductsForAdmin(
-      @RequestParam(required = false) String keyword, // THÊM KEYWORD
+      @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) Integer categoryId,
       @RequestParam(required = false) Long farmerId,
       @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
-    // Gọi phương thức đã implement trong ProductService
+
     Page<ProductSummaryResponse> products =
         productService.getAllProductsForAdmin(keyword, status, categoryId, farmerId, pageable);
     return ResponseEntity.ok(ApiResponse.success(products));
@@ -67,14 +67,14 @@ public class AdminCatalogController {
   @GetMapping("/products/{id}")
   public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductByIdForAdmin(
       @PathVariable Long id) {
-    // Gọi phương thức đã implement trong ProductService
+
     ProductDetailResponse product = productService.getProductByIdForAdmin(id);
     return ResponseEntity.ok(ApiResponse.success(product));
   }
 
   @PostMapping("/products/{id}/approve")
   public ResponseEntity<ApiResponse<ProductDetailResponse>> approveProduct(@PathVariable Long id) {
-    // Gọi phương thức đã implement trong ProductService
+
     ProductDetailResponse product = productService.approveProduct(id);
     return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_JSON) // Thêm Content-Type
@@ -84,16 +84,16 @@ public class AdminCatalogController {
   @PostMapping("/products/{id}/reject")
   public ResponseEntity<ApiResponse<ProductDetailResponse>> rejectProduct(
       @PathVariable Long id,
-      @RequestBody(required = false) ProductRejectRequest request) { // Dùng DTO
+      @RequestBody(required = false) ProductRejectRequest request) {
     String reason = (request != null) ? request.getReason() : null;
-    // Gọi phương thức đã implement trong ProductService
+
     ProductDetailResponse product = productService.rejectProduct(id, reason);
     return ResponseEntity.ok(ApiResponse.success(product, "Product rejected successfully"));
   }
 
   @DeleteMapping("/products/{id}/force")
   public ResponseEntity<ApiResponse<Void>> forceDeleteProduct(@PathVariable Long id) {
-    // Gọi phương thức đã implement trong ProductService
+
     productService.forceDeleteProduct(id);
     return ResponseEntity.ok(ApiResponse.success("Product permanently deleted"));
   }

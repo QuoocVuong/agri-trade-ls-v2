@@ -12,7 +12,7 @@ import org.springframework.util.StringUtils;
 
 public class ProductSpecifications {
 
-  // ****** THÊM PHƯƠNG THỨC NÀY ******
+
   public static Specification<Product> fetchFarmerAndProfile() {
     return (root, query, cb) -> {
       // Chỉ thực hiện fetch khi query không phải là count query
@@ -23,12 +23,12 @@ public class ProductSpecifications {
         // Fetch farmerProfile từ farmer đã fetch
         farmerFetch.fetch("farmerProfile", JoinType.LEFT); // LEFT vì farmer có thể chưa có profile
       }
-      // Trả về một Predicate luôn đúng để không ảnh hưởng đến điều kiện WHERE
+      // Trả về một Predicate luôn đúng
       return cb.conjunction();
     };
   }
 
-  // **********************************
+
 
   // Specification: Lấy sản phẩm có trạng thái PUBLISHED
   public static Specification<Product> isPublished() {
@@ -45,8 +45,6 @@ public class ProductSpecifications {
       String pattern = "%" + keyword.toLowerCase() + "%";
       // Tạo biểu thức OR cho tìm kiếm trong name hoặc description
       Predicate nameLike = criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), pattern);
-      //            Predicate descriptionLike =
-      // criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), pattern);
       Predicate descriptionLike =
           criteriaBuilder.like(root.get("description"), "%" + keyword + "%");
       return criteriaBuilder.or(nameLike, descriptionLike);
@@ -63,7 +61,6 @@ public class ProductSpecifications {
       Join<Product, Category> categoryJoin =
           root.join("category", JoinType.INNER); // Dùng INNER JOIN
       return criteriaBuilder.equal(categoryJoin.get("id"), categoryId);
-      // Lưu ý: Lọc theo danh mục con cần logic phức tạp hơn
     };
   }
 
@@ -77,7 +74,7 @@ public class ProductSpecifications {
     };
   }
 
-  // --- THÊM CÁC SPECIFICATIONS MỚI ---
+
   public static Specification<Product> hasMinPrice(BigDecimal minPrice) {
     if (minPrice == null) {
       return null;
@@ -95,7 +92,7 @@ public class ProductSpecifications {
   }
 
   public static Specification<Product> hasMinRating(Double minRating) {
-    // Giả sử Product entity có trường 'averageRating' kiểu Double
+
     if (minRating == null || minRating <= 0) { // Không lọc nếu rating <= 0
       return null;
     }
@@ -103,7 +100,7 @@ public class ProductSpecifications {
         criteriaBuilder.greaterThanOrEqualTo(root.get("averageRating"), minRating);
   }
 
-  // ------------------------------------
+
 
   // Specification: Lọc theo trạng thái (dùng cho Admin)
   public static Specification<Product> hasStatus(String statusString) {
@@ -116,7 +113,7 @@ public class ProductSpecifications {
             ProductStatus.valueOf(statusString.toUpperCase()); // Chuyển string thành Enum
         return criteriaBuilder.equal(root.get("status"), status);
       } catch (IllegalArgumentException e) {
-        // Nếu statusString không hợp lệ, trả về điều kiện không khớp với bản ghi nào
+
         return criteriaBuilder.disjunction(); // Điều kiện luôn sai
       }
     };
@@ -146,11 +143,5 @@ public class ProductSpecifications {
     };
   }
 
-  // (Optional) Specification: Lọc sản phẩm chưa bị xóa mềm (nếu không dùng @Where)
-  /*
-  public static Specification<Product> isNotDeleted() {
-      return (root, query, criteriaBuilder) ->
-              criteriaBuilder.isFalse(root.get("isDeleted"));
-  }
-  */
+
 }

@@ -31,16 +31,16 @@ public class EmailServiceImpl implements EmailService {
   @Value("${spring.mail.username}")
   private String senderEmail;
 
-  @Value("${app.mail.from}") // <--- THÊM DÒNG NÀY ĐỂ LẤY ĐÚNG EMAIL NGƯỜI GỬI
+  @Value("${app.mail.from}")
   private String appMailFrom;
 
-  @Value("${app.mail.sender-name}") // <--- THÊM DÒNG NÀY ĐỂ LẤY TÊN NGƯỜI GỬI
+  @Value("${app.mail.sender-name}")
   private String appMailSenderName;
 
   @Value("${app.frontend.url:http://localhost:4200}")
   private String frontendUrl;
 
-  @Value("${app.name:AgriTrade}") // Thêm tên ứng dụng vào config
+  @Value("${app.name:AgriTrade}")
   private String appName;
 
   // --- User Related ---
@@ -78,7 +78,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("appName", appName);
     context.setVariable("loginUrl", frontendUrl + "/auth/login"); // Ví dụ link đăng nhập
     String htmlBody =
-        thymeleafTemplateEngine.process("mail/welcome", context); // Cần tạo template này
+        thymeleafTemplateEngine.process("mail/welcome", context);
     sendHtmlEmail(subject, user.getEmail(), htmlBody);
   }
 
@@ -90,7 +90,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("username", user.getFullName());
     context.setVariable("appName", appName);
     String htmlBody =
-        thymeleafTemplateEngine.process("mail/password-changed", context); // Cần tạo template này
+        thymeleafTemplateEngine.process("mail/password-changed", context);
     sendHtmlEmail(subject, user.getEmail(), htmlBody);
   }
 
@@ -108,7 +108,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("appName", appName);
     String htmlBody =
         thymeleafTemplateEngine.process(
-            "mail/order-confirmation-buyer", context); // Cần tạo template này
+            "mail/order-confirmation-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -124,7 +124,7 @@ public class EmailServiceImpl implements EmailService {
         "orderUrl", frontendUrl + "/farmer/orders/" + order.getId()); // Link quản lý đơn hàng
     context.setVariable("appName", appName);
     String htmlBody =
-        thymeleafTemplateEngine.process("mail/new-order-farmer", context); // Cần tạo template này
+        thymeleafTemplateEngine.process("mail/new-order-farmer", context);
     sendHtmlEmail(subject, order.getFarmer().getEmail(), htmlBody);
   }
 
@@ -145,7 +145,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("appName", appName);
     String htmlBody =
         thymeleafTemplateEngine.process(
-            "mail/order-status-update-buyer", context); // Cần tạo template này
+            "mail/order-status-update-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -161,7 +161,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("appName", appName);
     String htmlBody =
         thymeleafTemplateEngine.process(
-            "mail/order-cancellation-buyer", context); // Cần tạo template này
+            "mail/order-cancellation-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -178,7 +178,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("appName", appName);
     String htmlBody =
         thymeleafTemplateEngine.process(
-            "mail/order-cancellation-farmer", context); // Cần tạo template này
+            "mail/order-cancellation-farmer", context);
     sendHtmlEmail(subject, order.getFarmer().getEmail(), htmlBody);
   }
 
@@ -196,7 +196,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("appName", appName);
     String htmlBody =
         thymeleafTemplateEngine.process(
-            "mail/payment-success-buyer", context); // Cần tạo template này
+            "mail/payment-success-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -224,7 +224,7 @@ public class EmailServiceImpl implements EmailService {
 
   @Override
   @Async("taskExecutor")
-  public void sendProductApprovedEmailToFarmer(Product product, User farmer) { // Thêm User farmer
+  public void sendProductApprovedEmailToFarmer(Product product, User farmer) {
     if (farmer == null || farmer.getEmail() == null) {
       log.error(
           "Cannot send product approved email. Farmer or farmer email is null for product ID: {}",
@@ -237,7 +237,7 @@ public class EmailServiceImpl implements EmailService {
       context.setVariable("productName", product.getName());
       context.setVariable("productUrl", frontendUrl + "/products/" + product.getSlug());
       context.setVariable("appName", appName);
-      // Thêm tên farmer vào context nếu template cần
+
       context.setVariable("farmerName", farmer.getFullName());
       String htmlBody = thymeleafTemplateEngine.process("mail/product-approved-farmer", context);
 
@@ -255,7 +255,7 @@ public class EmailServiceImpl implements EmailService {
   @Override
   @Async("taskExecutor")
   public void sendProductRejectedEmailToFarmer(
-      Product product, String reason, User farmer) { // Thêm User farmer
+      Product product, String reason, User farmer) {
     if (farmer == null || farmer.getEmail() == null) {
       log.error(
           "Cannot send product rejected email. Farmer or farmer email is null for product ID: {}",
@@ -300,7 +300,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("totalAmount", invoice.getTotalAmount());
     context.setVariable("orderUrl", frontendUrl + "/user/orders/" + invoice.getOrder().getId());
     context.setVariable("appName", appName);
-    // Cần tạo template: templates/mail/invoice-overdue-reminder.html
+
     String htmlBody = thymeleafTemplateEngine.process("mail/invoice-overdue-reminder", context);
     sendHtmlEmail(subject, buyer.getEmail(), htmlBody);
     log.info("Sent overdue invoice reminder email for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
@@ -323,7 +323,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("totalAmount", invoice.getTotalAmount());
     context.setVariable("orderUrl", frontendUrl + "/user/orders/" + invoice.getOrder().getId());
     context.setVariable("appName", appName);
-    // Cần tạo template: templates/mail/invoice-due-soon-reminder.html
+
     String htmlBody = thymeleafTemplateEngine.process("mail/invoice-due-soon-reminder", context);
     sendHtmlEmail(subject, buyer.getEmail(), htmlBody);
     log.info("Sent due soon invoice reminder email for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
@@ -345,7 +345,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("totalAmount", invoice.getTotalAmount());
     context.setVariable("adminOrderUrl", frontendUrl + "/admin/orders/" + (invoice.getOrder() != null ? invoice.getOrder().getId() : ""));
     context.setVariable("appName", appName);
-    // Cần tạo template: templates/mail/invoice-overdue-admin-alert.html
+
     String htmlBody = thymeleafTemplateEngine.process("mail/invoice-overdue-admin-alert", context);
 
     for (User admin : adminUsers) {
@@ -369,7 +369,7 @@ public class EmailServiceImpl implements EmailService {
       MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
       helper.setFrom(
           appMailFrom,
-          appMailSenderName); // Hoặc tên hiển thị: helper.setFrom(senderEmail, appName);
+          appMailSenderName);
       helper.setTo(recipientEmail);
       helper.setSubject(subject);
       helper.setText(htmlContent, true); // true = HTML content
@@ -377,8 +377,8 @@ public class EmailServiceImpl implements EmailService {
       log.info("HTML email sent successfully to {}", recipientEmail);
     } catch (MessagingException e) {
       log.error("Failed to send HTML email to {}: {}", recipientEmail, e.getMessage(), e);
-      // Xem xét việc throw exception hoặc đưa vào hàng đợi retry
-    } catch (Exception e) { // Bắt các lỗi khác (ví dụ: lỗi template)
+
+    } catch (Exception e) {
       log.error("Unexpected error sending email to {}: {}", recipientEmail, e.getMessage(), e);
     }
   }

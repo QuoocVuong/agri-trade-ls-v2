@@ -49,7 +49,7 @@ public class AuthController {
     ApiResponse<UserResponse> response =
         ApiResponse.created(
             createdUser,
-            "Registration successful. Please check your email to verify your account."); // Thay đổi
+            "Registration successful. Please check your email to verify your account.");
     // message
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
@@ -59,11 +59,11 @@ public class AuthController {
   public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam("token") String token) {
     boolean verified = userService.verifyEmail(token);
     if (verified) {
-      // Có thể redirect sang trang login của frontend hoặc trả về success
+
       return ResponseEntity.ok(
           ApiResponse.success("Email verified successfully. You can now login."));
     } else {
-      // Trường hợp này ít xảy ra nếu service ném exception
+
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
           .body(ApiResponse.badRequest("Email verification failed."));
     }
@@ -92,8 +92,8 @@ public class AuthController {
 
   @PostMapping("/refresh-token")
   public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(
-      @RequestBody String refreshToken) { // Nhận refresh token từ body
-    // Loại bỏ dấu ngoặc kép thừa nếu client gửi dạng JSON string: "\"your_token\""
+      @RequestBody String refreshToken) {
+
     String cleanRefreshToken = refreshToken.replace("\"", "");
     LoginResponse newTokens = userService.refreshToken(cleanRefreshToken);
     return ResponseEntity.ok(ApiResponse.success(newTokens, "Token refreshed successfully"));
@@ -123,9 +123,9 @@ public class AuthController {
     }
 
     String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-    userService.invalidateRefreshTokenForUser(userEmail); // << THÊM HÀM NÀY VÀO UserService
+    userService.invalidateRefreshTokenForUser(userEmail);
 
-    SecurityContextHolder.clearContext(); // Luôn xóa context bảo mật
+    SecurityContextHolder.clearContext();
     return ResponseEntity.ok(ApiResponse.success("Logout successful. Token has been invalidated."));
   }
 

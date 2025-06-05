@@ -31,20 +31,14 @@ public class ProductImage {
   private boolean isDefault = false;
 
   @Column(nullable = false)
-  private int displayOrder = 0; // Thêm trường thứ tự
+  private int displayOrder = 0;
 
-  @Column(length = 1024, nullable = false) // Độ dài phù hợp với blobPath
-  private String blobPath; // <<< THÊM TRƯỜNG NÀY
+  @Column(length = 1024, nullable = false)
+  private String blobPath;
 
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
-//  // Constructor cập nhật
-//  public ProductImage(String blobPath, boolean isDefault, int displayOrder) {
-//    // this.imageUrl = imageUrl;
-//    this.blobPath = blobPath;
-//    this.isDefault = isDefault;
-//    this.displayOrder = displayOrder;
-//  }
+
 }

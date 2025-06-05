@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('ADMIN')") // Yêu cầu quyền Admin
 public class AdminPermissionController {
 
-  private final PermissionService permissionService; // Inject service
+  private final PermissionService permissionService;
 
   @GetMapping
   public ResponseEntity<ApiResponse<List<PermissionResponse>>> getAllPermissions() {
@@ -37,7 +37,7 @@ public class AdminPermissionController {
   // --- THÊM CÁC ENDPOINT CRUD ---
 
   @PostMapping
-  @PreAuthorize("hasAuthority('PERMISSION_MANAGE') or hasRole('ADMIN')") // Ví dụ dùng permission
+  @PreAuthorize("hasAuthority('PERMISSION_MANAGE') or hasRole('ADMIN')") //  dùng permission
   public ResponseEntity<ApiResponse<PermissionResponse>> createPermission(
       @Valid @RequestBody PermissionRequest request) {
     PermissionResponse createdPermission = permissionService.createPermission(request);
@@ -61,5 +61,5 @@ public class AdminPermissionController {
     permissionService.deletePermission(id);
     return ResponseEntity.ok(ApiResponse.success("Permission deleted successfully."));
   }
-  // -----------------------------
+
 }

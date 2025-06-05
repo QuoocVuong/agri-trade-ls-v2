@@ -35,7 +35,7 @@ public class ChatMessage {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 10)
-  private MessageType messageType = MessageType.TEXT; // Tạo Enum này
+  private MessageType messageType = MessageType.TEXT;
 
   @Column(nullable = false, updatable = false)
   private LocalDateTime sentAt = LocalDateTime.now(); // Gán thời gian khi tạo

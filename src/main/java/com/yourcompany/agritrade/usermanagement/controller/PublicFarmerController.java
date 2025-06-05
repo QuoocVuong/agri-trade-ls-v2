@@ -36,14 +36,7 @@ public class PublicFarmerController {
     return ResponseEntity.ok(ApiResponse.success(featuredFarmers));
   }
 
-  // Có thể thêm các endpoint public khác liên quan đến farmer ở đây
-  // Ví dụ: API tìm kiếm/lọc farmer công khai
-  /*
-  @GetMapping
-  public ResponseEntity<ApiResponse<Page<FarmerSummaryResponse>>> searchPublicFarmers(...) {
-      // ...
-  }
-  */
+
   // ===== ENDPOINT MỚI CHO TÌM KIẾM/LỌC =====
   @GetMapping
   public ResponseEntity<ApiResponse<Page<FarmerSummaryResponse>>> searchPublicFarmers(

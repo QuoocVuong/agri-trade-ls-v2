@@ -23,10 +23,6 @@ public class Notification {
   @JoinColumn(name = "recipient_id", nullable = false)
   private User recipient; // Người nhận
 
-  // @ManyToOne(fetch = FetchType.LAZY)
-  // @JoinColumn(name = "sender_id")
-  // private User sender; // Người gửi (tùy chọn)
-
   @Lob // Cho message dài
   @Column(nullable = false, columnDefinition = "TEXT")
   private String message;

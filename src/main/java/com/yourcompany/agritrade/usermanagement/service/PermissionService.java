@@ -8,7 +8,7 @@ import java.util.List;
 public interface PermissionService {
   List<PermissionResponse> getAllPermissions();
 
-  // Có thể thêm các phương thức khác nếu cần CRUD Permissions
+
 
   // Thêm các phương thức mới
   PermissionResponse createPermission(PermissionRequest request);
@@ -17,5 +17,5 @@ public interface PermissionService {
 
   void deletePermission(Integer id);
 
-  PermissionResponse getPermissionById(Integer id); // Thêm hàm lấy theo ID nếu cần
+  PermissionResponse getPermissionById(Integer id);
 }

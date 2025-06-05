@@ -16,9 +16,8 @@ public class OrderSummaryResponse {
   private OrderStatus status;
   private PaymentStatus paymentStatus;
   private LocalDateTime createdAt;
-  // Có thể thêm thông tin tóm tắt về buyer/farmer nếu cần trong danh sách
-  private String buyerName; // Ví dụ
-  private String farmerName; // Ví dụ
-  // private UserResponse buyerSummary;
-  // private FarmerInfoResponse farmerSummary;
+
+  private String buyerName;
+  private String farmerName;
+
 }

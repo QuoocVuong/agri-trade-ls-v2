@@ -27,7 +27,7 @@ public class InvoiceScheduler {
     private final InvoiceRepository invoiceRepository;
     private final NotificationService notificationService;
     private final EmailService emailService;
-    private final UserRepository userRepository; // Inject UserRepository
+    private final UserRepository userRepository;
 
     @Value("${app.scheduler.invoice.cron}")
     private String invoiceSchedulerCron;
@@ -42,7 +42,7 @@ public class InvoiceScheduler {
 
     @Scheduled(cron = "${app.scheduler.invoice.cron}")
     @Transactional
-    public void checkInvoicesAndSendReminders() { // Đổi tên phương thức cho rõ ràng
+    public void checkInvoicesAndSendReminders() {
         log.info("Scheduled task: Checking invoices and sending reminders - START");
         LocalDate today = LocalDate.now();
 
@@ -52,7 +52,7 @@ public class InvoiceScheduler {
             log.warn("Invoice {} for order {} is overdue (Due date: {}). Marking as OVERDUE.",
                     invoice.getInvoiceNumber(), invoice.getOrder().getOrderCode(), invoice.getDueDate());
             invoice.setStatus(InvoiceStatus.OVERDUE);
-            // invoiceRepository.save(invoice); // Sẽ được save cuối transaction nếu có thay đổi
+
 
             User buyer = invoice.getOrder().getBuyer();
             if (buyer != null) {

@@ -164,30 +164,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         });
   }
 
-  //    @Override
-  //    @Transactional(readOnly = true)
-  //    public Page<UserProfileResponse> getAllFarmers(VerificationStatus verificationStatus, String
-  // keyword, Pageable pageable) {
-  //        // Dùng Specification để lọc User có role FARMER và các điều kiện khác
-  //        Specification<User> spec =
-  // Specification.where(UserSpecification.hasRole(RoleType.ROLE_FARMER))
-  //                .and(UserSpecification.hasKeyword(keyword))
-  //                .and(UserSpecification.hasFarmerVerificationStatus(verificationStatus)) // Thêm
-  // spec này
-  //                .and(UserSpecification.isNotDeleted());
   //
-  //        Page<User> farmerUsers = userRepository.findAll(spec, pageable);
-  //
-  //        // Map sang UserProfileResponse (cần lấy cả FarmerProfile)
-  //        return farmerUsers.map(user -> {
-  //            UserProfileResponse upr = userMapper.toUserProfileResponse(user);
-  //            // Lấy FarmerProfile (có thể gây N+1 nếu không tối ưu)
-  //            farmerProfileRepository.findById(user.getId()).ifPresent(profile ->
-  //                    upr.setFarmerProfile(farmerProfileMapper.toFarmerProfileResponse(profile))
-  //            );
-  //            return upr;
-  //        });
-  //    }
   @Override
   @Transactional(readOnly = true)
   public Page<UserProfileResponse> getAllFarmers(
@@ -286,8 +263,4 @@ public class AdminUserServiceImpl implements AdminUserService {
   }
 }
 
-// *** Cần tạo UserSpecification.java ***
-// (File: usermanagement/repository/specification/UserSpecification.java - Mới)
-/*
 
-*/

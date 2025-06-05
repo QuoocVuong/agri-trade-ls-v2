@@ -69,13 +69,13 @@ public class UserServiceImpl implements UserService {
   private final RoleRepository roleRepository;
   private final PasswordEncoder passwordEncoder;
   private final UserMapper userMapper;
-  private final FarmerProfileRepository farmerProfileRepository; // Inject repo mới
-  private final BusinessProfileRepository businessProfileRepository; // Inject repo mới
-  private final FarmerProfileMapper farmerProfileMapper; // Inject trực tiếp
-  private final BusinessProfileMapper businessProfileMapper; // Inject trực tiếp
+  private final FarmerProfileRepository farmerProfileRepository;
+  private final BusinessProfileRepository businessProfileRepository;
+  private final FarmerProfileMapper farmerProfileMapper;
+  private final BusinessProfileMapper businessProfileMapper;
   private final EmailService emailService;
   private final FarmerSummaryMapper farmerSummaryMapper;
-  private final JwtTokenProvider jwtTokenProvider; // Inject JWT provider
+  private final JwtTokenProvider jwtTokenProvider;
 
   private final JwtProperties jwtProperties;
 
@@ -93,9 +93,9 @@ public class UserServiceImpl implements UserService {
 
   @Override
   @Transactional
-  public UserResponse registerUser(UserRegistrationRequest registrationRequest) { // Đổi tên tham số
+  public UserResponse registerUser(UserRegistrationRequest registrationRequest) {
 
-    String email = registrationRequest.getEmail().toLowerCase(); // << CHUẨN HÓA EMAIL
+    String email = registrationRequest.getEmail().toLowerCase();
 
     // 1. Kiểm tra trùng lặp
     if (userRepository.existsByEmailIgnoringSoftDelete(email)) {
@@ -215,7 +215,7 @@ public class UserServiceImpl implements UserService {
     userRepository.save(user);
   }
 
-  // --- Implement các phương thức cho Admin nếu cần ---
+  //  Implement các phương thức cho Admin
 
   @Override
   @Transactional
@@ -436,7 +436,7 @@ public class UserServiceImpl implements UserService {
     // Có thể gửi email thông báo đổi mật khẩu thành công (tùy chọn)
   }
 
-  // ===== IMPLEMENT PHƯƠNG THỨC MỚI =====
+
   @Override
   @Transactional(readOnly = true)
   public List<FarmerSummaryResponse> getFeaturedFarmers(int limit) {
@@ -473,9 +473,9 @@ public class UserServiceImpl implements UserService {
     return responseList;
   }
 
-  // =====================================
 
-  // ===== IMPLEMENT PHƯƠNG THỨC MỚI =====
+
+
   @Override
   @Transactional(readOnly = true)
   public Page<FarmerSummaryResponse> searchPublicFarmers(
@@ -486,13 +486,13 @@ public class UserServiceImpl implements UserService {
         provinceCode,
         pageable);
 
-    // *** Tạo Specification cho FarmerProfile ***
+
     Specification<FarmerProfile> spec =
         Specification.where(isVerified()) // Lọc profile đã VERIFIED
             .and(hasKeywordInProfileOrUser(keyword)) // Lọc theo keyword
             .and(hasProvince(provinceCode)); // Lọc theo tỉnh
 
-    // *** Gọi findAll trên FarmerProfileRepository ***
+
     Page<FarmerProfile> farmerProfilePage = farmerProfileRepository.findAll(spec, pageable);
 
     // Map sang Page<FarmerSummaryResponse> và xử lý null bên trong map
@@ -520,7 +520,7 @@ public class UserServiceImpl implements UserService {
         }); // <-- Bỏ .filter(Objects::nonNull) ở đây
   }
 
-  // =====================================
+
 
   // --- Specification Helper Methods ---
   private Specification<FarmerProfile> isVerified() {
@@ -623,9 +623,7 @@ public class UserServiceImpl implements UserService {
     boolean emailVerified = payload.getEmailVerified();
     String name = (String) payload.get("name");
     String pictureUrl = (String) payload.get("picture");
-    // String locale = (String) payload.get("locale");
-    // String familyName = (String) payload.get("family_name");
-    // String givenName = (String) payload.get("given_name");
+
 
     if (!emailVerified) {
       throw new BadRequestException("Google account email is not verified.");
@@ -641,7 +639,7 @@ public class UserServiceImpl implements UserService {
     // Cần tạo đối tượng Authentication thủ công để generateToken
     // Lấy authorities từ user đã tìm/tạo
     Collection<? extends GrantedAuthority> authorities =
-        mapRolesToAuthorities(user.getRoles()); // Giả sử có hàm này
+        mapRolesToAuthorities(user.getRoles());
     UsernamePasswordAuthenticationToken authentication =
         new UsernamePasswordAuthenticationToken(
             user.getEmail(), null, mapRolesToAuthorities(user.getRoles()));
@@ -761,9 +759,7 @@ public class UserServiceImpl implements UserService {
       newUser.setVerificationToken(null);
       newUser.setVerificationTokenExpiry(null);
 
-      // Khởi tạo các trường count nếu cần (mặc dù Entity User đã có giá trị mặc định là 0)
-      // newUser.setFollowerCount(0);
-      // newUser.setFollowingCount(0);
+
 
       try {
         // Gán vai trò mặc định cho user mới (ví dụ: ROLE_CONSUMER)
@@ -858,13 +854,9 @@ public class UserServiceImpl implements UserService {
         new UsernamePasswordAuthenticationToken(user.getEmail(), null, authorities);
     String newAccessToken = jwtTokenProvider.generateAccessToken(authentication);
 
-    // 5. (QUAN TRỌNG - Chiến lược Refresh Token)
-    // Lựa chọn 1: Trả về access token mới và giữ nguyên refresh token cũ (nếu nó còn hạn dài)
-    // LoginResponse response = new LoginResponse(newAccessToken, refreshTokenRequest,
-    // userMapper.toUserResponse(user));
+    // 5. ( Refresh Token)
 
-    // Lựa chọn 2: Tạo cả access token MỚI và refresh token MỚI (xoay vòng refresh token - an toàn
-    // hơn)
+    //  Tạo cả access token MỚI và refresh token MỚI (xoay vòng refresh token)
     String newRefreshToken = jwtTokenProvider.generateRefreshToken(authentication);
     user.setRefreshToken(newRefreshToken);
     user.setRefreshTokenExpiryDate(

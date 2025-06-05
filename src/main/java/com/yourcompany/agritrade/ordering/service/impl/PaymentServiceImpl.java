@@ -117,7 +117,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
         log.info(
             "Payment SUCCESS recorded for order {}, transaction {}", orderCode, transactionCode);
-        // TODO: Gửi email/thông báo thanh toán thành công
         // *** Gửi thông báo thanh toán thành công ***
         notificationService.sendPaymentSuccessNotification(order);
       } else {
@@ -131,7 +130,7 @@ public class PaymentServiceImpl implements PaymentService {
             orderCode,
             transactionCode,
             errorMessage);
-        // TODO: Gửi email/thông báo thanh toán thất bại
+
         // *** Gửi thông báo thanh toán thất bại ***
         notificationService.sendPaymentFailureNotification(order);
       }

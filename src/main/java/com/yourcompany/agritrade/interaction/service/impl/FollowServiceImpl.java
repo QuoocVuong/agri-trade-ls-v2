@@ -30,8 +30,6 @@ public class FollowServiceImpl implements FollowService {
   private final UserFollowRepository userFollowRepository;
   private final UserRepository userRepository;
   private final FollowUserMapper followUserMapper;
-  // Inject UserServiceImpl để dùng lại helper getUserFromAuthentication nếu muốn
-  // private final UserServiceImpl userServiceImpl;
   private final NotificationService notificationService;
 
   @Override
@@ -61,11 +59,9 @@ public class FollowServiceImpl implements FollowService {
 
     updateFollowCounts(follower.getId(), followingId, true); // Gọi hàm cập nhật count
 
-    // Cập nhật count trong User entity nếu có (cần xử lý đồng thời)
-    // updateFollowCounts(follower.getId(), followingId, true);
 
     log.info("User {} started following user {}", follower.getId(), followingId);
-    // *** Gửi thông báo cho người được follow ***
+    // Gửi thông báo cho người được follow
     notificationService.sendNewFollowerNotification(following, follower); // Gọi NotificationService
   }
 
@@ -84,9 +80,6 @@ public class FollowServiceImpl implements FollowService {
     userFollowRepository.deleteByFollowerIdAndFollowingId(follower.getId(), followingId);
 
     updateFollowCounts(follower.getId(), followingId, false); // Gọi hàm cập nhật count
-
-    // Cập nhật count trong User entity nếu có
-    // updateFollowCounts(follower.getId(), followingId, false);
 
     log.info("User {} unfollowed user {}", follower.getId(), followingId);
   }
@@ -152,9 +145,7 @@ public class FollowServiceImpl implements FollowService {
         .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
   }
 
-  // (Optional) Helper method để cập nhật follow count (cần xử lý race condition)
-  // Helper method cập nhật count (cách đơn giản)
-  // Helper method cập nhật count (cách đơn giản)
+
   private void updateFollowCounts(Long followerId, Long followingId, boolean isFollowing) {
     User follower = userRepository.findById(followerId).orElse(null);
     User following = userRepository.findById(followingId).orElse(null);

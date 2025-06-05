@@ -47,7 +47,7 @@ public class ReviewController {
     return ResponseEntity.ok(ApiResponse.success(reviews));
   }
 
-  // ****** THÊM ENDPOINT NÀY VÀO ******
+
   // Lấy danh sách review của user hiện tại (yêu cầu đăng nhập)
   @GetMapping("/my")
   @PreAuthorize("isAuthenticated()") // Yêu cầu đã đăng nhập
@@ -60,6 +60,6 @@ public class ReviewController {
     Page<ReviewResponse> reviews = reviewService.getMyReviews(authentication, pageable);
     return ResponseEntity.ok(ApiResponse.success(reviews));
   }
-  // ***********************************
+
 
 }

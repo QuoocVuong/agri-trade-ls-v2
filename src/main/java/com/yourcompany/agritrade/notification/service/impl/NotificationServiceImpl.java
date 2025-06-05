@@ -41,10 +41,10 @@ public class NotificationServiceImpl implements NotificationService {
 
   private final NotificationRepository notificationRepository;
   private final NotificationMapper notificationMapper;
-  private final EmailService emailService; // Inject EmailService
+  private final EmailService emailService;
   private final InAppNotificationService
-      inAppNotificationService; // Inject InAppNotificationService
-  private final UserRepository userRepository; // Inject UserRepository
+      inAppNotificationService;
+  private final UserRepository userRepository;
 
   @Value("${app.frontend.url:http://localhost:4200}")
   private String frontendUrl;

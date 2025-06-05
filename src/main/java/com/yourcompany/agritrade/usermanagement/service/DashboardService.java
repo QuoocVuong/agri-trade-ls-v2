@@ -23,25 +23,21 @@ public interface DashboardService {
   /** Lấy sản phẩm bán chạy nhất của Farmer */
   List<TopProductResponse> getTopSellingFarmerProducts(Authentication authentication, int limit);
 
-  // ===== PHƯƠNG THỨC MỚI CHO FARMER CHART =====
+  //  PHƯƠNG THỨC MỚI CHO FARMER CHART
   /** Lấy dữ liệu số lượng đơn hàng theo ngày cho biểu đồ Farmer */
   List<FarmerChartDataResponse> getFarmerOrderCountChartData(
       Authentication authentication,
       LocalDate startDate,
-      LocalDate endDate); // <<<< THÊM PHƯƠNG THỨC NÀY
+      LocalDate endDate);
 
   /** Lấy dữ liệu doanh thu theo ngày cho biểu đồ Farmer */
   List<FarmerChartDataResponse> getFarmerRevenueChartData(
       Authentication authentication,
       LocalDate startDate,
-      LocalDate endDate); // <<<< THÊM PHƯƠNG THỨC NÀY
+      LocalDate endDate);
 
-  // ==========================================
 
   /** Lấy thống kê tổng quan cho dashboard Admin */
-  // DashboardStatsResponse getAdminDashboardStats();
-
-  // Có thể thêm các phương thức lấy dữ liệu biểu đồ, hoạt động gần đây... cho Admin
 
   /** Lấy thống kê tổng quan cho dashboard Admin */
   DashboardStatsResponse getAdminDashboardStats();

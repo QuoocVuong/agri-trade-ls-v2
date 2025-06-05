@@ -26,21 +26,17 @@ public class FarmerReviewController {
   @GetMapping
   public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getMyProductReviews(
       Authentication authentication,
-      // (Tùy chọn) Thêm RequestParam để lọc theo status
-      // @RequestParam(required = false) ReviewStatus status,
+
       @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
 
     log.info("API /api/farmer/reviews called by farmer: {}", authentication.getName());
     Page<ReviewResponse> reviews;
-    // if (status != null) {
-    //     reviews = reviewService.getReviewsForFarmerProductsByStatus(authentication, status,
-    // pageable);
-    // } else {
+
     reviews = reviewService.getReviewsForFarmerProducts(authentication, pageable);
-    // }
+
     return ResponseEntity.ok(ApiResponse.success(reviews));
   }
 
-  // Có thể thêm các endpoint khác cho farmer liên quan đến review ở đây (ví dụ: trả lời review)
+
 }

@@ -52,8 +52,8 @@ public class ReviewServiceImpl implements ReviewService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Product", "id", request.getProductId()));
 
-    // --- Kiểm tra điều kiện viết review (quan trọng) ---
-    // 1. Kiểm tra xem user đã mua sản phẩm này chưa (khuyến nghị)
+    //  Kiểm tra điều kiện viết review
+    // 1. Kiểm tra xem user đã mua sản phẩm này chưa
     boolean hasPurchased =
         checkIfUserPurchasedProduct(consumer.getId(), request.getProductId(), request.getOrderId());
     if (!hasPurchased) {
@@ -97,15 +97,14 @@ public class ReviewServiceImpl implements ReviewService {
         savedReview.getId(),
         product.getId(),
         consumer.getId());
-    // ****** THAY ĐỔI QUAN TRỌNG ******
-    // Cập nhật rating trung bình của sản phẩm ngay sau khi lưu review mới
-    updateProductAverageRating(product.getId());
-    // ********************************
 
-    // (Tùy chọn) Gửi thông báo review đã được đăng (thay vì pending)
+    updateProductAverageRating(product.getId());
+
+
+
     // notificationService.sendReviewPendingNotification(savedReview); // Xóa hoặc comment dòng này
     notificationService.sendReviewApprovedNotification(
-        savedReview); // Có thể gọi hàm này nếu muốn thông báo
+        savedReview);
 
     return reviewMapper.toReviewResponse(savedReview);
   }
@@ -135,14 +134,9 @@ public class ReviewServiceImpl implements ReviewService {
   public Page<ReviewResponse> getReviewsForFarmerProducts(
       Authentication authentication, Pageable pageable) {
     User farmer = getUserFromAuthentication(authentication); // Lấy user farmer đang đăng nhập
-    // Kiểm tra xem có đúng là farmer không (tùy chọn, vì đã có @PreAuthorize ở controller)
-    // if (!farmer.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
-    //     throw new AccessDeniedException("User is not a farmer.");
-    // }
     Page<Review> reviewPage =
         reviewRepository.findReviewsForFarmerProducts(farmer.getId(), pageable);
-    // Hoặc: Page<Review> reviewPage = reviewRepository.findByProduct_Farmer_Id(farmer.getId(),
-    // pageable);
+
     return reviewMapper.toReviewResponsePage(reviewPage);
   }
 
@@ -154,12 +148,11 @@ public class ReviewServiceImpl implements ReviewService {
     User farmer = getUserFromAuthentication(authentication);
     Page<Review> reviewPage =
         reviewRepository.findReviewsForFarmerProductsByStatus(farmer.getId(), status, pageable);
-    // Hoặc: Page<Review> reviewPage =
-    // reviewRepository.findByProduct_Farmer_IdAndStatus(farmer.getId(), status, pageable);
+
     return reviewMapper.toReviewResponsePage(reviewPage);
   }
 
-  // *************************************
+
 
   // --- Admin Methods ---
 
@@ -180,7 +173,7 @@ public class ReviewServiceImpl implements ReviewService {
       // Cập nhật lại rating trung bình của sản phẩm sau khi duyệt
       updateProductAverageRating(review.getProduct().getId());
       log.info("Review {} approved by admin.", reviewId);
-      // *** Gửi thông báo cho người viết review ***
+      //  Gửi thông báo cho người viết review
       notificationService.sendReviewApprovedNotification(savedReview); // Gọi NotificationService
       return reviewMapper.toReviewResponse(savedReview);
     } else {
@@ -206,7 +199,7 @@ public class ReviewServiceImpl implements ReviewService {
         updateProductAverageRating(review.getProduct().getId());
       }
       log.info("Review {} rejected by admin.", reviewId);
-      // *** Gửi thông báo cho người viết review ***
+      //  Gửi thông báo cho người viết review *
       notificationService.sendReviewRejectedNotification(savedReview); // Gọi NotificationService
       return reviewMapper.toReviewResponse(savedReview);
     } else {
@@ -234,7 +227,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
   }
 
-  // *** SỬA LẠI HELPER METHOD NÀY ***
+  //  HELPER METHOD
   private User getUserFromAuthentication(Authentication authentication) {
     if (authentication == null
         || !authentication.isAuthenticated()
@@ -252,7 +245,7 @@ public class ReviewServiceImpl implements ReviewService {
                         + email)); // Ném lỗi nếu không thấy user trong DB
   }
 
-  // ********************************
+
 
   private Review findReviewById(Long reviewId) {
     return reviewRepository
@@ -270,10 +263,6 @@ public class ReviewServiceImpl implements ReviewService {
     }
   }
 
-  // Cập nhật rating trung bình và số lượng rating cho sản phẩm
-  // Trong ReviewServiceImpl.java
-
-// Trong ReviewServiceImpl.java
 
   private void updateProductAverageRating(Long productId) {
     log.info("===> START updateProductAverageRating for productId: {}", productId);

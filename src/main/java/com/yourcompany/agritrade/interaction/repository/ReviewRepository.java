@@ -75,8 +75,7 @@ public interface ReviewRepository
       "SELECT r FROM Review r JOIN FETCH r.product p WHERE p.farmer.id = :farmerId AND r.status = :status")
   Page<Review> findReviewsForFarmerProductsByStatus(
       @Param("farmerId") Long farmerId, @Param("status") ReviewStatus status, Pageable pageable);
-  // Hoặc: Page<Review> findByProduct_Farmer_IdAndStatus(Long farmerId, ReviewStatus status,
-  // Pageable pageable);
+
 
   long countByProductIdAndStatus(Long productId, ReviewStatus status);
 

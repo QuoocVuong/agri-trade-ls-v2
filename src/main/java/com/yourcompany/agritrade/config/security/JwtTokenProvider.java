@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Slf4j // Lombok logger
 public class JwtTokenProvider {
 
-  private final SecretKey key; // Sử dụng SecretKey thay vì String
+  private final SecretKey key; // Sử dụng SecretKey
   private final long jwtExpirationMs;
   private static final String AUTHORITIES_KEY = "roles"; // Key để lưu roles trong claims
 
@@ -83,7 +83,6 @@ public class JwtTokenProvider {
     return (List<String>) claims.get(AUTHORITIES_KEY, List.class);
   }
 
-  // --- THÊM CÁC PHƯƠNG THỨC MỚI ---
   public String getJtiFromToken(String token) {
     try {
       Claims claims =
@@ -106,7 +105,7 @@ public class JwtTokenProvider {
     }
   }
 
-  // ---------------------------------
+
 
   // Xác thực JWT
   public boolean validateToken(String authToken) {

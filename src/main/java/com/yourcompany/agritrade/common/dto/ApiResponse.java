@@ -21,7 +21,7 @@ public class ApiResponse<T> {
   private Integer status; // Mã trạng thái HTTP
   private LocalDateTime timestamp;
 
-  // Có thể thêm trường mã lỗi tùy chỉnh nếu cần
+  // Có thể thêm trường mã lỗi tùy chỉnh
   // private String errorCode;
 
   // Constructor private để khuyến khích dùng static factory methods
@@ -59,9 +59,9 @@ public class ApiResponse<T> {
   }
 
   // Response lỗi chung
-  //    public static <T> ApiResponse<T> error(String message, HttpStatus status) {
-  //        return new ApiResponse<>(false, message, null, status);
-  //    }
+//      public static <T> ApiResponse<T> error(String message, HttpStatus status) {
+//          return new ApiResponse<>(false, message, null, status);
+//      }
 
   // Response lỗi cụ thể hơn (ví dụ: Bad Request)
   public static <T> ApiResponse<T> badRequest(String message) {
@@ -90,7 +90,7 @@ public class ApiResponse<T> {
 
   private Map<String, Object> details; // Thêm trường details
 
-  // Constructor mới hoặc sửa constructor cũ để nhận details
+  // Constructor mới
   private ApiResponse(
       boolean success, String message, T data, HttpStatus status, Map<String, Object> details) {
     this.success = success;

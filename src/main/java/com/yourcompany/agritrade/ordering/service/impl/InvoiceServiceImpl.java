@@ -36,7 +36,7 @@ import org.springframework.util.StringUtils;
 public class InvoiceServiceImpl implements InvoiceService {
 
   private final InvoiceRepository invoiceRepository;
-  private final OrderRepository orderRepository; // Inject để lấy chi tiết Order khi tạo PDF
+  private final OrderRepository orderRepository;
 
   private final InvoiceMapper invoiceMapper;
 
@@ -64,8 +64,6 @@ public class InvoiceServiceImpl implements InvoiceService {
       // Đối với các phương thức thanh toán khác, hóa đơn có thể là DRAFT hoặc ISSUED ngay
       // và có thể được đánh dấu PAID ngay nếu thanh toán thành công tức thì.
       // Hoặc bạn có thể không tạo Invoice cho các đơn hàng không phải công nợ.
-      // Tùy thuộc vào yêu cầu nghiệp vụ.
-      // Ví dụ:
       if (order.getPaymentStatus() == PaymentStatus.PAID) {
         invoice.setStatus(InvoiceStatus.PAID);
       } else {
@@ -78,8 +76,8 @@ public class InvoiceServiceImpl implements InvoiceService {
   }
 
   private String generateInvoiceNumber(String orderCode) {
-    // Ví dụ: INV-LS240421-1234
-    return "INV-" + orderCode; // Hoặc logic sinh số phức tạp hơn
+
+    return "INV-" + orderCode;
   }
 
   @Override
@@ -99,44 +97,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     Document document = new Document(PageSize.A4); // Tạo document iText/OpenPDF
 
-    //        try {
-    //            PdfWriter.getInstance(document, out);
-    //            document.open();
-    //
-    //            // --- Thêm nội dung vào PDF ---
-    //            // (Đây là ví dụ rất cơ bản, bạn cần dùng font hỗ trợ TV và thiết kế layout đẹp
-    // hơn)
-    //            document.add(new Paragraph("HOA DON BAN HANG"));
-    //            document.add(new Paragraph("So hoa don: " + invoice.getInvoiceNumber()));
-    //            document.add(new Paragraph("Ngay xuat: " +
-    // invoice.getIssueDate().format(DateTimeFormatter.ISO_DATE)));
-    //            document.add(new Paragraph("Ma don hang: " + order.getOrderCode()));
-    //            document.add(new Paragraph("---------------------------------"));
-    //            document.add(new Paragraph("Nguoi ban: " + order.getFarmer().getFullName()));
-    //            // Thêm thông tin người bán (tên trang trại, địa chỉ...) nếu cần
-    //            document.add(new Paragraph("Nguoi mua: " + order.getBuyer().getFullName()));
-    //            // Thêm thông tin người mua (tên công ty, MST - nếu là B2B)
-    //            document.add(new Paragraph("Dia chi giao hang: " +
-    // order.getShippingAddressDetail() + ", " + order.getShippingWardCode() + ", " +
-    // order.getShippingDistrictCode() + ", " + order.getShippingProvinceCode()));
-    //            document.add(new Paragraph("---------------------------------"));
-    //            document.add(new Paragraph("Chi tiet san pham:"));
-    //            order.getOrderItems().forEach(item -> {
-    //                try {
-    //                    document.add(new Paragraph(String.format("- %s (x%d %s): %s",
-    //                            item.getProductName(), item.getQuantity(), item.getUnit(),
-    // item.getTotalPrice())));
-    //                } catch (DocumentException e) { /* Handle */ }
-    //            });
-    //            document.add(new Paragraph("---------------------------------"));
-    //            document.add(new Paragraph("Tong tien hang: " + order.getSubTotal()));
-    //            document.add(new Paragraph("Phi van chuyen: " + order.getShippingFee()));
-    //            document.add(new Paragraph("Giam gia: " + order.getDiscountAmount()));
-    //            document.add(new Paragraph("TONG CONG: " + order.getTotalAmount()));
-    //            document.add(new Paragraph("---------------------------------"));
-    //            document.add(new Paragraph("Trang thai thanh toan: " + order.getPaymentStatus()));
-    //
-    //            document.close();
+
     try {
       PdfWriter writer = PdfWriter.getInstance(document, out);
       document.open();
@@ -148,9 +109,6 @@ public class InvoiceServiceImpl implements InvoiceService {
       Font fontNormal =
           FontFactory.getFont(
               "../fonts/font.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, 10, Font.NORMAL);
-      //            Font fontTitle = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18); // Font
-      // mặc định, không có TV
-      //            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 10);
 
       // --- Header ---
       Paragraph title = new Paragraph("HÓA ĐƠN BÁN HÀNG", fontTitle);
@@ -343,13 +301,6 @@ public class InvoiceServiceImpl implements InvoiceService {
       spec = spec.and(keywordSpec);
     }
 
-    // Fetch các thông tin cần thiết để tránh N+1
-    // Ví dụ: fetch order, order.buyer
-    // Bạn có thể tạo một Specification riêng cho việc fetch hoặc dùng @EntityGraph trong InvoiceRepository
-    // Hoặc đảm bảo các mối quan hệ được fetch EAGER nếu phù hợp (ít khuyến khích cho performance)
-    // Hiện tại, mapper sẽ tự động load qua các mối quan hệ LAZY, có thể gây N+1.
-    // Để tối ưu, nên dùng JOIN FETCH trong query hoặc @EntityGraph.
-    // Ví dụ đơn giản:
     spec = spec.and(InvoiceSpecifications.fetchOrderAndBuyer());
 
 

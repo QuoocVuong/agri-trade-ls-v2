@@ -18,7 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
 public interface UserService {
-  UserResponse registerUser(UserRegistrationRequest registrationRequest); // Đổi tên tham số
+  UserResponse registerUser(UserRegistrationRequest registrationRequest);
 
   // Lấy thông tin profile đầy đủ của user đang đăng nhập
   UserProfileResponse getCurrentUserProfile(Authentication authentication);
@@ -66,10 +66,7 @@ public interface UserService {
 
   UserResponse updateUserRoles(Long id, Set<RoleType> roles);
 
-  // Có thể thêm phương thức xóa mềm user
-  // void softDeleteUser(Long id);
 
-  // ===== PHƯƠNG THỨC MỚI =====
   /**
    * Lấy danh sách nông dân nổi bật (ví dụ: theo số người theo dõi).
    *
@@ -78,9 +75,7 @@ public interface UserService {
    */
   List<FarmerSummaryResponse> getFeaturedFarmers(int limit);
 
-  // ===========================
 
-  // ===== PHƯƠNG THỨC MỚI =====
   /**
    * Tìm kiếm và lọc danh sách Farmer công khai (đã được duyệt).
    *
@@ -92,7 +87,7 @@ public interface UserService {
   Page<FarmerSummaryResponse> searchPublicFarmers(
       String keyword, String provinceCode, Pageable pageable);
 
-  // ===========================
+
 
   // --- PHƯƠNG THỨC CHO XỬ LÝ LOGIN VÀ TOKEN ---
   /**
@@ -102,9 +97,9 @@ public interface UserService {
    * @return LoginResponse chứa accessToken, refreshToken và thông tin user.
    */
   LoginResponse processLoginAuthentication(
-      Authentication authentication); // << THÊM PHƯƠNG THỨC NÀY
+      Authentication authentication);
 
-  // ****** THÊM PHƯƠNG THỨC NÀY ******
+
   /**
    * Xử lý đăng nhập bằng Google ID Token. Xác thực token, tìm hoặc tạo người dùng, và trả về JWT
    * của ứng dụng.
@@ -115,7 +110,7 @@ public interface UserService {
   LoginResponse processGoogleLogin(String idTokenString)
       throws GeneralSecurityException, IOException;
 
-  // **********************************
+
 
   /**
    * Làm mới access token bằng cách sử dụng refresh token.
@@ -124,7 +119,7 @@ public interface UserService {
    * @return LoginResponse chứa accessToken mới và refresh token (có thể là cũ hoặc mới tùy chiến
    *     lược). //* @throws BadRequestException Nếu refresh token không hợp lệ hoặc hết hạn.
    */
-  LoginResponse refreshToken(String refreshTokenRequest); // << THÊM PHƯƠNG THỨC N
+  LoginResponse refreshToken(String refreshTokenRequest);
 
   void invalidateRefreshTokenForUser(String email);
 

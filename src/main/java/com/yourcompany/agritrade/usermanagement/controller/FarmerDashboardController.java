@@ -58,7 +58,7 @@ public class FarmerDashboardController {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-    // Gọi phương thức trong service để lấy dữ liệu (cần implement trong DashboardService)
+
     List<FarmerChartDataResponse> chartData =
         dashboardService.getFarmerOrderCountChartData(authentication, startDate, endDate);
 
@@ -72,7 +72,7 @@ public class FarmerDashboardController {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-    // Gọi phương thức trong service để lấy dữ liệu (cần implement trong DashboardService)
+
     List<FarmerChartDataResponse> chartData =
         dashboardService.getFarmerRevenueChartData(authentication, startDate, endDate);
 

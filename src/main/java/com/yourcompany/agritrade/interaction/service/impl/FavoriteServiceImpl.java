@@ -50,8 +50,6 @@ public class FavoriteServiceImpl implements FavoriteService {
     favorite.setProduct(product);
     favoriteProductRepository.save(favorite);
 
-    // Cập nhật favorite_count trên Product (cần xử lý đồng thời)
-    // updateFavoriteCount(productId, true);
     updateFavoriteCount(productId, true); // Gọi hàm cập nhật count
 
     log.info("User {} added product {} to favorites", user.getId(), productId);
@@ -70,8 +68,7 @@ public class FavoriteServiceImpl implements FavoriteService {
 
     favoriteProductRepository.deleteByUserIdAndProductId(user.getId(), productId);
 
-    // Cập nhật favorite_count trên Product
-    // updateFavoriteCount(productId, false);
+
     updateFavoriteCount(productId, false); // Gọi hàm cập nhật count
 
     log.info("User {} removed product {} from favorites", user.getId(), productId);
@@ -114,20 +111,6 @@ public class FavoriteServiceImpl implements FavoriteService {
                         + email)); // Ném lỗi nếu không thấy user trong DB
   }
 
-  // (Optional) Helper method để cập nhật favorite count (cần xử lý race condition)
-  /*
-  private void updateFavoriteCount(Long productId, boolean increment) {
-      Product product = productRepository.findById(productId).orElse(null);
-      if (product != null) {
-          if (increment) {
-              product.setFavoriteCount(product.getFavoriteCount() + 1);
-          } else {
-              product.setFavoriteCount(Math.max(0, product.getFavoriteCount() - 1));
-          }
-          productRepository.save(product);
-      }
-  }
-  */
   private void updateFavoriteCount(Long productId, boolean increment) {
     // Dùng cách đếm lại cho an toàn
     long currentCount = favoriteProductRepository.countByProductId(productId);

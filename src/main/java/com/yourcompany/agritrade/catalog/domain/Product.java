@@ -45,7 +45,7 @@ public class Product {
   private String slug;
 
   @Lob
-  @Column(columnDefinition = "LONGTEXT") // Đảm bảo khớp với migration
+  @Column(columnDefinition = "LONGTEXT")
   private String description;
 
   @Column(nullable = false, length = 50)
@@ -57,12 +57,12 @@ public class Product {
   @Column(nullable = false)
   private Integer stockQuantity = 0;
 
-  @Version // *** Thêm Annotation @Version ***
-  private Long version; // Kiểu dữ liệu có thể là Long, Integer, Timestamp...
+  @Version // Annotation @Version
+  private Long version;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private ProductStatus status = ProductStatus.PENDING_APPROVAL; // Tạo Enum này
+  private ProductStatus status = ProductStatus.PENDING_APPROVAL;
 
   @Column(nullable = false, length = 10)
   private String provinceCode;
@@ -99,13 +99,13 @@ public class Product {
       cascade = CascadeType.ALL,
       orphanRemoval = true,
       fetch = FetchType.LAZY)
-  private Set<ProductPricingTier> pricingTiers = new HashSet<>(); // Nếu dùng giá bậc thang
+  private Set<ProductPricingTier> pricingTiers = new HashSet<>();
 
-  @Lob // Có thể cần @Lob nếu lý do dài
-  private String rejectReason; // Thêm trường lý do từ chối
+  @Lob // @Lob nếu lý do dài
+  private String rejectReason;
 
-  @Column // Có thể nullable nếu không phải SP nào cũng có cân nặng
-  private Integer weightInGrams; // Trọng lượng của 1 'unit' (đơn vị B2C) tính
+  @Column
+  private Integer weightInGrams;
   // bằng gram
 
 
@@ -136,7 +136,7 @@ public class Product {
   @Column(nullable = false)
   private boolean isDeleted = false;
 
-  // Helper methods cho images/pricingTiers (tùy chọn)
+  // Helper methods cho images/pricingTiers
   public void addImage(ProductImage image) {
     images.add(image);
     image.setProduct(this);

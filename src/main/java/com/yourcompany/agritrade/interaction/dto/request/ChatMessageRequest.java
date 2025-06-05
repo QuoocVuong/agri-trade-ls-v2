@@ -13,7 +13,7 @@ public class ChatMessageRequest {
   @NotNull(message = "Recipient ID is required")
   private Long recipientId;
 
-  // Có thể thêm roomId nếu client biết trước phòng chat
+  // thêm roomId nếu client biết trước phòng chat
   // private Long roomId;
 
   @NotBlank(message = "Message content cannot be blank")
@@ -23,10 +23,10 @@ public class ChatMessageRequest {
   // Client có thể chỉ định loại tin nhắn (mặc định là TEXT)
   private MessageType messageType = MessageType.TEXT;
 
-  // Thêm các trường cho ngữ cảnh sản phẩm (tùy chọn)
+  // Thêm các trường cho ngữ cảnh sản phẩm
   private Long contextProductId;
   private String contextProductName;
-  private String contextProductSlug; // Để tạo link nếu cần
-  // Bạn có thể thêm thumbnail nếu muốn hiển thị ảnh nhỏ trong tin nhắn hệ thống
+  private String contextProductSlug;
+
    private String contextProductThumbnailUrl;
 }

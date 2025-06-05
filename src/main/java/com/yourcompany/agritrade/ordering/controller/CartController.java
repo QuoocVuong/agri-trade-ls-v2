@@ -32,8 +32,7 @@ public class CartController {
   public ResponseEntity<ApiResponse<CartItemResponse>> addItemToCart(
       Authentication authentication, @Valid @RequestBody CartItemRequest request) {
     CartItemResponse addedItem = cartService.addItem(authentication, request);
-    // Trả về 201 Created hoặc 200 OK tùy theo ngữ cảnh (thêm mới hay cập nhật)
-    // Ở đây dùng 200 OK cho đơn giản vì nó xử lý cả 2 trường hợp
+
     return ResponseEntity.ok(ApiResponse.success(addedItem, "Item added/updated in cart"));
   }
 

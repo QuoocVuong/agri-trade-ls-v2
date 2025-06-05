@@ -25,7 +25,7 @@ public interface NotificationService {
 
   void sendPaymentFailureNotification(Order order);
 
-  void sendNewChatMessageNotification(User recipient, User sender, Long roomId); // Ví dụ cho chat
+  void sendNewChatMessageNotification(User recipient, User sender, Long roomId);
 
   // ... thêm các phương thức gửi khác ...
 
@@ -59,27 +59,27 @@ public interface NotificationService {
   void sendRolesUpdateNotification(User user); // Có thể truyền thêm Set<RoleType> cũ nếu cần
 
   /** Gửi thông báo khi hồ sơ Farmer được duyệt */
-  void sendFarmerProfileApprovedNotification(FarmerProfile profile); // *** Thêm mới ***
+  void sendFarmerProfileApprovedNotification(FarmerProfile profile);
 
   /** Gửi thông báo khi hồ sơ Farmer bị từ chối */
   void sendFarmerProfileRejectedNotification(
-      FarmerProfile profile, String reason); // *** Thêm mới ***
+      FarmerProfile profile, String reason);
 
   // --- Follow Related ---
   /** Gửi thông báo cho user khi có người mới theo dõi họ */
-  void sendNewFollowerNotification(User followedUser, User follower); // Thêm mới
+  void sendNewFollowerNotification(User followedUser, User follower);
 
   // --- Review Related ---
   /** Gửi thông báo cho user khi review của họ được duyệt */
-  void sendReviewApprovedNotification(Review review); // Thêm mới
+  void sendReviewApprovedNotification(Review review);
 
   /** Gửi thông báo cho user khi review của họ bị từ chối */
-  void sendReviewRejectedNotification(Review review); // Thêm mới
+  void sendReviewRejectedNotification(Review review);
 
 
   // --- Invoice Related ---
-  void sendOverdueInvoiceReminderToBuyer(Invoice invoice); // Mới
-  void sendDueSoonInvoiceReminderToBuyer(Invoice invoice);  // Mới
-  void sendOverdueInvoiceNotificationToAdmin(Invoice invoice); // Mới
+  void sendOverdueInvoiceReminderToBuyer(Invoice invoice);
+  void sendDueSoonInvoiceReminderToBuyer(Invoice invoice);
+  void sendOverdueInvoiceNotificationToAdmin(Invoice invoice);
 
 }

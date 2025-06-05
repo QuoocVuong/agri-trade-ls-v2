@@ -29,8 +29,8 @@ public class FarmerOrderController {
   @GetMapping("/my")
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsFarmer(
       Authentication authentication,
-      @RequestParam(required = false) String keyword, // THÊM
-      @RequestParam(required = false) String status, // THÊM (nhận là String)
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String status,
       @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
     OrderStatus statusEnum = null;
@@ -38,8 +38,7 @@ public class FarmerOrderController {
       try {
         statusEnum = OrderStatus.valueOf(status.toUpperCase());
       } catch (IllegalArgumentException e) {
-        // log.warn("Invalid order status value received: {}", status);
-        // Có thể trả về lỗi BadRequest hoặc bỏ qua filter này
+
       }
     }
 
@@ -52,8 +51,7 @@ public class FarmerOrderController {
   @GetMapping("/{orderId}")
   public ResponseEntity<ApiResponse<OrderResponse>> getMyOrderDetailsAsFarmer(
       Authentication authentication, @PathVariable Long orderId) {
-    // Có thể gọi getOrderDetails và để service kiểm tra quyền,
-    // hoặc tạo phương thức riêng trong service chỉ lấy đơn hàng của farmer đó
+
     OrderResponse order = orderService.getOrderDetails(authentication, orderId);
     return ResponseEntity.ok(ApiResponse.success(order));
   }
@@ -66,7 +64,7 @@ public class FarmerOrderController {
       @Valid @RequestBody OrderStatusUpdateRequest request) {
     OrderResponse updatedOrder =
         orderService.updateOrderStatus(
-            authentication, orderId, request); // Service kiểm tra quyền và logic trạng thái
+            authentication, orderId, request);
     return ResponseEntity.ok(
         ApiResponse.success(updatedOrder, "Order status updated successfully"));
   }

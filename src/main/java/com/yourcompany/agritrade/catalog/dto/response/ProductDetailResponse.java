@@ -10,11 +10,11 @@ import java.util.List;
 import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
 import lombok.Data;
 
-// DTO đầy đủ cho trang chi tiết
+
 @Data
-// @EqualsAndHashCode(callSuper = true) // Có thể kế thừa từ Summary nếu muốn
+
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ProductDetailResponse { // Hoặc kế thừa ProductSummaryResponse
+public class ProductDetailResponse {
   private Long id;
   private String name;
   private String slug;
@@ -26,7 +26,7 @@ public class ProductDetailResponse { // Hoặc kế thừa ProductSummaryRespons
   private Integer ratingCount;
   private Integer favoriteCount;
   private ProductStatus status;
-  private String rejectReason; // Thêm lý do từ chối
+  private String rejectReason; //  do từ chối
   private String provinceCode;
 
   // Thông tin liên kết
@@ -47,7 +47,7 @@ public class ProductDetailResponse { // Hoặc kế thừa ProductSummaryRespons
   private List<ProductSummaryResponse>
       relatedProducts; // Dùng Summary DTO để tránh quá nhiều thông tin
 
-  // Trong cả ProductDetailResponse và ProductSummaryResponse (hoặc tùy chọn cho Summary)
+
   private LocalDate harvestDate;
   private LocalDateTime lastStockUpdate;
   private boolean negotiablePrice;

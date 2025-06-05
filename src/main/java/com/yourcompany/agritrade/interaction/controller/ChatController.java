@@ -68,15 +68,5 @@ public class ChatController {
     return ResponseEntity.ok(ApiResponse.success(count));
   }
 
-  // API gửi tin nhắn (tùy chọn, thường gửi qua WebSocket tốt hơn)
-  // Nếu dùng API này, nó sẽ gọi ChatService.sendMessage và service sẽ tự push qua WebSocket
-  /*
-  @PostMapping("/messages")
-  public ResponseEntity<ApiResponse<ChatMessageResponse>> sendMessageViaApi(
-          Authentication authentication,
-          @Valid @RequestBody ChatMessageRequest request) {
-      ChatMessageResponse sentMessage = chatService.sendMessage(authentication, request);
-      return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(sentMessage, "Message sent"));
-  }
-  */
+
 }

@@ -88,11 +88,9 @@ public class PermissionServiceImpl implements PermissionService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Permission", "id", id));
 
-    // *** QUAN TRỌNG: Kiểm tra xem có Role nào đang sử dụng Permission này không ***
-    // Cách 1: Dùng query trong RoleRepository (cần thêm phương thức)
-    // boolean isInUse = roleRepository.existsByPermissionsContains(permissionToDelete);
 
-    // Cách 2: Lấy tất cả Role và kiểm tra (có thể không hiệu quả nếu nhiều Role)
+
+    //  Lấy tất cả Role và kiểm tra
     boolean isInUse =
         roleRepository.findAll().stream()
             .anyMatch(role -> role.getPermissions().contains(permissionToDelete));

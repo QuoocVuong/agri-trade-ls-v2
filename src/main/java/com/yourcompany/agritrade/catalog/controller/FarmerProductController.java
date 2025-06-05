@@ -4,8 +4,10 @@ import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
+import com.yourcompany.agritrade.catalog.dto.response.SupplySourceResponse;
 import com.yourcompany.agritrade.catalog.service.ProductService;
 import com.yourcompany.agritrade.common.dto.ApiResponse;
+import com.yourcompany.agritrade.common.exception.BadRequestException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,8 +17,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.file.attribute.UserPrincipal;
 
 @RestController
 @RequestMapping("/api/farmer/products") // Base path cho Farmer
@@ -38,9 +43,7 @@ public class FarmerProductController {
       try {
         statusEnum = ProductStatus.valueOf(status.toUpperCase());
       } catch (IllegalArgumentException e) {
-        // Log lỗi hoặc xử lý nếu status không hợp lệ (ví dụ: trả về lỗi BadRequest)
-        // Hoặc đơn giản là bỏ qua filter theo status nếu giá trị không đúng
-        // log.warn("Invalid status value received: {}", status);
+
       }
     }
     Page<ProductSummaryResponse> products =
@@ -79,6 +82,20 @@ public class FarmerProductController {
       Authentication authentication, @PathVariable Long id) {
     productService.deleteMyProduct(authentication, id);
     return ResponseEntity.ok(
-        ApiResponse.success("Product deleted successfully")); // Hoặc 204 No Content
+        ApiResponse.success("Product deleted successfully"));
   }
+
+//  @PostMapping("/supply-sources")
+//  @PreAuthorize("hasRole('FARMER')")
+//  public ApiResponse<SupplySourceResponse> registerSupplySource(
+//          @Valid @RequestBody SupplySourceRequest request,
+//          @AuthenticationPrincipal UserPrincipal user) {
+//    if (!supplySourceService.isFarmerProfileApproved(user.getId())) {
+//      throw new BadRequestException("Hồ sơ Farmer chưa được duyệt");
+//    }
+//    SupplySourceResponse response = supplySourceService.register(request, user.getId());
+//
+//    return ApiResponse.success(response);
+//  }
+
 }

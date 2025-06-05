@@ -23,9 +23,9 @@ public class PublicCatalogController {
   private final CategoryService categoryService;
   private final ProductService productService;
 
-  @GetMapping("/categories") // Map với URL mà frontend đang gọi
+  @GetMapping("/categories")
   public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategoriesForDropdown() {
-    // Gọi phương thức service mới đã tạo
+    // Gọi phương thức service
     List<CategoryResponse> categories = categoryService.getAllCategoriesForDropdown();
     System.out.println(
         "Handling /api/public/categories request. Found categories: "
@@ -52,10 +52,10 @@ public class PublicCatalogController {
   public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> searchProducts(
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Integer categoryId,
-      @RequestParam(required = false) String provinceCode, // Lọc theo tỉnh (cho B2C)
-      @RequestParam(required = false) Double minPrice, // Thêm
-      @RequestParam(required = false) Double maxPrice, // Thêm
-      @RequestParam(required = false) Integer minRating, // Thêm (dùng Integer để có thể là null)
+      @RequestParam(required = false) String provinceCode,
+      @RequestParam(required = false) Double minPrice,
+      @RequestParam(required = false) Double maxPrice,
+      @RequestParam(required = false) Integer minRating,
       @PageableDefault(size = 12, sort = "created_at,desc") Pageable pageable) {
     Page<ProductSummaryResponse> products =
         productService.searchPublicProducts(
@@ -70,34 +70,34 @@ public class PublicCatalogController {
     return ResponseEntity.ok(ApiResponse.success(product));
   }
 
-  @GetMapping("/products/id/{id}") // Thêm endpoint lấy theo ID nếu cần
+  @GetMapping("/products/id/{id}") // endpoint lấy theo ID
   public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductById(@PathVariable Long id) {
     ProductDetailResponse product = productService.getPublicProductById(id);
     return ResponseEntity.ok(ApiResponse.success(product));
   }
 
-  // Trong PublicCatalogController.java
+
   @GetMapping("/farmer/{farmerId}/products")
   public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> getProductsByFarmerPublic(
       @PathVariable Long farmerId,
       @PageableDefault(size = 8, sort = "createdAt,desc") Pageable pageable) {
-    // Gọi service để lấy sản phẩm public của farmer này
+    // Gọi service
     Page<ProductSummaryResponse> products =
         productService.getPublicProductsByFarmerId(farmerId, pageable);
     return ResponseEntity.ok(ApiResponse.success(products));
   }
 
-  @GetMapping("/supply-sources") // Hoặc một tên khác phù hợp
+  @GetMapping("/supply-sources")
   public ResponseEntity<ApiResponse<Page<SupplySourceResponse>>> findSupplySources(
           @RequestParam(required = false) String productKeyword,
           @RequestParam(required = false) Integer categoryId,
           @RequestParam(required = false) String provinceCode,
-          @RequestParam(required = false) String districtCode, // Thêm districtCode
+          @RequestParam(required = false) String districtCode,
           @RequestParam(required = false) String wardCode,
           @RequestParam(required = false) Integer minQuantityNeeded,
-          @PageableDefault(size = 10, sort = "farmerInfo.farmName,asc") Pageable pageable) { // Ví dụ sort theo tên trang trại
+          @PageableDefault(size = 10, sort = "farmerInfo.farmName,asc") Pageable pageable) {
 
-    // Gọi service mới
+    // Gọi service
     Page<SupplySourceResponse> supplySources = productService.findSupplySources(
             productKeyword, categoryId, provinceCode, districtCode, wardCode, minQuantityNeeded, pageable
     );

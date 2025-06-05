@@ -19,13 +19,13 @@ import java.util.Set;
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
 
-// Khai báo uses các mapper khác
+
 @Mapper(
     componentModel = "spring",
     uses = {
       CategoryMapper.class,
       ProductImageMapper.class,
-      ProductPricingTierMapper.class, // Thêm nếu dùng
+      ProductPricingTierMapper.class,
       FarmerInfoMapper.class // Dùng mapper riêng cho FarmerInfo
     })
 public abstract class ProductMapper {
@@ -41,7 +41,6 @@ public abstract class ProductMapper {
       target = "farmerInfo",
       source = "product",
       qualifiedByName = "mapProductToFarmerInfo") // Dùng method tùy chỉnh
-  // @Mapping(target = "isNew", ignore = true) // Map isNew nếu cần logic riêng
   @Mapping(target = "category", source = "category")
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")
   @Mapping(target = "b2bUnit", source = "b2bUnit")
@@ -50,14 +49,12 @@ public abstract class ProductMapper {
   @Mapping(
       target = "pricingTiers",
       source = "pricingTiers") // MapStruct sẽ dùng ProductPricingTierMapper
-  // @Mapping(target = "new", ignore = true) // Ignore map tự động
-  // ***************************************
   public abstract ProductSummaryResponse toProductSummaryResponse(Product product);
 
   @AfterMapping
   protected void setIsNewFlag(@MappingTarget ProductSummaryResponse dto, Product product) {
     if (product.getCreatedAt() != null) {
-      // Ví dụ: Sản phẩm tạo trong vòng 7 ngày gần nhất được coi là mới
+      //  Sản phẩm tạo trong vòng 7 ngày gần nhất được coi là mới
       long daysSinceCreation = ChronoUnit.DAYS.between(product.getCreatedAt(), LocalDateTime.now());
       dto.setNew(daysSinceCreation <= 7);
     } else {
@@ -100,7 +97,6 @@ public abstract class ProductMapper {
   @Mapping(target = "version", ignore = true) // Bỏ qua version khi tạo mới
   @Mapping(target = "rejectReason", ignore = true) // Bỏ qua rejectReason khi tạo mới
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")
-  //@Mapping(target = "deleted", ignore = true) // Bỏ qua isDeleted khi tạo mới
   public abstract Product requestToProduct(ProductRequest request);
 
   // --- Update Mapper ---
@@ -119,24 +115,24 @@ public abstract class ProductMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")
   @Mapping(target = "version", ignore = true) // Không map version
-  // @Mapping(target = "isDeleted", ignore = true)
+
   public abstract void updateProductFromRequest(
       ProductRequest request, @MappingTarget Product product);
 
-  // ****** THÊM PHƯƠNG THỨC NÀY ******
+
   @Mapping(
       target = "thumbnailUrl",
       source = "images",
       qualifiedByName = "getDefaultImageUrl") // Lấy ảnh thumbnail
   public abstract ProductInfoResponse toProductInfoResponse(Product product);
 
-  // **********************************
+
 
   // --- Helper Methods ---
   @Named("getDefaultImageUrl")
   String getDefaultImageUrl(Set<ProductImage> images) {
     if (images == null || images.isEmpty()) {
-      // return null; // Hoặc placeholder
+
       return "assets/images/placeholder-image.png"; // Trả về placeholder nếu không có ảnh
     }
     Optional<ProductImage> imageOpt =
@@ -148,44 +144,28 @@ public abstract class ProductMapper {
     if (imageOpt.isPresent() && imageOpt.get().getBlobPath() != null) {
       try {
         // Gọi service để lấy URL mới nhất (Signed URL)
-        return fileStorageService.getFileUrl(imageOpt.get().getBlobPath()); // Đã đúng
+        return fileStorageService.getFileUrl(imageOpt.get().getBlobPath());
       } catch (Exception e) {
-        // log.error("Error generating default image URL for blobPath: {}",
-        // imageOpt.get().getBlobPath(), e);
-        return "assets/images/placeholder-image.png"; // Placeholder nếu lỗi
+
+        return "assets/images/placeholder-image.png";
       }
     }
-    return "assets/images/placeholder-image.png"; // Placeholder nếu không có blobPath
+    return "assets/images/placeholder-image.png";
   }
 
-  // Sử dụng FarmerInfoMapper đã inject (cần đổi ProductMapper thành abstract class)
-  /*
-  @Autowired
-  protected FarmerInfoMapper farmerInfoMapper;
-
-  @Named("mapFarmerToInfo")
-  default FarmerInfoResponse mapFarmerToInfo(User farmer) {
-      if (farmer == null) return null;
-      // Cần lấy FarmerProfile tương ứng nếu FarmerInfoMapper yêu cầu
-      // FarmerProfile profile = farmerProfileRepository.findById(farmer.getId()).orElse(null);
-      // return farmerInfoMapper.toFarmerInfoResponse(farmer, profile);
-      // Hoặc dùng mapper đơn giản hơn nếu chỉ cần thông tin từ User
-      return farmerInfoMapper.userToFarmerInfoResponse(farmer);
-  }
-  */
   @Named("mapProductToFarmerInfo")
-  protected FarmerInfoResponse mapProductToFarmerInfo(Product product) { // protected hoặc public
+  protected FarmerInfoResponse mapProductToFarmerInfo(Product product) {
     if (product == null || product.getFarmer() == null) {
       return null;
     }
     User farmer = product.getFarmer();
-    // Quan trọng: Dòng này yêu cầu FarmerProfile phải được load sẵn (do JOIN FETCH)
+
     FarmerProfile profile = farmer.getFarmerProfile();
 
-    // Gọi FarmerInfoMapper đã inject
+
     FarmerInfoResponse info = farmerInfoMapper.toFarmerInfoResponse(farmer, profile);
 
-    // Fallback logic nếu cần (ví dụ: nếu profile null hoặc farmName trong profile là null)
+    // Fallback logic
     if (info != null
         && (info.getFarmName() == null || info.getFarmName().isEmpty())
         && farmer.getFullName() != null) {
@@ -195,16 +175,6 @@ public abstract class ProductMapper {
     return info;
   }
 
-  //    @Named("resolveIsB2bAvailable")
-  //    protected boolean resolveIsB2bAvailable(Boolean input) {
-  //        return input != null && input;
-  //    }
+
 
 }
-// Lưu ý: Để dùng @Autowired trong Mapper, cần đổi thành abstract class thay vì interface.
-// Tuy nhiên, việc inject Repository vào Mapper không phải là best practice.
-// Cách tốt hơn là Service sẽ lấy User và FarmerProfile, sau đó gọi một phương thức map nhận cả 2
-// đối tượng.
-// Hoặc tạo một DTO trung gian chỉ chứa thông tin cần thiết từ User và Profile để truyền vào mapper.
-// Trong ví dụ này, tạm dùng mapFarmerToInfoManual và chấp nhận thiếu farmName/provinceCode hoặc sẽ
-// xử lý ở Service.

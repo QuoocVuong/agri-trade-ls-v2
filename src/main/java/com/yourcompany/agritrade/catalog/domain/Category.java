@@ -33,7 +33,7 @@ public class Category {
   @Transient // <<< Đánh dấu Transient
   private String imageUrl;
 
-  @Column(length = 1024) // <<< Thêm cột blobPath, cho phép NULL
+  @Column(length = 1024)
   private String blobPath;
 
   @ManyToOne(fetch = FetchType.LAZY) // Quan hệ cha
@@ -51,7 +51,7 @@ public class Category {
   @Column(nullable = false)
   private LocalDateTime updatedAt;
 
-  // Helper methods để quản lý quan hệ hai chiều (tùy chọn)
+  // Helper methods để quản lý quan hệ hai chiều
   public void addChild(Category child) {
     children.add(child);
     child.setParent(this);

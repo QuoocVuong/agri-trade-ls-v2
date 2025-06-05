@@ -13,8 +13,6 @@ import java.util.List;
 public class AgreedOrderRequest {
     @NotNull
     private Long buyerId; // ID người mua (doanh nghiệp/đối tác)
-//    @NotNull
-//    private Long farmerId; // ID nông dân
 
     @NotEmpty
     private List<AgreedOrderItemRequest> items;

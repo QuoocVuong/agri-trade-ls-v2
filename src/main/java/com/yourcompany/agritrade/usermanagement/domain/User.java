@@ -43,10 +43,6 @@ public class User {
 
   private String avatarUrl;
 
-  //    @Column(nullable = false)
-  //    private boolean isActive = true;
-
-  // *** Thêm các trường count ***
   @Column(nullable = false)
   private Integer followerCount = 0; // Số người theo dõi user này
 
@@ -60,7 +56,7 @@ public class User {
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   private Set<Role> roles = new HashSet<>();
 
-  // ****** THÊM PHẦN NÀY ******
+
   @OneToOne(
       mappedBy =
           "user", // Quan trọng: Chỉ định rằng mối quan hệ được quản lý bởi trường 'user' trong
@@ -77,7 +73,6 @@ public class User {
   @Column(length = 255) // Lưu ID từ nhà cung cấp OAuth2
   private String providerId;
 
-  // ****************************
 
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
@@ -91,7 +86,7 @@ public class User {
   private boolean isDeleted = false;
 
   @Column(nullable = false)
-  private boolean isActive = false; // Đổi default thành false
+  private boolean isActive = false;
 
   // Thêm trường mới
   @Column(length = 100, unique = true)
@@ -104,5 +99,5 @@ public class User {
 
   private LocalDateTime refreshTokenExpiryDate;
 
-  // Constructors, other fields (verification code etc.) can be added later
+
 }

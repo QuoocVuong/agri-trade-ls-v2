@@ -10,7 +10,5 @@ public interface FarmerProfileService {
 
   FarmerProfileResponse getFarmerProfile(
       Long userId); // Lấy profile của farmer bất kỳ (cho public view)
-  // Các hàm cho Admin duyệt
-  // void approveFarmerProfile(Long userId, Authentication adminAuth);
-  // void rejectFarmerProfile(Long userId, String reason, Authentication adminAuth);
+
 }

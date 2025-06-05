@@ -78,9 +78,7 @@ public class AddressController {
     if (defaultAddress != null) {
       return ResponseEntity.ok(ApiResponse.success(defaultAddress));
     } else {
-      // Trả về 200 OK với data là null nếu không có địa chỉ mặc định,
-      // hoặc 404 Not Found tùy theo logic bạn muốn.
-      // Trả về 200 với data null thường dễ xử lý ở frontend hơn.
+
       return ResponseEntity.ok(ApiResponse.success(null, "No default address found for this user."));
     }
   }

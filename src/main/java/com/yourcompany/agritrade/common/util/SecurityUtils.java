@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class SecurityUtils {
 
-    private static UserRepository staticUserRepository; // Biến static để lưu trữ UserRepository
+    private static UserRepository staticUserRepository;
 
     // Constructor injection cho UserRepository
     // Spring sẽ tự động inject UserRepository vào đây khi SecurityUtils được tạo

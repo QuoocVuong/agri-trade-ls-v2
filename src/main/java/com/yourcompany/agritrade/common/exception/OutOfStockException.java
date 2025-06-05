@@ -2,17 +2,15 @@ package com.yourcompany.agritrade.common.exception;
 
 import lombok.Getter;
 
-@Getter // Thêm Lombok Getter
+@Getter
 public class OutOfStockException extends RuntimeException {
 
-  private final Integer availableStock; // Thêm trường này để lưu số lượng tồn
+  private final Integer availableStock;
 
-  // private final Long productId; // (Tùy chọn) Có thể thêm ID sản phẩm nếu cần
 
-  // Sửa constructor để nhận availableStock
-  public OutOfStockException(String message, Integer availableStock /*, Long productId */) {
+  public OutOfStockException(String message, Integer availableStock ) {
     super(message);
     this.availableStock = availableStock;
-    // this.productId = productId;
+
   }
 }

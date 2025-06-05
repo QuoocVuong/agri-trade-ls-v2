@@ -10,7 +10,7 @@ import lombok.Data;
 public class ReviewResponse {
   private Long id;
   // private Long productId; // Chỉ cần ID sản phẩm
-  private Long orderId; // ID đơn hàng (nếu có)
+  private Long orderId;
   private UserInfoSimpleResponse consumer; // Thông tin người đánh giá
   private int rating;
   private String comment;

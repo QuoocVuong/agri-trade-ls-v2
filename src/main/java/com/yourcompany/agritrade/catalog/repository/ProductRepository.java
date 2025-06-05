@@ -40,37 +40,8 @@ public interface ProductRepository
   // Đếm sản phẩm theo category (hữu ích khi xóa category)
   long countByCategoryId(Integer categoryId);
 
-  // Ví dụ truy vấn phức tạp hơn với JPQL (có thể thay bằng Specification)
-  @Query(
-      "SELECT p FROM Product p WHERE p.farmer.id = :farmerId AND (:status IS NULL OR p.status = :status)")
-  Page<Product> findByFarmerIdAndOptionalStatus(
-      @Param("farmerId") Long farmerId, @Param("status") ProductStatus status, Pageable pageable);
 
-  // Sử dụng Native Query với MATCH AGAINST cho Full-Text Search
-  // Lưu ý: Cần đảm bảo index FULLTEXT đã được tạo trên name, description
-  // countQuery dùng để Spring Data tính tổng số trang
-  @Query(
-      value =
-          "SELECT p.* FROM products p "
-              + "JOIN categories c ON p.category_id = c.id "
-              + // Join nếu cần lọc category
-              "WHERE p.status = 'PUBLISHED' AND p.is_deleted = false "
-              + "AND (:categoryId IS NULL OR p.category_id = :categoryId) "
-              + "AND (:provinceCode IS NULL OR p.province_code = :provinceCode) "
-              + "AND (:keyword IS NULL OR MATCH(p.name, p.description) AGAINST (:keyword IN NATURAL LANGUAGE MODE))",
-      countQuery =
-          "SELECT count(p.id) FROM products p "
-              + "JOIN categories c ON p.category_id = c.id "
-              + "WHERE p.status = 'PUBLISHED' AND p.is_deleted = false "
-              + "AND (:categoryId IS NULL OR p.category_id = :categoryId) "
-              + "AND (:provinceCode IS NULL OR p.province_code = :provinceCode) "
-              + "AND (:keyword IS NULL OR MATCH(p.name, p.description) AGAINST (:keyword IN NATURAL LANGUAGE MODE))",
-      nativeQuery = true)
-  Page<Product> searchPublicProductsWithFullText(
-      @Param("keyword") String keyword,
-      @Param("categoryId") Integer categoryId,
-      @Param("provinceCode") String provinceCode,
-      Pageable pageable);
+
 
   /**
    * Tìm các sản phẩm khác trong cùng danh mục (đã published, không bao gồm sản phẩm hiện tại). Giới
@@ -127,7 +98,7 @@ public interface ProductRepository
   // Đếm sản phẩm sắp hết hàng của Farmer (ví dụ: < 5)
   Long countByFarmerIdAndStockQuantityLessThan(Long farmerId, int threshold);
 
-  // File: catalog/repository/ProductRepository.java
+
   @Query(
       "SELECT new com.yourcompany.agritrade.catalog.dto.response.TopProductResponse("
           + "oi.product.id, oi.product.name, oi.product.slug, SUM(oi.quantity), SUM(oi.totalPrice)) "
@@ -139,16 +110,14 @@ public interface ProductRepository
           + // Group by các trường của product
           "ORDER BY SUM(oi.quantity) DESC")
   List<TopProductResponse> findTopSellingProductsByFarmerWithoutThumbnail(
-      @Param("farmerId") Long farmerId, Pageable pageable); // Đổi tên phương thức
+      @Param("farmerId") Long farmerId, Pageable pageable);
 
   // Đếm sản phẩm theo trạng thái (cho Admin)
   Long countByStatus(ProductStatus status);
 
-  // Trong ProductRepository.java
+
   Page<Product> findByFarmerIdAndStatus(Long farmerId, ProductStatus status, Pageable pageable);
 
-  // ****** THÊM PHƯƠNG THỨC NÀY ******
-  // Cách 1: Dùng @Query với JOIN FETCH (Như đã làm cho OrderRepository)
   @Query(
       "SELECT p FROM Product p "
           + "LEFT JOIN FETCH p.farmer f "
@@ -161,15 +130,6 @@ public interface ProductRepository
           "WHERE p.id = :productId")
   Optional<Product> findByIdWithDetails(@Param("productId") Long productId);
 
-  // Cách 2: Dùng @EntityGraph (Gọn hơn)
-  /*
-  @EntityGraph(attributePaths = {
-      "farmer", "farmer.farmerProfile", "category", "images", "pricingTiers"
-  })
-  Optional<Product> findById(Long productId); // Có thể override findById hoặc tạo tên mới
-  // Nếu override findById, hãy đảm bảo bạn hiểu rõ ảnh hưởng của nó đến các lời gọi findById khác
-  // Tạo tên mới như findByIdWithDetails có thể an toàn hơn.
-  */
-  // **********************************
+
 
 }

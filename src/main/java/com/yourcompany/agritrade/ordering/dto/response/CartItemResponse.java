@@ -12,6 +12,5 @@ public class CartItemResponse {
   private LocalDateTime addedAt;
   private LocalDateTime updatedAt;
   private ProductSummaryResponse product; // Nhúng thông tin tóm tắt sản phẩm
-  private BigDecimal
-      itemTotal; // Giá trị tạm tính (price * quantity) - sẽ được tính trong mapper/service
+  private BigDecimal itemTotal; // Giá trị tạm tính (price * quantity) - sẽ được tính trong mapper/service
 }

@@ -11,6 +11,7 @@ import com.yourcompany.agritrade.usermanagement.service.UserService;
 import jakarta.validation.Valid;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Slf4j
 // @PreAuthorize("isAuthenticated()") // Yêu cầu xác thực cho tất cả API trong controller này
 public class UserController {
 
@@ -75,7 +77,7 @@ public class UserController {
       try {
         roleEnum = RoleType.valueOf(role.toUpperCase());
       } catch (IllegalArgumentException e) {
-        // log.warn("Invalid role value received: {}", role);
+         log.warn("Invalid role value received: {}", role);
       }
     }
     Page<UserResponse> users = adminUserService.getAllUsers(pageable, roleEnum, keyword, isActive);

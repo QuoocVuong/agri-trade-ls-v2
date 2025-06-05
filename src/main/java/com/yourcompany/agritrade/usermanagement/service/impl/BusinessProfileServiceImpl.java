@@ -35,17 +35,7 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
       Authentication authentication, BusinessProfileRequest request) {
     User user = getUserFromAuthentication(authentication);
 
-    // Đảm bảo user là Business Buyer
-    //        if (!user.getRoles().stream().anyMatch(role -> role.getName() ==
-    // RoleType.ROLE_BUSINESS_BUYER)) {
-    //            throw new AccessDeniedException("User is not a Business Buyer");
-    //        }
 
-    // Kiểm tra tỉnh Lạng Sơn
-    //        if (!LANG_SON_PROVINCE_CODE.equals(request.getBusinessProvinceCode())) {
-    //            throw new BadRequestException("Business profile province must be Lang Son (" +
-    // LANG_SON_PROVINCE_CODE + ").");
-    //        }
 
     // Kiểm tra xem profile đã tồn tại chưa để biết là tạo mới hay cập nhật
     boolean isNewProfile = !businessProfileRepository.existsById(user.getId());
@@ -65,11 +55,8 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
     // Nếu profile đã tồn tại (cập nhật)
     if (profile.getUserId() != null) {
       businessProfileMapper.updateBusinessProfileFromRequest(request, profile);
-      // Không thay đổi trạng thái duyệt khi user tự cập nhật
-      // Trạng thái duyệt chỉ thay đổi bởi Admin
+
     }
-    // Nếu là tạo mới, trạng thái duyệt sẽ là PENDING (mặc định trong DB hoặc set ở đây nếu cần)
-    // profile.setVerificationStatus(VerificationStatus.PENDING); // Nếu cần set tường minh
 
     // Lưu profile (tạo mới hoặc cập nhật)
     BusinessProfile savedProfile = businessProfileRepository.save(profile);
@@ -101,12 +88,6 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
             .findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("BusinessProfile", "userId", userId));
 
-    // Optional: Kiểm tra xem user có đúng là Business Buyer không trước khi trả về
-    // if (!profile.getUser().getRoles().stream().anyMatch(role -> role.getName() ==
-    // RoleType.ROLE_BUSINESS_BUYER)) {
-    //     throw new ResourceNotFoundException("BusinessProfile", "userId", userId); // Hoặc lỗi
-    // khác
-    // }
 
     return businessProfileMapper.toBusinessProfileResponse(profile);
   }

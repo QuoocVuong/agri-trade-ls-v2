@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class NotificationResponse {
   private Long id;
-  // Không cần gửi recipientId vì user chỉ lấy thông báo của mình
+
   private String message;
   private NotificationType type;
   private boolean isRead;

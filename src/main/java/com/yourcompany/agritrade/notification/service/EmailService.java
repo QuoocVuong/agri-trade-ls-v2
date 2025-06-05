@@ -15,37 +15,33 @@ public interface EmailService {
 
   void sendPasswordResetEmail(User user, String token, String resetUrl);
 
-  void sendWelcomeEmail(User user); // Thêm mới
+  void sendWelcomeEmail(User user);
 
-  void sendPasswordChangedEmail(User user); // Thêm mới
+  void sendPasswordChangedEmail(User user);
 
   // --- Order Related ---
-  void sendOrderConfirmationEmailToBuyer(Order order); // Thêm mới
+  void sendOrderConfirmationEmailToBuyer(Order order);
 
-  void sendNewOrderNotificationToFarmer(Order order); // Thêm mới
+  void sendNewOrderNotificationToFarmer(Order order);
 
-  void sendOrderStatusUpdateEmailToBuyer(Order order, OrderStatus previousStatus); // Thêm mới
+  void sendOrderStatusUpdateEmailToBuyer(Order order, OrderStatus previousStatus);
 
-  void sendOrderCancellationEmailToBuyer(Order order); // Thêm mới
+  void sendOrderCancellationEmailToBuyer(Order order);
 
-  void sendOrderCancellationNotificationToFarmer(Order order); // Thêm mới
+  void sendOrderCancellationNotificationToFarmer(Order order);
 
   // --- Payment Related ---
-  void sendPaymentSuccessEmailToBuyer(Order order); // Thêm mới
+  void sendPaymentSuccessEmailToBuyer(Order order);
 
-  void sendPaymentFailureEmailToBuyer(Order order); // Thêm mới
+  void sendPaymentFailureEmailToBuyer(Order order);
 
-  // --- Product/Review/Farmer Approval Related (Thêm nếu cần) ---
-  // void sendProductApprovedEmailToFarmer(Product product);
-  // void sendProductRejectedEmailToFarmer(Product product, String reason);
-  // void sendFarmerProfileApprovedEmail(FarmerProfile profile);
-  // void sendFarmerProfileRejectedEmail(FarmerProfile profile, String reason);
+
   void sendProductApprovedEmailToFarmer(Product product, User farmer);
 
   void sendProductRejectedEmailToFarmer(Product product, String reason, User farmer);
 
   // --- Invoice Related ---
-  void sendOverdueInvoiceReminderEmail(Invoice invoice); // Mới
-  void sendDueSoonInvoiceReminderEmail(Invoice invoice);  // Mới
-  void sendOverdueInvoiceAdminEmail(Invoice invoice, List<User> adminUsers); // Mới
+  void sendOverdueInvoiceReminderEmail(Invoice invoice);
+  void sendDueSoonInvoiceReminderEmail(Invoice invoice);
+  void sendOverdueInvoiceAdminEmail(Invoice invoice, List<User> adminUsers);
 }

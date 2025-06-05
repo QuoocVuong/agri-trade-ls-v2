@@ -21,7 +21,7 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
 
   // Inject các bean cần thiết cho xác thực JWT
   private final JwtTokenProvider tokenProvider;
-  private final UserDetailsServiceImpl userDetailsService; // Hoặc service tương ứng
+  private final UserDetailsServiceImpl userDetailsService;
 
   @Override
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -38,13 +38,13 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
         try {
           if (tokenProvider.validateToken(jwt)) { // Hàm validate token của bạn
             String username = tokenProvider.getEmailFromToken(jwt); // Hàm lấy username từ token
-            // Tạo đối tượng Authentication (ví dụ dùng UserDetails)
+            // Tạo đối tượng Authentication
             var userDetails = userDetailsService.loadUserByUsername(username);
             UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
                     userDetails, null, userDetails.getAuthorities());
 
-            // *** Quan trọng: Set Principal cho WebSocket session ***
+
             accessor.setUser(authentication);
             log.info("STOMP CONNECT authenticated for user: {}", username);
           } else {
@@ -69,14 +69,14 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
           "STOMP SUBSCRIBE received for user: {} to destination: {}",
           (user != null ? user.getName() : "anonymous"),
           accessor.getDestination());
-      // Kiểm tra quyền subscribe nếu cần
+      // Kiểm tra quyền subscribe
     } else if (accessor != null && StompCommand.SEND.equals(accessor.getCommand())) {
       Principal user = accessor.getUser();
       log.debug(
           "STOMP SEND received for user: {} to destination: {}",
           (user != null ? user.getName() : "anonymous"),
           accessor.getDestination());
-      // Kiểm tra quyền gửi nếu cần
+
     }
 
     return message;

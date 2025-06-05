@@ -26,7 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-@Service("firebaseStorageService") // Đặt tên cụ thể cho bean
+@Service("firebaseStorageService")
 @Primary
 @Slf4j
 public class FirebaseStorageService implements FileStorageService {
@@ -37,15 +37,9 @@ public class FirebaseStorageService implements FileStorageService {
   @Value("${firebase.storage.service-account-key-path}")
   private String serviceAccountKeyPath;
 
-  // Bỏ @Value cho publicBaseUrl nếu bạn quyết định luôn dùng Signed URL
-  // (Tùy chọn) Base URL nếu bucket public
-  //    @Value("${firebase.storage.public-base-url:#{null}}") // Mặc định là null
-  //    private String publicBaseUrl;
 
   private Storage storage; // Client của Google Cloud Storage
 
-  // private Bucket bucket; // Không cần bucket ở đây nữa nếu dùng
-  // StorageClient.getInstance().bucket() trực tiếp
 
   @PostConstruct // Khởi tạo Firebase Admin SDK khi service được tạo
   @Override
@@ -71,7 +65,7 @@ public class FirebaseStorageService implements FileStorageService {
               .setStorageBucket(bucketName)
               .build();
 
-      // Khởi tạo FirebaseApp nếu chưa có (tránh lỗi nếu có config Firebase khác)
+      // Khởi tạo FirebaseApp nếu chưa có
       if (FirebaseApp.getApps().isEmpty()) {
         FirebaseApp.initializeApp(options);
         log.info("FirebaseApp initialized.");
@@ -83,8 +77,7 @@ public class FirebaseStorageService implements FileStorageService {
 
       // Lấy Storage client từ FirebaseApp đã khởi tạo
       this.storage = StorageClient.getInstance().bucket().getStorage();
-      // Hoặc StorageClient.getInstance(FirebaseApp.getInstance()).bucket().getStorage();
-      // this.bucket = StorageClient.getInstance().bucket();// Lấy bucket cụ thể
+
       log.info("Firebase Storage initialized for bucket: {}", bucketName);
 
     } catch (IOException e) {
@@ -112,8 +105,7 @@ public class FirebaseStorageService implements FileStorageService {
       BlobInfo blobInfo =
           BlobInfo.newBuilder(blobId)
               .setContentType(file.getContentType())
-              // Thêm metadata nếu cần (ví dụ: cờ public)
-              // .setMetadata(Map.of("public", "true"))
+
               .build();
 
       // Upload file lên Firebase Storage
@@ -133,33 +125,20 @@ public class FirebaseStorageService implements FileStorageService {
 
   @Override
   public Stream<Path> loadAll(String subFolderPrefix) {
-    // Việc list tất cả file trong bucket/subfolder có thể tốn kém và không hiệu quả với cloud
-    // storage.
-    // Thường thì bạn sẽ lưu thông tin file (URL hoặc key) trong DB và truy vấn từ đó.
-    // Trả về Stream rỗng hoặc ném lỗi không hỗ trợ.
     log.warn(
         "loadAll operation is not efficiently supported by FirebaseStorageService. Returning empty stream.");
     return Stream.empty();
-    // Hoặc nếu thực sự cần:
-    // try {
-    //     Page<Blob> blobs = bucket.list(Storage.BlobListOption.prefix(subFolder + "/"),
-    // Storage.BlobListOption.currentDirectory());
-    //     // Cần chuyển đổi Blob sang Path (có thể không trực tiếp)
-    //     return StreamSupport.stream(blobs.iterateAll().spliterator(), false).map(blob ->
-    // Paths.get(blob.getName()));
-    // } catch (Exception e) {
-    //     throw new StorageException("Failed to read stored files in " + subFolder, e);
-    // }
+
   }
 
   @Override
   public Path load(String blobPath) {
     // Không trả về Path vật lý vì file nằm trên cloud.
-    // Phương thức này có thể không còn ý nghĩa.
+
     throw new UnsupportedOperationException("load(blobPath) is not supported");
   }
 
-  @Override // Đảm bảo @Override khớp với interface mới
+  @Override
   public Resource loadAsResource(String blobPath) { // Nhận vào đường dẫn đầy đủ trên Storage
     try {
       Blob blob = storage.get(BlobId.of(bucketName, blobPath));
@@ -174,12 +153,6 @@ public class FirebaseStorageService implements FileStorageService {
     }
   }
 
-  // Overload để tương thích interface cũ (nhưng nên đổi interface)
-  //    @Override
-  //    public Resource loadAsResource(String filename, String subFolder) {
-  //        String blobPath = (StringUtils.hasText(subFolder) ? subFolder + "/" : "") + filename;
-  //        return loadAsResource(blobPath);
-  //    }
 
   @Override // Đảm bảo @Override khớp với interface mới
   public void delete(String blobPath) { // Nhận vào đường dẫn đầy đủ
@@ -190,8 +163,6 @@ public class FirebaseStorageService implements FileStorageService {
         log.info("Deleted file from Firebase Storage: {}", blobPath);
       } else {
         log.warn("File not found or could not be deleted from Firebase Storage: {}", blobPath);
-        // Không ném lỗi nếu file không tồn tại để tránh lỗi khi xóa nhiều lần
-        // throw new StorageFileNotFoundException("Could not delete file: " + blobPath);
       }
     } catch (Exception e) {
       log.error("Error deleting file from Firebase Storage: {}", blobPath, e);
@@ -199,43 +170,7 @@ public class FirebaseStorageService implements FileStorageService {
     }
   }
 
-  // Overload để tương thích interface cũ
-  //    @Override
-  //    public void delete(String filename, String subFolder) {
-  //        String blobPath = (StringUtils.hasText(subFolder) ? subFolder + "/" : "") + filename;
-  //        delete(blobPath);
-  //    }
 
-  //    @Override // Đảm bảo @Override khớp với interface mới
-  //    public String getFileUrl(String blobPath) { // Nhận vào đường dẫn đầy đủ
-  //        // Cách 1: Nếu bucket public-read
-  //        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
-  //            // Cần encode tên file/đường dẫn để tránh lỗi với ký tự đặc biệt
-  //            try {
-  //                String encodedBlobPath = URLEncoder.encode(blobPath,
-  // StandardCharsets.UTF_8.toString())
-  //                        .replace("+", "%20"); // Thay dấu + thành %20
-  //                return publicBaseUrl + "/" + encodedBlobPath;
-  //            } catch (Exception e) {
-  //                log.error("Error encoding blob path for public URL", e);
-  //                // Fallback về signed URL nếu encode lỗi
-  //            }
-  //        }
-  //
-  //        // Cách 2: Tạo Signed URL (có thời hạn truy cập) - An toàn hơn
-  //        try {
-  //            BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, blobPath)).build();
-  //            // Tạo URL có hiệu lực trong 1 giờ (ví dụ)
-  //            // Cần cấp quyền "Service Account Token Creator" cho service account của bạn trong
-  // IAM
-  //            java.net.URL signedUrl = storage.signUrl(blobInfo, 1, TimeUnit.HOURS,
-  // Storage.SignUrlOption.withV4Signature());
-  //            return signedUrl.toString();
-  //        } catch (Exception e) {
-  //            log.error("Error generating signed URL for blob: {}", blobPath, e);
-  //            throw new StorageException("Could not generate file URL for " + blobPath, e);
-  //        }
-  //    }
   @Override
   public String getFileUrl(String blobPath) { // Nhận blobPath
     // Luôn tạo Signed URL
@@ -248,25 +183,15 @@ public class FirebaseStorageService implements FileStorageService {
     } catch (Exception e) {
       log.error("Error generating signed URL for blob: {}", blobPath, e);
       // Trả về một URL placeholder hoặc ném lỗi tùy theo yêu cầu
-      // Ví dụ, trả về blobPath để client biết có lỗi nhưng vẫn có key
-      // Hoặc throw new StorageException("Could not generate file URL for " + blobPath, e);
-      return "error-generating-url/" + blobPath; // Hoặc một URL lỗi cố định
+
+      return "error-generating-url/" + blobPath;
     }
   }
 
-  // Overload để tương thích interface cũ
-  //    @Override
-  //    public String getFileUrl(String filename, String subFolder) {
-  //        String blobPath = (StringUtils.hasText(subFolder) ? subFolder + "/" : "") + filename;
-  //        return getFileUrl(blobPath);
-  //    }
+
 
   @Override
   public void deleteAll(String subFolderPrefix) {
-    // Xóa tất cả object trong một "thư mục" trên cloud storage phức tạp hơn.
-    // Cần list tất cả blobs với prefix và xóa từng cái một.
-    // Hoặc dùng các thư viện/công cụ quản lý bucket.
     log.warn("deleteAll not implemented for Firebase");
-    // Implement nếu thực sự cần thiết và cẩn thận.
   }
 }

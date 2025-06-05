@@ -23,10 +23,10 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
   protected FarmerProfileMapper farmerProfileMapper;
   @Autowired protected BusinessProfileMapper businessProfileMapper;
 
-  // ****** INJECT WebSocketEventListener ******
+
   @Autowired protected WebSocketEventListener presenceService;
 
-  // ***************************************
+
 
   // Chỉ map các trường cơ bản từ User sang UserResponse
   @Mapping(source = "roles", target = "roles", qualifiedByName = "rolesToRoleNames")
@@ -36,20 +36,10 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
 
   // Mapping cho UserProfileResponse (kết hợp)
   @Mapping(source = "roles", target = "roles", qualifiedByName = "rolesToRoleNames")
-  // Map farmerProfile và businessProfile nếu tồn tại (cần có getter trong User entity hoặc lấy từ
-  // repo)
-  // Giả sử bạn đã thêm getter hoặc sẽ lấy riêng trong service
-  //    @Mapping(source = "farmerProfile", target = "farmerProfile") // MapStruct sẽ dùng
-  // FarmerProfileMapper
-  //    @Mapping(source = "businessProfile", target = "businessProfile") // MapStruct sẽ dùng
-  // BusinessProfileMapper
-  // MapStruct sẽ tự động map các trường giống tên từ User sang các trường kế thừa trong
-  // UserProfileResponse
-  // Các trường farmerProfile và businessProfile sẽ là null sau khi map này, và được gán giá trị
-  // trong Service
+
   public abstract UserProfileResponse toUserProfileResponse(User user);
 
-  // ****** THÊM PHƯƠNG THỨC MAP SANG UserInfoSimpleResponse ******
+  //  THÊM PHƯƠNG THỨC MAP SANG UserInfoSimpleResponse
   @Mapping(target = "id", source = "id")
   @Mapping(target = "fullName", source = "fullName")
   @Mapping(target = "avatarUrl", source = "avatarUrl")
@@ -57,12 +47,10 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
   @Mapping(target = "online", expression = "java(presenceService.isUserOnline(user.getId()))")
   public abstract UserInfoSimpleResponse toUserInfoSimpleResponse(User user);
 
-  // ***********************************************************
-
-  // ****** THÊM PHƯƠNG THỨC MAP LIST SANG UserInfoSimpleResponse ******
+  // THÊM PHƯƠNG THỨC MAP LIST SANG UserInfoSimpleResponse
   public abstract List<UserInfoSimpleResponse> toUserInfoSimpleResponseList(List<User> users);
 
-  // ****************************************************************
+
 
   @Named("rolesToRoleNames")
   Set<String> rolesToRoleNames(Set<Role> roles) { // Bỏ default khi là abstract class

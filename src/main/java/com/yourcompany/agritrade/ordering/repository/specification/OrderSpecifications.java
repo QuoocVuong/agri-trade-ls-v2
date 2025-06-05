@@ -78,7 +78,7 @@ public class OrderSpecifications {
       Join<Order, User> buyerJoin =
           root.join(
               "buyer",
-              JoinType.LEFT); // LEFT JOIN để không loại bỏ đơn nếu buyer bị null (dù không nên)
+              JoinType.LEFT); // LEFT JOIN để không loại bỏ đơn nếu buyer bị null
       return criteriaBuilder.like(criteriaBuilder.lower(buyerJoin.get("fullName")), namePattern);
     };
   }
@@ -153,5 +153,5 @@ public class OrderSpecifications {
     };
   }
 
-  // Có thể thêm các Specification khác (lọc theo ngày tạo, tổng tiền, mã đơn hàng...)
+
 }

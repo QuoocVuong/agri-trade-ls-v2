@@ -45,14 +45,14 @@ public class SecurityConfig {
     return new RestTemplate();
   }
 
-  // Cần bean này để inject vào AuthController cho việc login
+
   @Bean
   public AuthenticationManager authenticationManager(
       AuthenticationConfiguration authenticationConfiguration) throws Exception {
     return authenticationConfiguration.getAuthenticationManager();
   }
 
-  // *** Bean cấu hình CORS ***
+  //  Bean cấu hình CORS
   @Bean
   CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();

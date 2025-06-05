@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.ordering.domain; // Đặt trong module ordering
+package com.yourcompany.agritrade.ordering.domain;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;

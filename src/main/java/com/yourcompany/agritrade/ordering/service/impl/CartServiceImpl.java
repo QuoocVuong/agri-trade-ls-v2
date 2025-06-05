@@ -96,7 +96,7 @@ public class CartServiceImpl implements CartService {
                 "Sản phẩm '" + product.getName() + "' không còn được bán và đã được xóa khỏi giỏ.";
             adjustmentType = "REMOVED";
           } else {
-            // *** KIỂM TRA VÀ ĐIỀU CHỈNH SỐ LƯỢNG ***
+            //  KIỂM TRA VÀ ĐIỀU CHỈNH SỐ LƯỢNG
             int currentStock = product.getStockQuantity();
             int quantityInCart = cartItem.getQuantity();
 
@@ -126,7 +126,7 @@ public class CartServiceImpl implements CartService {
                       + " do thay đổi tồn kho.";
               adjustmentType = "ADJUSTED";
             }
-            // *************************************
+
           }
         }
       }
@@ -210,14 +210,14 @@ public class CartServiceImpl implements CartService {
 
     int currentStock = product.getStockQuantity(); // Lấy tồn kho hiện tại
 
-    // Kiểm tra số lượng yêu cầu (chỉ cho lần thêm này)
+    // Kiểm tra số lượng yêu cầu
     if (currentStock < request.getQuantity()) {
-      // ****** SỬA DÒNG NÀY ******
+
       throw new OutOfStockException(
           "Not enough stock for product: " + product.getName(),
           currentStock // Truyền số lượng tồn thực tế
           );
-      // *************************
+
     }
 
     Optional<CartItem> existingItemOpt =
@@ -230,7 +230,7 @@ public class CartServiceImpl implements CartService {
           cartItem.getQuantity() + request.getQuantity(); // Tính tổng số lượng sẽ có trong giỏ
       // Kiểm tra lại tồn kho với tổng số lượng mới
       if (currentStock < newTotalQuantity) {
-        // ****** SỬA DÒNG NÀY ******
+
         throw new OutOfStockException(
             "Not enough stock for product: "
                 + product.getName()
@@ -239,7 +239,7 @@ public class CartServiceImpl implements CartService {
                 + ")",
             currentStock // Vẫn là số lượng tồn thực tế
             );
-        // *************************
+
       }
       cartItem.setQuantity(newTotalQuantity);
       log.info(
@@ -294,12 +294,12 @@ public class CartServiceImpl implements CartService {
 
     // Kiểm tra tồn kho với số lượng mới
     if (currentStock < newQuantity) {
-      // ****** SỬA DÒNG NÀY ******
+
       throw new OutOfStockException(
           "Not enough stock for product: " + product.getName(),
           currentStock // Truyền số lượng tồn thực tế
           );
-      // *************************
+
     }
 
     cartItem.setQuantity(request.getQuantity());

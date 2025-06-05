@@ -44,8 +44,8 @@ public class ChatServiceImpl implements ChatService {
   private final UserRepository userRepository;
   private final ChatRoomMapper chatRoomMapper;
   private final ChatMessageMapper chatMessageMapper;
-  private final SimpMessagingTemplate messagingTemplate; // Inject để gửi qua WebSocket
-  private final ProductRepository productRepository;
+  private final SimpMessagingTemplate messagingTemplate;
+
   @Value("${app.frontend.url:http://localhost:4200}") // Lấy URL frontend
   private String frontendUrl;
 
@@ -99,9 +99,7 @@ public class ChatServiceImpl implements ChatService {
             .orElseGet(() -> chatRoomRepository.save(new ChatRoom(sender, recipient)));
 
 
-    // --- XỬ LÝ GỬI TIN NHẮN NGỮ CẢNH SẢN PHẨM (NẾU CÓ) ---
-    // Chỉ gửi tin nhắn context nếu đây là tin nhắn đầu tiên có context trong phòng này
-    // Hoặc bạn có thể có logic khác để tránh gửi lặp lại (ví dụ: kiểm tra tin nhắn cuối cùng)
+
     boolean shouldSendContextMessage = request.getContextProductId() != null &&
             request.getContextProductName() != null &&
             !hasRecentContextMessage(room.getId(), request.getContextProductId(), sender.getId());
@@ -147,7 +145,7 @@ public class ChatServiceImpl implements ChatService {
         chatRoomRepository.save(room);
       }
     }
-    // --- KẾT THÚC XỬ LÝ TIN NHẮN NGỮ CẢNH ---
+
 
 
 
@@ -280,7 +278,7 @@ public class ChatServiceImpl implements ChatService {
             user.getId(),
             roomId);
 
-        // *** Gửi thông báo đã đọc qua WebSocket cho người kia ***
+        // Gửi thông báo đã đọc qua WebSocket cho người kia
         User otherUser =
             room.getUser1().getId().equals(user.getId()) ? room.getUser2() : room.getUser1();
         String readNotificationDestination =

@@ -33,28 +33,21 @@ public class FileController {
 
   // Endpoint để upload một file
   @PostMapping("/upload")
-  @PreAuthorize("isAuthenticated()") // Ví dụ: Yêu cầu đăng nhập để upload
+  @PreAuthorize("isAuthenticated()") //  Yêu cầu đăng nhập để upload
   public ResponseEntity<ApiResponse<FileUploadResponse>> uploadFile(
       @RequestParam("file") MultipartFile file,
       @RequestParam(required = false, defaultValue = "images")
           String type) { // Phân loại thư mục con
 
-    // Kiểm tra loại file nếu cần (ví dụ chỉ cho phép ảnh)
-    // if (!Arrays.asList(MediaType.IMAGE_JPEG_VALUE,
-    // MediaType.IMAGE_PNG_VALUE).contains(file.getContentType())) {
-    //     return ResponseEntity.badRequest().body(ApiResponse.badRequest("Only JPG/PNG images are
-    // allowed"));
-    // }
-
     String blobPath = fileStorageService.store(file, type);
-    String fileDownloadUri = fileStorageService.getFileUrl(blobPath); // <<< GỌI VỚI 1 THAM SỐ
+    String fileDownloadUri = fileStorageService.getFileUrl(blobPath);
 
     FileUploadResponse responseData =
         new FileUploadResponse(blobPath, fileDownloadUri, file.getContentType(), file.getSize());
     return ResponseEntity.ok(ApiResponse.success(responseData, "File uploaded successfully"));
   }
 
-  // Endpoint để upload nhiều file (tùy chọn)
+  // Endpoint để upload nhiều file
   @PostMapping("/uploadMultiple")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<List<FileUploadResponse>>> uploadMultipleFiles(
@@ -65,12 +58,9 @@ public class FileController {
         Arrays.stream(files)
             .map(
                 file -> {
-                  //                    String filename = fileStorageService.store(file, type);
-                  //                    String fileDownloadUri =
-                  // fileStorageService.getFileUrl(filename, type);
                   String blobPath = fileStorageService.store(file, type);
                   String fileDownloadUri =
-                      fileStorageService.getFileUrl(blobPath); // <<< GỌI VỚI 1 THAM SỐ
+                      fileStorageService.getFileUrl(blobPath);
                   return new FileUploadResponse(
                       blobPath, fileDownloadUri, file.getContentType(), file.getSize());
                 })
@@ -80,7 +70,7 @@ public class FileController {
   }
 
   // Endpoint để tải/xem file
-  // Endpoint download giữ nguyên cách nhận path variable
+
   @GetMapping("/download/**")
   public ResponseEntity<Resource> downloadFile(HttpServletRequest request) {
     String finalBlobPath = extractBlobPath(request, "/download/"); // Truyền prefix
@@ -103,17 +93,16 @@ public class FileController {
         .body(resource);
   }
 
-  // Endpoint để xóa file (tùy chọn, cần bảo mật cẩn thận)
+  // Endpoint để xóa file
   @DeleteMapping("/**")
   @PreAuthorize(
-      "hasRole('ADMIN') or hasAuthority('MANAGE_OWN_FILES')") // Ví dụ: Chỉ Admin hoặc người sở hữu
+      "hasRole('ADMIN') or hasAuthority('MANAGE_OWN_FILES')") // Chỉ Admin hoặc người sở hữu
   // được xóa
   public ResponseEntity<ApiResponse<Void>> deleteFile(HttpServletRequest request) {
-    // Đối với delete, prefix có thể chỉ là "" nếu mapping là "/**" trong context của /api/files
-    // Hoặc nếu bạn có một prefix cụ thể cho delete, ví dụ /delete/**, thì truyền prefix đó
+
     String finalBlobPath =
-        extractBlobPath(request, ""); // Giả sử không có prefix cố định cho delete
-    // hoặc nếu endpoint là /delete/** thì truyền "/delete/"
+        extractBlobPath(request, "");
+
     if (!StringUtils.hasText(finalBlobPath)) {
       return ResponseEntity.badRequest()
           .body(ApiResponse.badRequest("Invalid file path for deletion"));
@@ -131,16 +120,8 @@ public class FileController {
     }
   }
 
-  // ****** THÊM HÀM HELPER NÀY ******
-  /**
-   * Trích xuất phần đường dẫn file (blobPath) từ HttpServletRequest. Nó loại bỏ phần base path của
-   * API và prefix của endpoint (nếu có).
-   *
-   * @param request HttpServletRequest hiện tại.
-   * @param endpointPrefix Prefix của endpoint cần loại bỏ (ví dụ: "/download/", "/delete/", hoặc ""
-   *     nếu không có).
-   * @return blobPath được trích xuất, hoặc null nếu không thành công.
-   */
+  // HÀM HELPER
+
   private String extractBlobPath(HttpServletRequest request, String endpointPrefix) {
     // Lấy toàn bộ đường dẫn sau context path của ứng dụng
     String path =
@@ -150,9 +131,9 @@ public class FileController {
         (String) request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
 
     if (path == null || bestMatchPattern == null) {
-      // Fallback nếu không lấy được từ HandlerMapping (ít xảy ra với Spring MVC chuẩn)
+
       String requestUri = request.getRequestURI();
-      String contextPath = request.getContextPath(); // Thường là rỗng cho Spring Boot
+      String contextPath = request.getContextPath();
       String servletPath = "/api/files"; // Base path của FileController
 
       int startIndex = requestUri.indexOf(contextPath + servletPath);
@@ -175,12 +156,7 @@ public class FileController {
     AntPathMatcher apm = new AntPathMatcher();
     String extractedPath = apm.extractPathWithinPattern(bestMatchPattern, path);
 
-    // Nếu endpointPrefix không rỗng và extractedPath bắt đầu bằng nó, loại bỏ prefix
-    // Điều này thường không cần thiết nếu bestMatchPattern đã bao gồm prefix
-    // Ví dụ: nếu bestMatchPattern là "/api/files/download/**", extractedPath sẽ là
-    // "subfolder/file.jpg"
-    // Nếu bestMatchPattern là "/api/files/**" và path là "/api/files/download/subfolder/file.jpg",
-    // thì extractedPath sẽ là "download/subfolder/file.jpg", lúc này cần bỏ "download/"
+
     if (StringUtils.hasText(endpointPrefix)
         && extractedPath.startsWith(
             endpointPrefix.startsWith("/") ? endpointPrefix.substring(1) : endpointPrefix)) {
@@ -195,7 +171,6 @@ public class FileController {
     return extractedPath;
   }
 
-  // **********************************
   // --- Helper Method ---
   private String getContentType(HttpServletRequest request, Resource resource) {
     String contentType = null;
@@ -203,14 +178,14 @@ public class FileController {
       contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
     } catch (IOException ex) {
       log.info("Could not determine file type via ServletContext.");
-      // Thử đoán từ tên file nếu không được
+
       String filename = resource.getFilename();
       if (filename != null) {
         if (filename.endsWith(".png")) contentType = MediaType.IMAGE_PNG_VALUE;
         else if (filename.endsWith(".jpg") || filename.endsWith(".jpeg"))
           contentType = MediaType.IMAGE_JPEG_VALUE;
         else if (filename.endsWith(".gif")) contentType = MediaType.IMAGE_GIF_VALUE;
-        // Thêm các kiểu file khác nếu cần
+
       }
     }
     return contentType != null ? contentType : "application/octet-stream";
