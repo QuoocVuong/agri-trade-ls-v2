@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.catalog.repository.specification;
 import com.yourcompany.agritrade.catalog.domain.Category;
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
+import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import jakarta.persistence.criteria.*;
 import java.math.BigDecimal;
@@ -130,6 +131,18 @@ public class ProductSpecifications {
       // Join với bảng User (farmer) để lấy id
       Join<Product, User> farmerJoin = root.join("farmer", JoinType.INNER);
       return criteriaBuilder.equal(farmerJoin.get("id"), farmerId);
+    };
+  }
+
+  public static Specification<Product> inWard(String wardCode) {
+    return (root, query, criteriaBuilder) -> {
+      if (!StringUtils.hasText(wardCode)) {
+        return criteriaBuilder.conjunction();
+      }
+      // Join Product -> User (farmer) -> FarmerProfile
+      Join<Product, User> farmerJoin = root.join("farmer", JoinType.INNER);
+      Join<User, FarmerProfile> profileJoin = farmerJoin.join("farmerProfile", JoinType.INNER); // INNER vì muốn lọc theo profile
+      return criteriaBuilder.equal(profileJoin.get("wardCode"), wardCode);
     };
   }
 

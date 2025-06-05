@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
+import com.yourcompany.agritrade.catalog.dto.response.SupplySourceResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -62,4 +63,15 @@ public interface ProductService {
   ProductDetailResponse rejectProduct(Long productId, String reason); // Có thể thêm lý do từ chối
 
   void forceDeleteProduct(Long productId); // Xóa vật lý (nếu cần)
+
+
+  Page<SupplySourceResponse> findSupplySources(
+          String productKeyword,
+          Integer categoryId,
+          String provinceCode,
+          String districtCode, // Thêm districtCode
+          String wardCode,
+          Integer minQuantityNeeded, // Số lượng tối thiểu người mua cần
+          Pageable pageable
+  );
 }

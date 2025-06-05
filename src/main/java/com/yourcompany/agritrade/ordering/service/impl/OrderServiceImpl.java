@@ -15,9 +15,7 @@ import com.yourcompany.agritrade.common.util.VnPayUtils;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.ordering.domain.*;
-import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
-import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
-import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
+import com.yourcompany.agritrade.ordering.dto.request.*;
 import com.yourcompany.agritrade.ordering.dto.response.*;
 import com.yourcompany.agritrade.ordering.mapper.OrderMapper;
 import com.yourcompany.agritrade.ordering.repository.*;
@@ -1476,4 +1474,99 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     log.info("Tạo URL thanh toán thành công cho đơn hàng {}, phương thức {}: {}", order.getOrderCode(), paymentMethod, paymentUrlResponse.getPaymentUrl());
     return paymentUrlResponse;
   }
+
+  @Override
+  @Transactional
+  public OrderResponse createAgreedOrder(Authentication authentication, AgreedOrderRequest request) {
+    // User thực hiện hành động này có thể là Admin hoặc Farmer (tùy quy trình của bạn)
+    User actor = SecurityUtils.getCurrentAuthenticatedUser();
+
+
+    log.info("User {} is creating an agreed order.", actor.getEmail());
+
+    // **KIỂM TRA VAI TRÒ FARMER**
+    if (actor.getRoles().stream().noneMatch(role -> role.getName() == RoleType.ROLE_FARMER)) {
+      throw new AccessDeniedException("Only farmers can create agreed orders.");
+    }
+
+    // **LẤY FARMER ID TỪ CURRENT ACTOR**
+    User farmer = actor; // Người đang đăng nhập chính là farmer
+    log.info("Farmer {} is creating an agreed order. Buyer ID: {}",
+            farmer.getEmail(), request.getBuyerId());
+
+    User buyer = userRepository.findById(request.getBuyerId())
+            .orElseThrow(() -> new ResourceNotFoundException("Buyer", "id", request.getBuyerId()));
+
+    // Kiểm tra buyer không phải là chính farmer đó
+    if (farmer.getId().equals(buyer.getId())) {
+      throw new BadRequestException("Farmer cannot create an agreed order with themselves as the buyer.");
+    }
+
+
+    Order order = new Order();
+    order.setOrderCode(generateOrderCode()); // Dùng lại hàm generateOrderCode
+    order.setBuyer(buyer);
+    order.setFarmer(farmer);
+    order.setOrderType(OrderType.B2B); // Hoặc một loại mới như AGREED_DEAL
+    order.setStatus(OrderStatus.PENDING); // Hoặc AGREEMENT_PENDING_CONFIRMATION
+
+    // Thông tin giao hàng từ request
+    order.setShippingFullName(request.getShippingFullName());
+    order.setShippingPhoneNumber(request.getShippingPhoneNumber());
+    order.setShippingAddressDetail(request.getShippingAddressDetail());
+    order.setShippingProvinceCode(request.getShippingProvinceCode());
+    order.setShippingDistrictCode(request.getShippingDistrictCode());
+    order.setShippingWardCode(request.getShippingWardCode());
+
+    order.setPaymentMethod(request.getAgreedPaymentMethod());
+    // Dựa vào agreedPaymentMethod để set paymentStatus
+    if (request.getAgreedPaymentMethod() == PaymentMethod.INVOICE) {
+      order.setPaymentStatus(PaymentStatus.AWAITING_PAYMENT_TERM);
+    } else {
+      order.setPaymentStatus(PaymentStatus.PENDING); // Chờ thanh toán (ví dụ: chuyển khoản)
+    }
+    order.setNotes(request.getNotes());
+    // order.setExpectedDeliveryDate(request.getExpectedDeliveryDate()); // Nếu có trường này trong Order
+
+    BigDecimal calculatedSubTotal = BigDecimal.ZERO;
+    for (AgreedOrderItemRequest itemRequest : request.getItems()) {
+      Product productRef = productRepository.findById(itemRequest.getProductId())
+              .orElseThrow(() -> new ResourceNotFoundException("Product reference", "id", itemRequest.getProductId()));
+
+      OrderItem orderItem = new OrderItem();
+      orderItem.setProduct(productRef); // Lưu tham chiếu đến sản phẩm gốc
+      orderItem.setProductName(itemRequest.getProductName());
+      orderItem.setUnit(itemRequest.getUnit());
+      orderItem.setQuantity(itemRequest.getQuantity());
+      orderItem.setPricePerUnit(itemRequest.getPricePerUnit());
+      BigDecimal itemTotalPrice = itemRequest.getPricePerUnit().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+      orderItem.setTotalPrice(itemTotalPrice);
+      order.addOrderItem(orderItem);
+      calculatedSubTotal = calculatedSubTotal.add(itemTotalPrice);
+    }
+
+    order.setSubTotal(calculatedSubTotal);
+    // Phí ship và discount có thể là 0 nếu đã gộp vào agreedTotalAmount, hoặc tính riêng nếu cần
+    order.setShippingFee(request.getAgreedTotalAmount().subtract(calculatedSubTotal).max(BigDecimal.ZERO)); // Ví dụ
+    order.setDiscountAmount(BigDecimal.ZERO); // Hoặc giá trị thỏa thuận
+    order.setTotalAmount(request.getAgreedTotalAmount());
+
+    Order savedOrder = orderRepository.save(order);
+
+    // Tạo Payment record ban đầu
+    createInitialPaymentRecord(savedOrder); // Dùng lại hàm helper đã có
+
+    // Tạo Invoice nếu là phương thức INVOICE
+    if (savedOrder.getPaymentMethod() == PaymentMethod.INVOICE) {
+      invoiceService.getOrCreateInvoiceForOrder(savedOrder);
+    }
+
+    // Gửi thông báo
+    notificationService.sendOrderPlacementNotification(savedOrder); // Có thể cần điều chỉnh nội dung thông báo
+
+    log.info("Agreed order {} created by user {}.", savedOrder.getOrderCode(), actor.getEmail());
+    // Load lại đầy đủ để trả về
+    return orderMapper.toOrderResponse(orderRepository.findByIdWithDetails(savedOrder.getId()).orElse(savedOrder));
+  }
+
 }

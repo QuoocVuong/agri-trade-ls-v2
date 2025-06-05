@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.catalog.domain;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -104,7 +105,25 @@ public class Product {
   private String rejectReason; // Thêm trường lý do từ chối
 
   @Column // Có thể nullable nếu không phải SP nào cũng có cân nặng
-  private Integer weightInGrams; // Trọng lượng của 1 'unit' (đơn vị B2C) tính bằng gram
+  private Integer weightInGrams; // Trọng lượng của 1 'unit' (đơn vị B2C) tính
+  // bằng gram
+
+
+
+  @Column
+  private LocalDate harvestDate; // Ngày thu hoạch/dự kiến
+
+  @Column
+  private LocalDateTime lastStockUpdate; // Tự động cập nhật khi stockQuantity thay đổi
+
+  @Column(nullable = false)
+  private boolean negotiablePrice = true; // Mặc định là true
+
+  @Column(length = 50)
+  private String wholesaleUnit; // Đơn vị tính cho số lượng lớn (ví dụ: tấn, tạ)
+
+  @Column(precision = 15, scale = 2)
+  private BigDecimal referenceWholesalePrice; // Giá tham khảo cho đơn vị sỉ
 
   @CreationTimestamp
   @Column(nullable = false, updatable = false)

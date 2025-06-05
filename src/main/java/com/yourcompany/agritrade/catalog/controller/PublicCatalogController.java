@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.catalog.controller;
 import com.yourcompany.agritrade.catalog.dto.response.CategoryResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
+import com.yourcompany.agritrade.catalog.dto.response.SupplySourceResponse;
 import com.yourcompany.agritrade.catalog.service.CategoryService;
 import com.yourcompany.agritrade.catalog.service.ProductService;
 import com.yourcompany.agritrade.common.dto.ApiResponse;
@@ -84,5 +85,22 @@ public class PublicCatalogController {
     Page<ProductSummaryResponse> products =
         productService.getPublicProductsByFarmerId(farmerId, pageable);
     return ResponseEntity.ok(ApiResponse.success(products));
+  }
+
+  @GetMapping("/supply-sources") // Hoặc một tên khác phù hợp
+  public ResponseEntity<ApiResponse<Page<SupplySourceResponse>>> findSupplySources(
+          @RequestParam(required = false) String productKeyword,
+          @RequestParam(required = false) Integer categoryId,
+          @RequestParam(required = false) String provinceCode,
+          @RequestParam(required = false) String districtCode, // Thêm districtCode
+          @RequestParam(required = false) String wardCode,
+          @RequestParam(required = false) Integer minQuantityNeeded,
+          @PageableDefault(size = 10, sort = "farmerInfo.farmName,asc") Pageable pageable) { // Ví dụ sort theo tên trang trại
+
+    // Gọi service mới
+    Page<SupplySourceResponse> supplySources = productService.findSupplySources(
+            productKeyword, categoryId, provinceCode, districtCode, wardCode, minQuantityNeeded, pageable
+    );
+    return ResponseEntity.ok(ApiResponse.success(supplySources));
   }
 }

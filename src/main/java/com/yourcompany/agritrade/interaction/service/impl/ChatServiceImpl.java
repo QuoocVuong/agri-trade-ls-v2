@@ -1,9 +1,12 @@
 package com.yourcompany.agritrade.interaction.service.impl;
 
+import com.yourcompany.agritrade.catalog.domain.Product;
+import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.interaction.domain.ChatMessage;
 import com.yourcompany.agritrade.interaction.domain.ChatRoom;
+import com.yourcompany.agritrade.interaction.domain.MessageType;
 import com.yourcompany.agritrade.interaction.dto.event.MessageReadEvent;
 import com.yourcompany.agritrade.interaction.dto.request.ChatMessageRequest;
 import com.yourcompany.agritrade.interaction.dto.response.ChatMessageResponse;
@@ -19,8 +22,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -39,6 +45,9 @@ public class ChatServiceImpl implements ChatService {
   private final ChatRoomMapper chatRoomMapper;
   private final ChatMessageMapper chatMessageMapper;
   private final SimpMessagingTemplate messagingTemplate; // Inject để gửi qua WebSocket
+  private final ProductRepository productRepository;
+  @Value("${app.frontend.url:http://localhost:4200}") // Lấy URL frontend
+  private String frontendUrl;
 
   @Override
   @Transactional
@@ -89,12 +98,65 @@ public class ChatServiceImpl implements ChatService {
             .findRoomBetweenUsers(sender.getId(), recipient.getId())
             .orElseGet(() -> chatRoomRepository.save(new ChatRoom(sender, recipient)));
 
+
+    // --- XỬ LÝ GỬI TIN NHẮN NGỮ CẢNH SẢN PHẨM (NẾU CÓ) ---
+    // Chỉ gửi tin nhắn context nếu đây là tin nhắn đầu tiên có context trong phòng này
+    // Hoặc bạn có thể có logic khác để tránh gửi lặp lại (ví dụ: kiểm tra tin nhắn cuối cùng)
+    boolean shouldSendContextMessage = request.getContextProductId() != null &&
+            request.getContextProductName() != null &&
+            !hasRecentContextMessage(room.getId(), request.getContextProductId(), sender.getId());
+
+    if (shouldSendContextMessage) {
+      String productLink = "#"; // Link mặc định
+      if (request.getContextProductSlug() != null) {
+
+         productLink = frontendUrl + "/supply-sources/detail/" + request.getContextProductSlug();
+      }
+
+      String contextMessageContent = String.format(
+              "Tôi quan tâm đến sản phẩm: %s (ID: %d).",
+              request.getContextProductName(),
+              request.getContextProductId(),
+              String.format("Thông tin sản phẩm đang quan tâm: <a href='%s' target='_blank'>%s</a> (ID: %d)", productLink, request.getContextProductName(), request.getContextProductId())
+      );
+
+      ChatMessage contextMessage = new ChatMessage();
+      contextMessage.setRoom(room);
+      contextMessage.setSender(sender); // Người gửi vẫn là người dùng hiện tại
+      contextMessage.setRecipient(recipient);
+      contextMessage.setContent(contextMessageContent);
+      contextMessage.setMessageType(MessageType.SYSTEM); // Đánh dấu là tin nhắn hệ thống/ngữ cảnh
+      contextMessage.setSentAt(LocalDateTime.now().minusNanos(1000000)); // Gửi trước tin nhắn chính một chút
+      contextMessage.setRead(false); // Ban đầu chưa đọc
+      ChatMessage savedContextMessage = chatMessageRepository.save(contextMessage);
+
+      // Gửi tin nhắn ngữ cảnh qua WebSocket cho cả hai bên
+      ChatMessageResponse contextDto = chatMessageMapper.toChatMessageResponse(savedContextMessage);
+      String recipientContextDest = "/user/" + recipient.getEmail() + "/queue/messages";
+      messagingTemplate.convertAndSend(recipientContextDest, contextDto);
+      String senderContextDest = "/user/" + sender.getEmail() + "/queue/messages"; // Gửi lại cho người gửi để họ cũng thấy
+      messagingTemplate.convertAndSend(senderContextDest, contextDto);
+      log.info("Sent SYSTEM context product message for product ID {} to room {}", request.getContextProductId(), room.getId());
+
+      // Cập nhật lastMessage của phòng nếu đây là tin nhắn đầu tiên
+      // (Tin nhắn người dùng sẽ ghi đè sau)
+      if (room.getLastMessage() == null) {
+        room.setLastMessage(savedContextMessage);
+        room.setLastMessageTime(savedContextMessage.getSentAt());
+        // Không tăng unread count cho tin nhắn hệ thống này
+        chatRoomRepository.save(room);
+      }
+    }
+    // --- KẾT THÚC XỬ LÝ TIN NHẮN NGỮ CẢNH ---
+
+
+
     // Tạo và lưu tin nhắn
     ChatMessage message = new ChatMessage();
     message.setRoom(room);
     message.setSender(sender);
     message.setRecipient(recipient);
-    message.setContent(request.getContent());
+    message.setContent(request.getContent());  // Nội dung người dùng nhập
     message.setMessageType(request.getMessageType());
     message.setSentAt(LocalDateTime.now()); // Gán thời gian gửi
     message.setRead(false); // Tin nhắn mới chưa đọc
@@ -129,6 +191,25 @@ public class ChatServiceImpl implements ChatService {
         "Sent WebSocket message back to sender {}: {}", senderDestination, responseDto.getId());
 
     return responseDto;
+  }
+
+  // Helper method để kiểm tra xem có tin nhắn context gần đây không
+  private boolean hasRecentContextMessage(Long roomId, Long contextProductId, Long senderId) {
+    // Tìm 5 tin nhắn cuối cùng trong phòng của sender này
+    Pageable recentMessagesPageable = PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "sentAt"));
+    Page<ChatMessage> recentMessages = chatMessageRepository.findByRoomIdAndSenderIdOrderBySentAtDesc(roomId, senderId, recentMessagesPageable);
+
+    for (ChatMessage msg : recentMessages.getContent()) {
+      if (msg.getMessageType() == MessageType.SYSTEM &&
+              msg.getContent() != null && // Thêm kiểm tra null cho content
+              msg.getContent().contains("(ID: " + contextProductId + ")")) { // Kiểm tra nội dung
+        if (msg.getSentAt().isAfter(LocalDateTime.now().minusMinutes(1))) { // Giảm thời gian kiểm tra xuống 1 phút
+          log.debug("Recent SYSTEM message for product {} in room {} by sender {} found. Skipping duplicate.", contextProductId, roomId, senderId);
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Override

@@ -16,5 +16,6 @@ public class InvoiceInfoResponse {
     private LocalDate issueDate;
     private LocalDate dueDate;
     private InvoiceStatus status;
-    // Bạn có thể thêm các trường khác nếu cần, ví dụ: private Long invoiceId;
+    private Long invoiceId;
+
 }

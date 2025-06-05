@@ -49,4 +49,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
    * @return Số lượng tin nhắn chưa đọc.
    */
   long countByRoomIdAndRecipientIdAndIsReadFalse(Long roomId, Long recipientId);
+
+  Page<ChatMessage> findByRoomIdAndSenderIdOrderBySentAtDesc(Long roomId, Long senderId, Pageable pageable);
 }

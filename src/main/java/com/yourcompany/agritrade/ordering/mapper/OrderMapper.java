@@ -68,7 +68,8 @@ public abstract class OrderMapper { // Đổi thành abstract class
                     invoice.getInvoiceNumber(),
                     invoice.getIssueDate(),
                     invoice.getDueDate(),
-                    invoice.getStatus()
+                    invoice.getStatus(),
+                    invoice.getId()
             ))
             .orElse(null); // Trả về null nếu không tìm thấy Invoice (dù không nên xảy ra)
   }

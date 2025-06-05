@@ -127,4 +127,6 @@ public interface UserService {
   LoginResponse refreshToken(String refreshTokenRequest); // << THÊM PHƯƠNG THỨC N
 
   void invalidateRefreshTokenForUser(String email);
+
+  Page<UserResponse> searchBuyers(String keyword, Pageable pageable);
 }

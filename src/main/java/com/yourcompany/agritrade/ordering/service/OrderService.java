@@ -2,6 +2,7 @@ package com.yourcompany.agritrade.ordering.service;
 
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
+import com.yourcompany.agritrade.ordering.dto.request.AgreedOrderRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
@@ -62,4 +63,6 @@ public interface OrderService {
   String generateOrderCode();
 
   PaymentUrlResponse createPaymentUrl(Authentication authentication, Long orderId, PaymentMethod paymentMethod, HttpServletRequest httpServletRequest);
+
+  OrderResponse createAgreedOrder(Authentication authentication, AgreedOrderRequest request);
 }

@@ -30,6 +30,7 @@ import com.yourcompany.agritrade.usermanagement.repository.BusinessProfileReposi
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.RoleRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
+import com.yourcompany.agritrade.usermanagement.repository.specification.UserSpecification;
 import com.yourcompany.agritrade.usermanagement.service.UserService;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
@@ -507,6 +508,7 @@ public class UserServiceImpl implements UserService {
             // để tránh lỗi filter sau này và giữ đúng cấu trúc Page
             return new FarmerSummaryResponse(
                 profile.getUserId(),
+                    profile.getUserId(),
                 profile.getFarmName(),
                 "[User not found]",
                 null,
@@ -887,5 +889,19 @@ public class UserServiceImpl implements UserService {
               userRepository.save(user);
               log.info("Invalidated refresh token for user: {}", email);
             });
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<UserResponse> searchBuyers(String keyword, Pageable pageable) {
+    Specification<User> spec = Specification.where(UserSpecification.isActive(true))
+            .and(Specification.where(UserSpecification.hasRole(RoleType.ROLE_CONSUMER))
+                    .or(UserSpecification.hasRole(RoleType.ROLE_BUSINESS_BUYER))
+                    .or(UserSpecification.hasRole(RoleType.ROLE_FARMER)));
+
+    if (StringUtils.hasText(keyword)) {
+      spec = spec.and(UserSpecification.hasKeyword(keyword));
+    }
+    return userRepository.findAll(spec, pageable).map(userMapper::toUserResponse);
   }
 }

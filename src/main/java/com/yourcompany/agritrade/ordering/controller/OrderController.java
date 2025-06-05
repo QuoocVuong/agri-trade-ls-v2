@@ -8,6 +8,7 @@ import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
+import com.yourcompany.agritrade.ordering.dto.request.AgreedOrderRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.response.*;
@@ -136,4 +137,14 @@ public class OrderController {
     return ResponseEntity.ok(ApiResponse.success(transferInfo));
   }
   // **************************************************
+
+  @PostMapping("/agreed-order")
+  @PreAuthorize("hasAnyRole('FARMER')") // Ví dụ: Chỉ Admin hoặc Farmer được tạo
+  public ResponseEntity<ApiResponse<OrderResponse>> createAgreedOrder(
+          Authentication authentication,
+          @Valid @RequestBody AgreedOrderRequest request) {
+    OrderResponse createdOrder = orderService.createAgreedOrder(authentication, request);
+    return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.created(createdOrder, "Agreed order created successfully."));
+  }
 }

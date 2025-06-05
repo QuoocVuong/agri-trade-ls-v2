@@ -25,4 +25,6 @@ public interface AddressService {
 
   /** Đặt địa chỉ làm mặc định cho người dùng hiện tại */
   void setMyDefaultAddress(Authentication authentication, Long addressId);
+
+  AddressResponse getDefaultAddressByUserId(Long userId);
 }

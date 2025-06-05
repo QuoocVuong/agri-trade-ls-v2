@@ -160,6 +160,19 @@ public class AddressServiceImpl implements AddressService {
     }
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public AddressResponse getDefaultAddressByUserId(Long userId) {
+    // Kiểm tra xem user có tồn tại không (tùy chọn, nhưng nên có)
+    if (!userRepository.existsById(userId)) {
+      throw new ResourceNotFoundException("User", "id", userId);
+    }
+    // @Where trên Address entity sẽ tự lọc is_deleted = false
+    return addressRepository.findByUserIdAndIsDefaultTrue(userId)
+            .map(addressMapper::toAddressResponse)
+            .orElse(null); // Trả về null nếu không có địa chỉ mặc định
+  }
+
   // --- Helper Methods ---
   private User getUserFromAuthentication(Authentication authentication) {
     if (authentication == null
@@ -188,4 +201,8 @@ public class AddressServiceImpl implements AddressService {
       addressRepository.saveAll(currentDefaults);
     }
   }
+
+
+
+
 }

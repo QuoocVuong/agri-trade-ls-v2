@@ -111,10 +111,15 @@ public class UserController {
   }
 
   // --- Public Endpoint (Ví dụ) ---
-  // Lấy thông tin cơ bản (không nhạy cảm) của user theo ID để hiển thị public
-  // Cần tạo DTO riêng (ví dụ PublicUserResponse) và phương thức service riêng
-  // @GetMapping("/{id}/public")
-  // public ResponseEntity<ApiResponse<PublicUserResponse>> getPublicUserInfo(@PathVariable Long id)
-  // { ... }
+
+  @GetMapping("/search-buyers")
+  @PreAuthorize("hasRole('FARMER')")
+  public ResponseEntity<ApiResponse<Page<UserResponse>>> searchBuyers(
+          @RequestParam(required = false) String keyword,
+          @PageableDefault(size = 10) Pageable pageable) {
+    Page<UserResponse> buyers = userService.searchBuyers(keyword, pageable);
+    return ResponseEntity.ok(ApiResponse.success(buyers));
+  }
+
 
 }

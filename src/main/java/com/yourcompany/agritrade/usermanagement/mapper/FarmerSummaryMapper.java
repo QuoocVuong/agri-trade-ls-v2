@@ -12,6 +12,7 @@ public interface FarmerSummaryMapper {
   // Phương thức chính để map từ User và FarmerProfile (nếu có)
   // Cần được gọi từ Service sau khi đã lấy cả User và FarmerProfile
   @Mapping(target = "userId", source = "user.id")
+  @Mapping(target = "farmerId", source = "user.id")
   @Mapping(target = "farmName", source = "profile.farmName") // Lấy từ profile
   @Mapping(target = "fullName", source = "user.fullName") // Lấy từ user
   @Mapping(target = "avatarUrl", source = "user.avatarUrl") // Lấy từ user

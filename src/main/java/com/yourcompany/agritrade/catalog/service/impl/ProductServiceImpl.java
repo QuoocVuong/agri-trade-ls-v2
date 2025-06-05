@@ -7,6 +7,7 @@ import com.yourcompany.agritrade.catalog.dto.request.ProductPricingTierRequest;
 import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
+import com.yourcompany.agritrade.catalog.dto.response.SupplySourceResponse;
 import com.yourcompany.agritrade.catalog.mapper.ProductImageMapper;
 import com.yourcompany.agritrade.catalog.mapper.ProductMapper;
 import com.yourcompany.agritrade.catalog.mapper.ProductPricingTierMapper;
@@ -24,20 +25,19 @@ import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
+import com.yourcompany.agritrade.usermanagement.dto.response.FarmerSummaryResponse;
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -189,6 +189,10 @@ public class ProductServiceImpl implements ProductService {
     if (product.getFavoriteCount() == null) { // Giả sử favoriteCount cũng là NOT NULL
       product.setFavoriteCount(0);
     }
+
+    if (product.getStockQuantity() != null) { // Hoặc một điều kiện khác nếu stockQuantity luôn có giá trị
+      product.setLastStockUpdate(LocalDateTime.now());
+    }
 // isDeleted đã được khởi tạo là false
 // status đã được khởi tạo
 // stockQuantity đã được khởi tạo là 0
@@ -245,6 +249,25 @@ public class ProductServiceImpl implements ProductService {
 
     // 8. Xử lý cập nhật Trạng thái sản phẩm
     updateProductStatusForFarmer(request, existingProduct, previousStatus, wasPublished);
+
+    if (request.getNegotiablePrice() != null) {
+      existingProduct.setNegotiablePrice(request.getNegotiablePrice());
+    }
+    if (request.getHarvestDate() != null) {
+      existingProduct.setHarvestDate(request.getHarvestDate());
+    }
+    if (request.getWholesaleUnit() != null) { // Cho phép cập nhật thành null/rỗng
+      existingProduct.setWholesaleUnit(request.getWholesaleUnit().isBlank() ? null : request.getWholesaleUnit());
+    }
+    if (request.getReferenceWholesalePrice() != null) {
+      existingProduct.setReferenceWholesalePrice(request.getReferenceWholesalePrice());
+    }
+
+    // Cập nhật lastStockUpdate nếu stockQuantity thay đổi
+    if (request.getStockQuantity() != null && !request.getStockQuantity().equals(existingProduct.getStockQuantity())) {
+      // existingProduct.setStockQuantity(request.getStockQuantity()); // Mapper đã làm
+      existingProduct.setLastStockUpdate(LocalDateTime.now());
+    }
 
     // 9. Lưu sản phẩm và các thay đổi liên quan
     Product savedProduct = productRepository.save(existingProduct);
@@ -1156,5 +1179,111 @@ public class ProductServiceImpl implements ProductService {
       return Collections.emptyList();
     }
     return productMapper.toProductSummaryResponseList(related);
+  }
+
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<SupplySourceResponse> findSupplySources(
+          String productKeyword, Integer categoryId, String provinceCode, String districtCode, String wardCode,
+          Integer minQuantityNeeded, Pageable pageable) {
+    log.debug("Finding supply sources with productKeyword: {}, categoryId: {}, provinceCode: {}, districtCode: {}, minQuantity: {}",
+            productKeyword, categoryId, provinceCode, districtCode, minQuantityNeeded);
+
+    // 1. Tạo Specification để tìm Product phù hợp
+    Specification<Product> productSpec = Specification.where(ProductSpecifications.isPublished()); // Chỉ sản phẩm đã published
+
+    if (StringUtils.hasText(productKeyword)) {
+      productSpec = productSpec.and(ProductSpecifications.hasKeyword(productKeyword));
+    }
+    if (categoryId != null) {
+      productSpec = productSpec.and(ProductSpecifications.inCategory(categoryId));
+    }
+    // Lọc sản phẩm theo tỉnh/huyện của nông dân (Product đã có provinceCode của farmer)
+    if (StringUtils.hasText(provinceCode)) {
+      productSpec = productSpec.and(ProductSpecifications.inProvince(provinceCode));
+      // Nếu cần lọc theo huyện của nông dân, bạn cần join Product với FarmerProfile
+      // hoặc đảm bảo Product có districtCode của farmer.
+      // Hiện tại Product có provinceCode của farmer, nên có thể dùng trực tiếp.
+      // Nếu muốn lọc theo huyện của nông dân, cần sửa ProductSpecifications.inProvince
+      // hoặc thêm spec mới.
+    }
+    if (StringUtils.hasText(wardCode)) {
+      productSpec = productSpec.and(ProductSpecifications.inWard(wardCode));
+    }
+    if (minQuantityNeeded != null && minQuantityNeeded > 0) {
+      // Lọc những sản phẩm có stockQuantity >= minQuantityNeeded
+      productSpec = productSpec.and((root, query, cb) ->
+              cb.greaterThanOrEqualTo(root.get("stockQuantity"), minQuantityNeeded)
+      );
+    }
+
+    // Thêm fetch join để lấy thông tin farmer và farmerProfile cùng lúc
+    productSpec = productSpec.and(ProductSpecifications.fetchFarmerAndProfile());
+
+
+    // 2. Tìm các Product thỏa mãn
+    // Lưu ý: Phân trang ở đây là phân trang trên Product, không phải trên SupplySourceResponse cuối cùng.
+    // Điều này có thể dẫn đến việc một số trang không có kết quả nếu các product đó không có farmer hợp lệ.
+    // Một cách tiếp cận khác là query trực tiếp từ FarmerProfile nếu bộ lọc chủ yếu dựa trên địa điểm của farmer.
+    Page<Product> products = productRepository.findAll(productSpec, pageable);
+
+    // 3. Chuyển đổi Page<Product> sang Page<SupplySourceResponse>
+    List<SupplySourceResponse> supplySources = products.getContent().stream()
+            .map(product -> {
+              User farmer = product.getFarmer();
+              FarmerProfile farmerProfile = farmer.getFarmerProfile(); // Đã được fetch
+
+              if (farmerProfile == null) {
+                log.warn("FarmerProfile not found for farmer {} of product {}", farmer.getId(), product.getId());
+                return null; // Bỏ qua nếu không có profile (hiếm khi xảy ra nếu logic đúng)
+              }
+
+              // Lọc thêm theo districtCode của FarmerProfile nếu được cung cấp
+              if (StringUtils.hasText(districtCode) && !districtCode.equals(farmerProfile.getDistrictCode())) {
+                return null; // Bỏ qua nếu huyện không khớp
+              }
+
+              SupplySourceResponse ssr = new SupplySourceResponse();
+              // Map thông tin Farmer (cần FarmerSummaryMapper hoặc làm thủ công)
+              // Ví dụ làm thủ công:
+              FarmerSummaryResponse farmerInfo = new FarmerSummaryResponse();
+              farmerInfo.setUserId(farmer.getId());
+              farmerInfo.setFarmerId(farmer.getId());
+              farmerInfo.setFullName(farmer.getFullName());
+              farmerInfo.setAvatarUrl(farmer.getAvatarUrl());
+              farmerInfo.setFarmName(farmerProfile.getFarmName());
+              farmerInfo.setProvinceCode(farmerProfile.getProvinceCode());
+              // farmerInfo.setFollowerCount(farmer.getFollowerCount()); // Nếu cần
+              ssr.setFarmerInfo(farmerInfo);
+
+              ssr.setProductId(product.getId());
+              ssr.setProductName(product.getName());
+              ssr.setProductSlug(product.getSlug());
+
+              // Lấy thumbnail URL (tương tự logic trong ProductMapper)
+              String thumbnailUrl = product.getImages().stream()
+                      .filter(ProductImage::isDefault)
+                      .findFirst()
+                      .or(() -> product.getImages().stream().min(Comparator.comparingInt(ProductImage::getDisplayOrder)))
+                      .map(img -> fileStorageService.getFileUrl(img.getBlobPath())) // Gọi getFileUrl
+                      .orElse("assets/images/placeholder-image.png"); // Placeholder
+              ssr.setThumbnailUrl(thumbnailUrl);
+
+              ssr.setCurrentStockQuantity(product.getStockQuantity());
+              ssr.setWholesaleUnit(product.getWholesaleUnit());
+              ssr.setReferenceWholesalePrice(product.getReferenceWholesalePrice());
+              ssr.setHarvestDate(product.getHarvestDate());
+              ssr.setLastStockUpdate(product.getLastStockUpdate());
+              ssr.setNegotiablePrice(product.isNegotiablePrice());
+              return ssr;
+            })
+            .filter(Objects::nonNull) // Loại bỏ các kết quả null (do farmerProfile null hoặc huyện không khớp)
+            .collect(Collectors.toList());
+
+    return new PageImpl<>(supplySources, pageable, products.getTotalElements());
+    // Lưu ý: products.getTotalElements() là tổng số Product, không phải tổng số SupplySourceResponse.
+    // Nếu muốn chính xác hơn, bạn cần query count riêng cho SupplySourceResponse hoặc chấp nhận sai số này.
+    // Hoặc, nếu số lượng filter null nhiều, có thể fetch hết rồi phân trang ở Java (không khuyến khích với dữ liệu lớn).
   }
 }

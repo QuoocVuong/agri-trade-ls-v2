@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.Data;
 
@@ -46,6 +47,14 @@ public class ProductRequest {
 
   @PositiveOrZero(message = "B2B price must be non-negative")
   private BigDecimal b2bBasePrice;
+
+
+  // ... các trường hiện có ...
+  private LocalDate harvestDate;
+  // lastStockUpdate không cần trong request
+  private Boolean negotiablePrice; // Cho phép null để nếu không gửi thì dùng default của entity
+  private String wholesaleUnit;
+  private BigDecimal referenceWholesalePrice;
 
   // Danh sách URL ảnh, ảnh đầu tiên sẽ là default nếu không có ảnh nào isDefault=true
   //    private List<String> imageUrls;

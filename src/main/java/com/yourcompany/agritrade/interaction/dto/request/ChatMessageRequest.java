@@ -22,4 +22,11 @@ public class ChatMessageRequest {
 
   // Client có thể chỉ định loại tin nhắn (mặc định là TEXT)
   private MessageType messageType = MessageType.TEXT;
+
+  // Thêm các trường cho ngữ cảnh sản phẩm (tùy chọn)
+  private Long contextProductId;
+  private String contextProductName;
+  private String contextProductSlug; // Để tạo link nếu cần
+  // Bạn có thể thêm thumbnail nếu muốn hiển thị ảnh nhỏ trong tin nhắn hệ thống
+   private String contextProductThumbnailUrl;
 }

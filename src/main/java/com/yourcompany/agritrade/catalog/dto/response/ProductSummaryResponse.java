@@ -2,6 +2,7 @@ package com.yourcompany.agritrade.catalog.dto.response;
 
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Data;
@@ -29,4 +30,11 @@ public class ProductSummaryResponse {
   private Integer minB2bQuantity; // Thêm nếu cần ở Cart
   private List<ProductPricingTierResponse> pricingTiers; // Dùng List
   private boolean isNew;
+
+  // Trong cả ProductDetailResponse và ProductSummaryResponse (hoặc tùy chọn cho Summary)
+  private LocalDate harvestDate;
+  private LocalDateTime lastStockUpdate;
+  private boolean negotiablePrice;
+  private String wholesaleUnit;
+  private BigDecimal referenceWholesalePrice;
 }

@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.catalog.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -45,6 +46,13 @@ public class ProductDetailResponse { // Hoặc kế thừa ProductSummaryRespons
   // Thêm trường mới cho sản phẩm liên quan
   private List<ProductSummaryResponse>
       relatedProducts; // Dùng Summary DTO để tránh quá nhiều thông tin
+
+  // Trong cả ProductDetailResponse và ProductSummaryResponse (hoặc tùy chọn cho Summary)
+  private LocalDate harvestDate;
+  private LocalDateTime lastStockUpdate;
+  private boolean negotiablePrice;
+  private String wholesaleUnit;
+  private BigDecimal referenceWholesalePrice;
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;

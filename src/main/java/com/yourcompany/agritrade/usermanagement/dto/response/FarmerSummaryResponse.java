@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FarmerSummaryResponse {
   private Long userId;
+  private Long farmerId;
   private String farmName; // Lấy từ FarmerProfile
   private String fullName; // Lấy từ User
   private String avatarUrl; // Lấy từ User
