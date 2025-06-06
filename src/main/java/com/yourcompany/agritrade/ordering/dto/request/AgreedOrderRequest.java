@@ -4,12 +4,14 @@ import com.google.firebase.database.annotations.NotNull;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Data
+@NoArgsConstructor
 public class AgreedOrderRequest {
     @NotNull
     private Long buyerId; // ID người mua (doanh nghiệp/đối tác)

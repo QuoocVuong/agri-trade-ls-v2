@@ -4,10 +4,12 @@ import com.google.firebase.database.annotations.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 @Data
+@NoArgsConstructor
 public class AgreedOrderItemRequest {
     @NotNull
     private Long productId; // ID sản phẩm gốc (để tham chiếu)
