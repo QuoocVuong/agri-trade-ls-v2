@@ -6,6 +6,7 @@ import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.dto.response.InvoiceSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
 
 import java.io.ByteArrayInputStream;
 
@@ -19,6 +20,8 @@ public interface InvoiceService {
 
   // -- Phương Thức của Admin--
 
-  Page<InvoiceSummaryResponse> getAllInvoices(InvoiceStatus status, String keyword, Pageable pageable);
+  Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(InvoiceStatus status, String keyword, Pageable pageable);
+
+  Page<InvoiceSummaryResponse> getInvoicesForFarmer(Authentication authentication, InvoiceStatus status, String keyword, Pageable pageable);
 
 }

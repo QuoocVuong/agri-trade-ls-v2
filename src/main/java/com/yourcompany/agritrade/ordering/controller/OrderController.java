@@ -138,7 +138,7 @@ public class OrderController {
 
 
   @PostMapping("/agreed-order")
-  @PreAuthorize("hasAnyRole('FARMER')") // Ví dụ: Chỉ Admin hoặc Farmer được tạo
+  @PreAuthorize("hasAnyRole('FARMER')") // Ví dụ: hoặc Farmer được tạo
   public ResponseEntity<ApiResponse<OrderResponse>> createAgreedOrder(
           Authentication authentication,
           @Valid @RequestBody AgreedOrderRequest request) {

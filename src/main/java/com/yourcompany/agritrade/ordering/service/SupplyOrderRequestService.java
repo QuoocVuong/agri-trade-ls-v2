@@ -14,5 +14,5 @@ public interface SupplyOrderRequestService {
     SupplyOrderRequestResponse getRequestDetails(Authentication authentication, Long requestId);
     OrderResponse acceptSupplyOrderRequest(Authentication authentication, Long requestId /*, Optional: AgreedPrice, etc. */);
     SupplyOrderRequestResponse rejectSupplyOrderRequest(Authentication authentication, Long requestId, String reason);
-     //void cancelSupplyOrderRequestByBuyer(Authentication authentication, Long requestId); // Tùy chọn
+     void cancelSupplyOrderRequestByBuyer(Authentication authentication, Long requestId); // Tùy chọn
 }

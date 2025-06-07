@@ -80,4 +80,12 @@ public class SupplyOrderRequestController {
         SupplyOrderRequestResponse rejectedRequest = requestService.rejectSupplyOrderRequest(authentication, requestId, reason);
         return ResponseEntity.ok(ApiResponse.success(rejectedRequest, "Supply request rejected."));
     }
+
+    @PostMapping("/{requestId}/cancel-by-buyer") // Hoặc dùng DELETE nếu thấy phù hợp hơn
+    @PreAuthorize("isAuthenticated()") // Buyer phải đăng nhập
+    public ResponseEntity<ApiResponse<Void>> cancelRequestByBuyer(
+            Authentication authentication, @PathVariable Long requestId) {
+        requestService.cancelSupplyOrderRequestByBuyer(authentication, requestId);
+        return ResponseEntity.ok(ApiResponse.success("Supply order request cancelled successfully by buyer."));
+    }
 }

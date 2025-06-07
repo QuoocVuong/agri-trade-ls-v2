@@ -74,4 +74,12 @@ public interface ProductService {
           Integer minQuantityNeeded, // Số lượng tối thiểu người mua cần
           Pageable pageable
   );
+
+
+  // Lấy sản phẩm B2C của Farmer
+  Page<ProductSummaryResponse> getMyB2CProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable);
+
+  // Lấy nguồn cung B2B của Farmer
+  Page<ProductSummaryResponse> getMySupplyProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable);
+
 }

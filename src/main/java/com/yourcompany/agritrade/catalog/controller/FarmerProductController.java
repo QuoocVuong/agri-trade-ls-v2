@@ -24,14 +24,14 @@ import org.springframework.web.bind.annotation.*;
 import java.nio.file.attribute.UserPrincipal;
 
 @RestController
-@RequestMapping("/api/farmer/products") // Base path cho Farmer
+@RequestMapping("/api/farmer") // Base path cho Farmer
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('FARMER')") // Yêu cầu vai trò Farmer
 public class FarmerProductController {
 
   private final ProductService productService;
 
-  @GetMapping("/me")
+  @GetMapping("/products/me")
   public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> getMyProducts(
       Authentication authentication,
       @RequestParam(required = false) String keyword, // NHẬN KEYWORD
@@ -47,18 +47,18 @@ public class FarmerProductController {
       }
     }
     Page<ProductSummaryResponse> products =
-        productService.getMyProducts(authentication, keyword, statusEnum, pageable);
+        productService.getMyB2CProducts(authentication, keyword, statusEnum, pageable);
     return ResponseEntity.ok(ApiResponse.success(products));
   }
 
-  @GetMapping("/me/{id}")
+  @GetMapping("/products/me/{id}")
   public ResponseEntity<ApiResponse<ProductDetailResponse>> getMyProductById(
       Authentication authentication, @PathVariable Long id) {
     ProductDetailResponse product = productService.getMyProductById(authentication, id);
     return ResponseEntity.ok(ApiResponse.success(product));
   }
 
-  @PostMapping("/me")
+  @PostMapping("/products/me")
   public ResponseEntity<ApiResponse<ProductDetailResponse>> createMyProduct(
       Authentication authentication, @Valid @RequestBody ProductRequest request) {
     ProductDetailResponse createdProduct = productService.createMyProduct(authentication, request);
@@ -67,7 +67,7 @@ public class FarmerProductController {
             .body(ApiResponse.created(createdProduct, "Product created successfully"));
   }
 
-  @PutMapping("/me/{id}")
+  @PutMapping("/products/me/{id}")
   public ResponseEntity<ApiResponse<ProductDetailResponse>> updateMyProduct(
       Authentication authentication,
       @PathVariable Long id,
@@ -77,7 +77,7 @@ public class FarmerProductController {
     return ResponseEntity.ok(ApiResponse.success(updatedProduct, "Product updated successfully"));
   }
 
-  @DeleteMapping("/me/{id}")
+  @DeleteMapping("/products/me/{id}")
   public ResponseEntity<ApiResponse<Void>> deleteMyProduct(
       Authentication authentication, @PathVariable Long id) {
     productService.deleteMyProduct(authentication, id);
@@ -85,17 +85,25 @@ public class FarmerProductController {
         ApiResponse.success("Product deleted successfully"));
   }
 
-//  @PostMapping("/supply-sources")
-//  @PreAuthorize("hasRole('FARMER')")
-//  public ApiResponse<SupplySourceResponse> registerSupplySource(
-//          @Valid @RequestBody SupplySourceRequest request,
-//          @AuthenticationPrincipal UserPrincipal user) {
-//    if (!supplySourceService.isFarmerProfileApproved(user.getId())) {
-//      throw new BadRequestException("Hồ sơ Farmer chưa được duyệt");
-//    }
-//    SupplySourceResponse response = supplySourceService.register(request, user.getId());
-//
-//    return ApiResponse.success(response);
-//  }
+  //api supplies
+
+  @GetMapping("/supplies/me")
+  public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> getMySupplyProducts(
+          Authentication authentication,
+          @RequestParam(required = false) String keyword,
+          @RequestParam(required = false) String status,
+          @PageableDefault(size = 10, sort = "updatedAt,desc") Pageable pageable) {
+
+    ProductStatus statusEnum = null;
+    if (StringUtils.hasText(status)) {
+      try {
+        statusEnum = ProductStatus.valueOf(status.toUpperCase());
+      } catch (IllegalArgumentException e) { /* Bỏ qua */ }
+    }
+    Page<ProductSummaryResponse> supplies =
+            productService.getMySupplyProducts(authentication, keyword, statusEnum, pageable); // Gọi hàm mới
+    return ResponseEntity.ok(ApiResponse.success(supplies));
+  }
+
 
 }

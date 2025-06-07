@@ -26,7 +26,7 @@ public class AdminInvoiceController {
             @RequestParam(required = false) InvoiceStatus status,
             @RequestParam(required = false) String keyword, // Tìm theo mã HĐ, mã ĐH, tên KH
             @PageableDefault(size = 20, sort = "issueDate,desc") Pageable pageable) {
-        Page<InvoiceSummaryResponse> invoices = invoiceService.getAllInvoices(status, keyword, pageable);
+        Page<InvoiceSummaryResponse> invoices = invoiceService.getAllInvoicesForAdmin(status, keyword, pageable);
         return ResponseEntity.ok(ApiResponse.success(invoices));
     }
 

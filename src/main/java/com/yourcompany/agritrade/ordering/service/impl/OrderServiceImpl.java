@@ -1335,7 +1335,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   @Override
   @Transactional
   public OrderResponse createAgreedOrder(Authentication authentication, AgreedOrderRequest request) {
-    // User thực hiện hành động này có thể là Admin hoặc Farmer (tùy quy trình của bạn)
+    // User thực hiện hành động này  là  hoặc Farmer
     User actor = SecurityUtils.getCurrentAuthenticatedUser();
 
 

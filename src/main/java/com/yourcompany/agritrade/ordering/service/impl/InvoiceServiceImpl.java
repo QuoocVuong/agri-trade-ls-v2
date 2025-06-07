@@ -8,6 +8,7 @@ import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.ordering.dto.response.InvoiceSummaryResponse;
 import com.yourcompany.agritrade.ordering.mapper.InvoiceMapper;
@@ -20,12 +21,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+
+import com.yourcompany.agritrade.usermanagement.domain.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -282,7 +287,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<InvoiceSummaryResponse> getAllInvoices(InvoiceStatus status, String keyword, Pageable pageable) {
+  public Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(InvoiceStatus status, String keyword, Pageable pageable) {
     log.debug("Admin fetching invoices with status: {}, keyword: {}, pageable: {}", status, keyword, pageable);
 
     Specification<Invoice> spec = Specification.where(null); // Bắt đầu với một spec trống
@@ -304,6 +309,26 @@ public class InvoiceServiceImpl implements InvoiceService {
     spec = spec.and(InvoiceSpecifications.fetchOrderAndBuyer());
 
 
+    Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
+    return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<InvoiceSummaryResponse> getInvoicesForFarmer(Authentication authentication, InvoiceStatus status, String keyword, Pageable pageable) {
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // Hàm helper của bạn
+    Specification<Invoice> spec = Specification.where(InvoiceSpecifications.fetchOrderAndBuyer())
+            .and(InvoiceSpecifications.isFarmerInvoice(farmer.getId())); // Spec mới
+
+    if (status != null) spec = spec.and(InvoiceSpecifications.hasStatus(status));
+    if (StringUtils.hasText(keyword)) {
+      // Farmer có thể tìm theo mã HĐ, mã ĐH, tên người mua của hóa đơn họ
+      spec = spec.and(Specification.anyOf(
+              InvoiceSpecifications.hasInvoiceNumber(keyword),
+              InvoiceSpecifications.hasOrderCode(keyword),
+              InvoiceSpecifications.hasBuyerFullName(keyword) // Vẫn giữ vì farmer cần biết của buyer nào
+      ));
+    }
     Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
     return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
   }

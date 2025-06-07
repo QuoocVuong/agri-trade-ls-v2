@@ -236,4 +236,30 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
 
         return requestMapper.toSupplyOrderRequestResponse(savedRequest);
     }
+
+    @Override
+    @Transactional
+    public void cancelSupplyOrderRequestByBuyer(Authentication authentication, Long requestId) {
+        User buyer = SecurityUtils.getCurrentAuthenticatedUser(); // Hoặc hàm helper của bạn
+
+        SupplyOrderRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("SupplyOrderRequest", "id", requestId));
+
+        // Kiểm tra quyền: Buyer phải là người tạo request
+        if (!request.getBuyer().getId().equals(buyer.getId())) {
+            throw new AccessDeniedException("You do not have permission to cancel this request.");
+        }
+
+        // Kiểm tra trạng thái: Chỉ cho phép hủy khi Farmer chưa xử lý
+        if (request.getStatus() != SupplyOrderRequestStatus.PENDING_FARMER_ACTION) {
+            throw new BadRequestException("This request cannot be cancelled as it's already being processed or has been finalized. Current status: " + request.getStatus());
+        }
+
+        request.setStatus(SupplyOrderRequestStatus.BUYER_CANCELLED);
+        requestRepository.save(request);
+        log.info("Buyer {} cancelled SupplyOrderRequest {}", buyer.getId(), requestId);
+
+        // TODO: Gửi thông báo cho Farmer rằng Buyer đã hủy yêu cầu
+        // notificationService.sendSupplyRequestCancelledByBuyerNotification(request.getFarmer(), request);
+    }
 }

@@ -144,4 +144,13 @@ public class ProductSpecifications {
   }
 
 
+  public static Specification<Product> isB2cProduct() {
+    return (root, query, criteriaBuilder) -> criteriaBuilder.isFalse(root.get("b2bEnabled"));
+  }
+
+  public static Specification<Product> isB2bSupply() {
+    return (root, query, criteriaBuilder) -> criteriaBuilder.isTrue(root.get("b2bEnabled"));
+  }
+
+
 }

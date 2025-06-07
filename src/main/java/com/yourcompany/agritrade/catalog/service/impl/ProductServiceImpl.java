@@ -111,6 +111,47 @@ public class ProductServiceImpl implements ProductService {
     return productPage.map(productMapper::toProductSummaryResponse);
   }
 
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ProductSummaryResponse> getMyB2CProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
+    User farmer = getUserFromAuthentication(authentication); // Hàm helper của bạn
+    Specification<Product> spec = Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
+            .and(ProductSpecifications.isB2cProduct()); // Lọc b2bEnabled = false
+
+    if (StringUtils.hasText(keyword)) {
+      spec = spec.and(ProductSpecifications.hasKeyword(keyword));
+    }
+    if (status != null) {
+      spec = spec.and(ProductSpecifications.hasStatus(status.name()));
+    }
+
+    Page<Product> productPage = productRepository.findAll(spec, pageable);
+    productPage.getContent().forEach(this::populateImageUrls); // Hàm helper của bạn
+    return productPage.map(productMapper::toProductSummaryResponse);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Page<ProductSummaryResponse> getMySupplyProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
+    User farmer = getUserFromAuthentication(authentication);
+    Specification<Product> spec = Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
+            .and(ProductSpecifications.isB2bSupply()); // Lọc b2bEnabled = true
+
+    if (StringUtils.hasText(keyword)) {
+      spec = spec.and(ProductSpecifications.hasKeyword(keyword));
+    }
+    if (status != null) {
+      spec = spec.and(ProductSpecifications.hasStatus(status.name()));
+    }
+
+    Page<Product> productPage = productRepository.findAll(spec, pageable);
+    productPage.getContent().forEach(this::populateImageUrls);
+    return productPage.map(productMapper::toProductSummaryResponse);
+  }
+
+
+
   // Phương thức helper để điền imageUrls
   private void populateImageUrls(Product product) {
     if (product != null && product.getImages() != null && !product.getImages().isEmpty()) {
@@ -497,7 +538,9 @@ public class ProductServiceImpl implements ProductService {
             .and(ProductSpecifications.hasKeyword(keyword))
             .and(ProductSpecifications.inCategory(categoryId))
             .and(ProductSpecifications.inProvince(provinceCode))
-            .and(ProductSpecifications.fetchFarmerAndProfile());
+            .and(ProductSpecifications.fetchFarmerAndProfile())
+            .and(ProductSpecifications.isB2cProduct());
+
 
     // Thêm các điều kiện lọc mới vào Specification
     if (minPrice != null) {
@@ -985,7 +1028,8 @@ public class ProductServiceImpl implements ProductService {
             productKeyword, categoryId, provinceCode, districtCode, minQuantityNeeded);
 
     // 1. Tạo Specification để tìm Product phù hợp
-    Specification<Product> productSpec = Specification.where(ProductSpecifications.isPublished()); // Chỉ sản phẩm đã published
+    Specification<Product> productSpec = Specification.where(ProductSpecifications.isPublished())// Chỉ sản phẩm đã published
+                                                      .and(ProductSpecifications.isB2bSupply());
 
     if (StringUtils.hasText(productKeyword)) {
       productSpec = productSpec.and(ProductSpecifications.hasKeyword(productKeyword));

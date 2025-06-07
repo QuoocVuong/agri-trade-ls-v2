@@ -47,4 +47,11 @@ public class InvoiceSpecifications {
             return criteriaBuilder.conjunction(); // Luôn trả về true để không ảnh hưởng đến điều kiện where
         };
     }
+
+    public static Specification<Invoice> isFarmerInvoice(Long farmerId) {
+        return (root, query, criteriaBuilder) -> {
+            Join<Invoice, Order> orderJoin = root.join("order", JoinType.INNER);
+            return criteriaBuilder.equal(orderJoin.get("farmer").get("id"), farmerId);
+        };
+    }
 }
