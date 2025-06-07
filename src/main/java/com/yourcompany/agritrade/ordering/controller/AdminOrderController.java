@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.ordering.controller;
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
+import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
@@ -30,23 +31,17 @@ public class AdminOrderController {
   // Lấy tất cả đơn hàng với bộ lọc
   @GetMapping
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getAllOrders(
-      @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) String status,
-      @RequestParam(required = false) Long buyerId,
-      @RequestParam(required = false) Long farmerId,
-      @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
+          @RequestParam(required = false) String keyword,
+          @RequestParam(required = false) OrderStatus status,
+          @RequestParam(required = false) PaymentMethod paymentMethod,
+          @RequestParam(required = false) PaymentStatus paymentStatus,
+          @RequestParam(required = false) Long buyerId,
+          @RequestParam(required = false) Long farmerId,
+          @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
 
-    OrderStatus statusEnum = null;
-    if (StringUtils.hasText(status)) {
-      try {
-        statusEnum = OrderStatus.valueOf(status.toUpperCase());
-      } catch (IllegalArgumentException e) {
-
-      }
-    }
 
     Page<OrderSummaryResponse> orders =
-        orderService.getAllOrdersForAdmin(keyword, statusEnum, buyerId, farmerId, pageable);
+        orderService.getAllOrdersForAdmin(keyword, status, paymentMethod, paymentStatus,   buyerId, farmerId, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 

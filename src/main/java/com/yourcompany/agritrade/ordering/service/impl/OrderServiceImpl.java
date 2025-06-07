@@ -356,11 +356,13 @@ public class OrderServiceImpl implements OrderService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
+  public Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus,  Pageable pageable) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser();
     Specification<Order> spec = Specification.where(OrderSpecifications.byBuyer(buyer.getId()))
             .and(OrderSpecifications.hasStatus(status))
-            .and(OrderSpecifications.buyerSearch(keyword));
+            .and(OrderSpecifications.buyerSearch(keyword))
+            .and(OrderSpecifications.hasPaymentMethod(paymentMethod))
+            .and(OrderSpecifications.hasPaymentStatus(paymentStatus));
 
     Page<Order> orderPage = orderRepository.findAll(spec, pageable);
     return orderMapper.toOrderSummaryResponsePage(orderPage);
@@ -369,11 +371,13 @@ public class OrderServiceImpl implements OrderService {
 
 @Override
 @Transactional(readOnly = true)
-public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable) {
+public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Pageable pageable) {
   User farmer = SecurityUtils.getCurrentAuthenticatedUser();
   Specification<Order> spec = Specification.where(OrderSpecifications.byFarmer(farmer.getId()))
           .and(OrderSpecifications.hasStatus(status))
-          .and(OrderSpecifications.farmerSearch(keyword)); // Sử dụng farmerSearch
+          .and(OrderSpecifications.farmerSearch(keyword)) // Sử dụng farmerSearch
+          .and(OrderSpecifications.hasPaymentMethod(paymentMethod))
+          .and(OrderSpecifications.hasPaymentStatus(paymentStatus));
 
 
   Page<Order> orderPage = orderRepository.findAll(spec, pageable);
@@ -384,11 +388,14 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   @Override
   @Transactional(readOnly = true)
   public Page<OrderSummaryResponse> getAllOrdersForAdmin(
-      String keyword, OrderStatus status, Long buyerId, Long farmerId, Pageable pageable) {
+      String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Long buyerId, Long farmerId, Pageable pageable) {
     Specification<Order> spec =
         Specification.where(OrderSpecifications.hasStatus(status))
             .and(OrderSpecifications.byBuyer(buyerId))
-            .and(OrderSpecifications.byFarmer(farmerId));
+            .and(OrderSpecifications.byFarmer(farmerId))
+            .and(OrderSpecifications.hasPaymentMethod(paymentMethod))
+            .and(OrderSpecifications.hasPaymentStatus(paymentStatus));
+
 
     if (StringUtils.hasText(keyword)) {
       // Keyword có thể là mã đơn hàng, tên người mua, hoặc tên người bán
@@ -1204,16 +1211,29 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
           "Bạn không có quyền xem thông tin thanh toán cho đơn hàng này.");
     }
 
-    if (order.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
+    if (order.getPaymentMethod() != PaymentMethod.BANK_TRANSFER && order.getPaymentMethod() != PaymentMethod.INVOICE) {
       throw new BadRequestException(
-          "Đơn hàng này không sử dụng phương thức chuyển khoản ngân hàng.");
-    }
-    if (order.getPaymentStatus() != PaymentStatus.PENDING
-        && order.getPaymentStatus() != PaymentStatus.AWAITING_PAYMENT_TERM) {
-      throw new BadRequestException("Đơn hàng này không ở trạng thái chờ thanh toán chuyển khoản.");
+              "Thông tin chuyển khoản không áp dụng cho phương thức thanh toán của đơn hàng này (" + order.getPaymentMethod() + ").");
     }
 
-    String transferContent = "CK " + order.getOrderCode();
+    // Kiểm tra trạng thái thanh toán phù hợp
+    boolean canViewBankInfo = false;
+    if (order.getPaymentMethod() == PaymentMethod.BANK_TRANSFER && order.getPaymentStatus() == PaymentStatus.PENDING) {
+      canViewBankInfo = true;
+    } else if (order.getPaymentMethod() == PaymentMethod.INVOICE &&
+            (order.getPaymentStatus() == PaymentStatus.AWAITING_PAYMENT_TERM || order.getPaymentStatus() == PaymentStatus.PENDING)) {
+      // Đối với INVOICE, có thể cho xem thông tin CK ngay cả khi đang AWAITING_PAYMENT_TERM
+      // hoặc PENDING (cho phép Buyer chủ động trả nợ sớm bằng CK)
+      canViewBankInfo = true;
+    }
+
+    if (!canViewBankInfo) {
+      throw new BadRequestException(
+              "Đơn hàng này không ở trạng thái cho phép xem thông tin chuyển khoản (PTTT: " + order.getPaymentMethod() + ", Trạng thái TT: " + order.getPaymentStatus() + ").");
+    }
+
+
+    String transferContent = "TT AgriTrade " + order.getOrderCode();
     String qrCodeDataString;
 
     // Tạo chuỗi cho QR code
@@ -1425,5 +1445,49 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     // Load lại đầy đủ để trả về
     return orderMapper.toOrderResponse(orderRepository.findByIdWithDetails(savedOrder.getId()).orElse(savedOrder));
   }
+
+  @Override
+  @Transactional
+  public void processBuyerPaymentNotification(Long orderId, PaymentNotificationRequest request, Authentication authentication) {
+    User buyer = SecurityUtils.getCurrentAuthenticatedUser();
+    Order order = orderRepository.findByIdAndBuyerId(orderId, buyer.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+    if (order.getPaymentMethod() != PaymentMethod.INVOICE && order.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
+      throw new BadRequestException("This order does not support payment notification via this method.");
+    }
+    if (order.getPaymentStatus() == PaymentStatus.PAID) {
+      log.warn("Buyer {} attempted to notify payment for already PAID order {}", buyer.getEmail(), order.getOrderCode());
+      // Không cần ném lỗi, chỉ log lại
+      return;
+    }
+
+    // Lưu thông tin thông báo của buyer (ví dụ vào một trường mới trong Order hoặc Invoice)
+    // Ví dụ: order.setBuyerPaymentNotificationNote(buildNotificationNote(request));
+    // Hoặc tạo một entity riêng để lưu lịch sử thông báo thanh toán nếu cần chi tiết.
+    // Hiện tại, chúng ta chỉ gửi thông báo.
+
+    log.info("Buyer {} notified payment for order {}. Ref: {}, Notes: {}",
+            buyer.getEmail(), order.getOrderCode(), request.getReferenceCode(), request.getNotes());
+
+    // Gửi thông báo cho Admin và Farmer (nếu Farmer quản lý đơn này)
+    // notificationService.sendBuyerPaymentNotifiedToAdmin(order, request);
+    // notificationService.sendBuyerPaymentNotifiedToFarmer(order, request);
+    // (Cần tạo các hàm này trong NotificationService)
+
+    // QUAN TRỌNG: KHÔNG thay đổi Order.paymentStatus ở đây.
+    // Việc này sẽ do Admin/Farmer thực hiện sau khi xác minh.
+  }
+
+// private String buildNotificationNote(PaymentNotificationRequest request) {
+//     StringBuilder note = new StringBuilder("Buyer payment notification:");
+//     if (StringUtils.hasText(request.getReferenceCode())) {
+//         note.append("\nRef Code: ").append(request.getReferenceCode());
+//     }
+//     if (StringUtils.hasText(request.getNotes())) {
+//         note.append("\nNotes: ").append(request.getNotes());
+//     }
+//     return note.toString();
+// }
 
 }

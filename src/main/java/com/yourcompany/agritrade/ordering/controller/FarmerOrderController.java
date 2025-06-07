@@ -2,6 +2,8 @@ package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
+import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
@@ -28,22 +30,16 @@ public class FarmerOrderController {
   // Lấy danh sách đơn hàng MÀ MÌNH LÀ NGƯỜI BÁN
   @GetMapping("/my")
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsFarmer(
-      Authentication authentication,
-      @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) String status,
-      @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
+          Authentication authentication,
+          @RequestParam(required = false) String keyword,
+          @RequestParam(required = false) OrderStatus status,
+          @RequestParam(required = false) PaymentMethod paymentMethod,
+          @RequestParam(required = false) PaymentStatus paymentStatus,
+          @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
-    OrderStatus statusEnum = null;
-    if (StringUtils.hasText(status)) {
-      try {
-        statusEnum = OrderStatus.valueOf(status.toUpperCase());
-      } catch (IllegalArgumentException e) {
-
-      }
-    }
 
     Page<OrderSummaryResponse> orders =
-        orderService.getMyOrdersAsFarmer(authentication, keyword, statusEnum, pageable);
+        orderService.getMyOrdersAsFarmer(authentication, keyword, status, paymentMethod, paymentStatus, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 

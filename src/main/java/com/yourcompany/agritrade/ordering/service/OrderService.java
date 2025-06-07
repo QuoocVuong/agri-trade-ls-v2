@@ -2,10 +2,8 @@ package com.yourcompany.agritrade.ordering.service;
 
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
-import com.yourcompany.agritrade.ordering.dto.request.AgreedOrderRequest;
-import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
-import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
-import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
+import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
+import com.yourcompany.agritrade.ordering.dto.request.*;
 import com.yourcompany.agritrade.ordering.dto.response.*;
 
 import java.util.List;
@@ -21,15 +19,15 @@ public interface OrderService {
   List<OrderResponse> checkout(Authentication authentication, CheckoutRequest request);
 
   /** Lấy danh sách đơn hàng của người mua hiện tại (phân trang) */
-  Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, Pageable pageable);
+  Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Pageable pageable);
 
   /** Lấy danh sách đơn hàng của nông dân hiện tại (phân trang) */
   Page<OrderSummaryResponse> getMyOrdersAsFarmer(
-      Authentication authentication, String keyword, OrderStatus status, Pageable pageable);
+      Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Pageable pageable);
 
   /** Lấy danh sách tất cả đơn hàng cho Admin (phân trang, có filter) */
   Page<OrderSummaryResponse> getAllOrdersForAdmin(
-      String keyword, OrderStatus status, Long buyerId, Long farmerId, Pageable pageable);
+          String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Long buyerId, Long farmerId, Pageable pageable);
 
   /** Lấy chi tiết đơn hàng theo ID (kiểm tra quyền truy cập) */
   OrderResponse getOrderDetails(Authentication authentication, Long orderId);
@@ -65,4 +63,6 @@ public interface OrderService {
   PaymentUrlResponse createPaymentUrl(Authentication authentication, Long orderId, PaymentMethod paymentMethod, HttpServletRequest httpServletRequest);
 
   OrderResponse createAgreedOrder(Authentication authentication, AgreedOrderRequest request);
+
+  void processBuyerPaymentNotification(Long orderId, PaymentNotificationRequest request, Authentication authentication);
 }

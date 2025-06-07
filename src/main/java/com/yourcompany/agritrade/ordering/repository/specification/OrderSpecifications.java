@@ -2,6 +2,8 @@ package com.yourcompany.agritrade.ordering.repository.specification;
 
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
+import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import jakarta.persistence.criteria.*;
@@ -150,6 +152,24 @@ public class OrderSpecifications {
       Predicate farmerFullNameLike =
           criteriaBuilder.like(criteriaBuilder.lower(farmerJoin.get("fullName")), namePattern);
       return criteriaBuilder.or(farmNameLike, farmerFullNameLike);
+    };
+  }
+
+  public static Specification<Order> hasPaymentMethod(PaymentMethod paymentMethod) {
+    return (root, query, criteriaBuilder) -> {
+      if (paymentMethod == null) { // THÊM KIỂM TRA NULL Ở ĐÂY
+        return criteriaBuilder.conjunction();
+      }
+      return criteriaBuilder.equal(root.get("paymentMethod"), paymentMethod);
+    };
+  }
+
+  public static Specification<Order> hasPaymentStatus(PaymentStatus paymentStatus) {
+    return (root, query, criteriaBuilder) -> {
+      if (paymentStatus == null) {
+        return criteriaBuilder.conjunction();
+      }
+      return criteriaBuilder.equal(root.get("paymentStatus"), paymentStatus);
     };
   }
 

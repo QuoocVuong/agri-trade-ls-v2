@@ -191,12 +191,14 @@ class OrderServiceImplTest {
             Pageable pageable = PageRequest.of(0, 10);
             String keyword = "ORD-SAMPLE";
             OrderStatus status = OrderStatus.PENDING;
+            PaymentMethod paymentMethod = PaymentMethod.COD;
+            PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
             Page<Order> orderPage = new PageImpl<>(List.of(orderEntity), pageable, 1);
             when(orderRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(orderPage);
             when(orderMapper.toOrderSummaryResponsePage(orderPage)).thenReturn(new PageImpl<>(List.of(orderSummaryResponseDto)));
 
-            Page<OrderSummaryResponse> result = orderService.getMyOrdersAsBuyer(authentication, keyword, status, pageable);
+            Page<OrderSummaryResponse> result = orderService.getMyOrdersAsBuyer(authentication, keyword, status, paymentMethod, paymentStatus,  pageable);
 
             assertNotNull(result);
             assertEquals(1, result.getTotalElements());
@@ -215,12 +217,14 @@ class OrderServiceImplTest {
             Pageable pageable = PageRequest.of(0, 10);
             String keyword = "Test Buyer";
             OrderStatus status = OrderStatus.PENDING;
+            PaymentMethod paymentMethod = PaymentMethod.COD;
+            PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
             Page<Order> orderPage = new PageImpl<>(List.of(orderEntity), pageable, 1);
             when(orderRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(orderPage);
             when(orderMapper.toOrderSummaryResponsePage(orderPage)).thenReturn(new PageImpl<>(List.of(orderSummaryResponseDto)));
 
-            Page<OrderSummaryResponse> result = orderService.getMyOrdersAsFarmer(authentication, keyword, status, pageable);
+            Page<OrderSummaryResponse> result = orderService.getMyOrdersAsFarmer(authentication, keyword, status, paymentMethod, paymentStatus, pageable);
 
             assertNotNull(result);
             assertEquals(1, result.getTotalElements());
@@ -240,12 +244,14 @@ class OrderServiceImplTest {
             OrderStatus status = OrderStatus.PROCESSING;
             Long buyerIdParam = testBuyer.getId();
             Long farmerIdParam = testFarmer.getId();
+            PaymentMethod paymentMethod = PaymentMethod.COD;
+            PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
             Page<Order> orderPage = new PageImpl<>(List.of(orderEntity), pageable, 1);
             when(orderRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(orderPage);
             when(orderMapper.toOrderSummaryResponsePage(orderPage)).thenReturn(new PageImpl<>(List.of(orderSummaryResponseDto)));
 
-            Page<OrderSummaryResponse> result = orderService.getAllOrdersForAdmin(keyword, status, buyerIdParam, farmerIdParam, pageable);
+            Page<OrderSummaryResponse> result = orderService.getAllOrdersForAdmin(keyword, status, paymentMethod, paymentStatus, buyerIdParam, farmerIdParam, pageable);
 
             assertNotNull(result);
             assertEquals(1, result.getTotalElements());

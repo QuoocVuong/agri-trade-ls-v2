@@ -237,7 +237,7 @@ class InvoiceServiceImplTest {
             when(invoiceMapper.toInvoiceSummaryResponsePage(invoicePage))
                     .thenReturn(new PageImpl<>(List.of(summaryResponse), pageable, 1));
 
-            Page<InvoiceSummaryResponse> result = invoiceService.getAllInvoicesForAdmin(null, null, pageable);
+            Page<InvoiceSummaryResponse> result = invoiceService.getAllInvoicesForAdmin(null, null, null, pageable);
 
             assertNotNull(result);
             assertEquals(1, result.getTotalElements());
@@ -256,7 +256,7 @@ class InvoiceServiceImplTest {
             when(invoiceMapper.toInvoiceSummaryResponsePage(emptyPage))
                     .thenReturn(new PageImpl<>(Collections.emptyList(), pageable, 0));
 
-            invoiceService.getAllInvoicesForAdmin(status, null, pageable);
+            invoiceService.getAllInvoicesForAdmin(status, null,null, pageable);
 
             ArgumentCaptor<Specification<Invoice>> specCaptor = ArgumentCaptor.forClass(Specification.class);
             verify(invoiceRepository).findAll(specCaptor.capture(), eq(pageable));
@@ -276,7 +276,7 @@ class InvoiceServiceImplTest {
             when(invoiceMapper.toInvoiceSummaryResponsePage(emptyPage))
                     .thenReturn(new PageImpl<>(Collections.emptyList(), pageable, 0));
 
-            invoiceService.getAllInvoicesForAdmin(null, keyword, pageable);
+            invoiceService.getAllInvoicesForAdmin(null,null, keyword, pageable);
 
             ArgumentCaptor<Specification<Invoice>> specCaptor = ArgumentCaptor.forClass(Specification.class);
             verify(invoiceRepository).findAll(specCaptor.capture(), eq(pageable));

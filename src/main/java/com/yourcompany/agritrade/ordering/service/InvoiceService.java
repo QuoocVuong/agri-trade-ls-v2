@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.ordering.service;
 import com.yourcompany.agritrade.ordering.domain.Invoice;
 import com.yourcompany.agritrade.ordering.domain.InvoiceStatus;
 import com.yourcompany.agritrade.ordering.domain.Order;
+import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.response.InvoiceSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,8 +21,10 @@ public interface InvoiceService {
 
   // -- Phương Thức của Admin--
 
-  Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(InvoiceStatus status, String keyword, Pageable pageable);
+  Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(InvoiceStatus status, PaymentStatus paymentStatus, String keyword, Pageable pageable);
 
-  Page<InvoiceSummaryResponse> getInvoicesForFarmer(Authentication authentication, InvoiceStatus status, String keyword, Pageable pageable);
+  Page<InvoiceSummaryResponse> getInvoicesForFarmer(Authentication authentication, InvoiceStatus status, PaymentStatus paymentStatus, String keyword, Pageable pageable);
+
+  Page<InvoiceSummaryResponse> getInvoicesForBuyer(Authentication authentication, InvoiceStatus status, PaymentStatus paymentStatus, String keyword, Pageable pageable);
 
 }

@@ -1,9 +1,8 @@
 // src/main/java/com/yourcompany/agritrade/ordering/repository/specification/InvoiceSpecifications.java
 package com.yourcompany.agritrade.ordering.repository.specification;
 
-import com.yourcompany.agritrade.ordering.domain.Invoice;
-import com.yourcompany.agritrade.ordering.domain.InvoiceStatus;
-import com.yourcompany.agritrade.ordering.domain.Order; // Import Order
+import com.yourcompany.agritrade.ordering.domain.*;
+import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.usermanagement.domain.User; // Import User
 import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;
@@ -52,6 +51,34 @@ public class InvoiceSpecifications {
         return (root, query, criteriaBuilder) -> {
             Join<Invoice, Order> orderJoin = root.join("order", JoinType.INNER);
             return criteriaBuilder.equal(orderJoin.get("farmer").get("id"), farmerId);
+        };
+    }
+
+    public static Specification<Invoice> isBuyerInvoice(Long buyerId) {
+        return (root, query, criteriaBuilder) -> {
+            Join<Invoice, Order> orderJoin = root.join("order", JoinType.INNER);
+            return criteriaBuilder.equal(orderJoin.get("buyer").get("id"), buyerId);
+        };
+    }
+
+    // Specification để lọc theo phương thức thanh toán của Order liên quan
+    public static Specification<Invoice> hasPaymentMethod(PaymentMethod paymentMethod) {
+        return (root, query, criteriaBuilder) -> {
+            if (paymentMethod == null) {
+                return criteriaBuilder.conjunction();
+            }
+            Join<Invoice, Order> orderJoin = root.join("order", JoinType.INNER);
+            return criteriaBuilder.equal(orderJoin.get("paymentMethod"), paymentMethod);
+        };
+    }
+
+    public static Specification<Invoice> hasOrderPaymentStatus(PaymentStatus paymentStatus) {
+        return (root, query, criteriaBuilder) -> {
+            if (paymentStatus == null) {
+                return criteriaBuilder.conjunction();
+            }
+            Join<Invoice, Order> orderJoin = root.join("order", JoinType.INNER);
+            return criteriaBuilder.equal(orderJoin.get("paymentStatus"), paymentStatus);
         };
     }
 }

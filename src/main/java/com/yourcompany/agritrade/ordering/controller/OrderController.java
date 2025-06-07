@@ -4,15 +4,14 @@ import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.util.VnPayUtils;
-import com.yourcompany.agritrade.ordering.domain.Order;
-import com.yourcompany.agritrade.ordering.domain.OrderStatus;
-import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
-import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
+import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.ordering.dto.request.AgreedOrderRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
+import com.yourcompany.agritrade.ordering.dto.request.PaymentNotificationRequest;
 import com.yourcompany.agritrade.ordering.dto.response.*;
 import com.yourcompany.agritrade.ordering.repository.OrderRepository;
+import com.yourcompany.agritrade.ordering.service.InvoiceService;
 import com.yourcompany.agritrade.ordering.service.OrderService;
 import com.yourcompany.agritrade.ordering.service.PaymentGatewayService;
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -44,6 +43,8 @@ public class OrderController {
 
   private final OrderService orderService;
 
+  private final InvoiceService invoiceService;
+
   @PostMapping("/checkout")
   // Chỉ Consumer hoặc Business Buyer mới được checkout
   @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')")
@@ -60,18 +61,12 @@ public class OrderController {
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsBuyer(
       Authentication authentication,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) String status,
+      @RequestParam(required = false) OrderStatus status,
+      @RequestParam(required = false) PaymentMethod paymentMethod,
+      @RequestParam(required = false) PaymentStatus paymentStatus,
       @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
-    OrderStatus statusEnum = null;
-    if (StringUtils.hasText(status)) {
-      try {
-        statusEnum = OrderStatus.valueOf(status.toUpperCase());
-      } catch (IllegalArgumentException e) {
-
-      }
-    }
-    Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsBuyer(authentication,keyword,statusEnum, pageable);
+    Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsBuyer(authentication,keyword,status, paymentMethod, paymentStatus, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 
@@ -138,12 +133,34 @@ public class OrderController {
 
 
   @PostMapping("/agreed-order")
-  @PreAuthorize("hasAnyRole('FARMER')") // Ví dụ: hoặc Farmer được tạo
+  @PreAuthorize("hasAnyRole('FARMER')") // Ví dụ: Farmer được tạo
   public ResponseEntity<ApiResponse<OrderResponse>> createAgreedOrder(
           Authentication authentication,
           @Valid @RequestBody AgreedOrderRequest request) {
     OrderResponse createdOrder = orderService.createAgreedOrder(authentication, request);
     return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.created(createdOrder, "Agreed order created successfully."));
+  }
+
+  @GetMapping("/my/invoices")
+  @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')") // Cho  Consumer và Business Buyer
+  public ResponseEntity<ApiResponse<Page<InvoiceSummaryResponse>>> getMyDebtInvoices(
+          Authentication authentication,
+          @RequestParam(required = false) InvoiceStatus status, // Buyer có thể muốn lọc theo trạng thái hóa đơn
+          @RequestParam(required = false) PaymentStatus paymentStatus,
+          @RequestParam(required = false) String keyword,   // Tìm theo mã HĐ, mã ĐH
+          @PageableDefault(size = 15, sort = "dueDate,asc") Pageable pageable) { // Sắp xếp theo ngày đáo hạn gần nhất
+    Page<InvoiceSummaryResponse> invoices = invoiceService.getInvoicesForBuyer(authentication, status, paymentStatus, keyword, pageable);
+    return ResponseEntity.ok(ApiResponse.success(invoices));
+  }
+
+  @PostMapping("/{orderId}/notify-payment-made")
+  @PreAuthorize("hasAnyRole('CONSUMER', 'BUSINESS_BUYER')")
+  public ResponseEntity<ApiResponse<Void>> notifyPaymentMade(
+          @PathVariable Long orderId,
+          @RequestBody(required = false) PaymentNotificationRequest request, // Tạo DTO này
+          Authentication authentication) {
+    orderService.processBuyerPaymentNotification(orderId, request, authentication);
+    return ResponseEntity.ok(ApiResponse.success("Payment notification received. Admin/Farmer will verify soon."));
   }
 }

@@ -287,7 +287,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(InvoiceStatus status, String keyword, Pageable pageable) {
+  public Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(InvoiceStatus status,  PaymentStatus paymentStatus, String keyword, Pageable pageable) {
     log.debug("Admin fetching invoices with status: {}, keyword: {}, pageable: {}", status, keyword, pageable);
 
     Specification<Invoice> spec = Specification.where(null); // Bắt đầu với một spec trống
@@ -295,6 +295,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     if (status != null) {
       spec = spec.and(InvoiceSpecifications.hasStatus(status));
     }
+    if (paymentStatus != null) spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
 
     if (StringUtils.hasText(keyword)) {
       // Tìm kiếm theo invoiceNumber, orderCode, hoặc buyerFullName
@@ -315,12 +316,13 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<InvoiceSummaryResponse> getInvoicesForFarmer(Authentication authentication, InvoiceStatus status, String keyword, Pageable pageable) {
+  public Page<InvoiceSummaryResponse> getInvoicesForFarmer(Authentication authentication, InvoiceStatus status, PaymentStatus paymentStatus, String keyword, Pageable pageable) {
     User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // Hàm helper của bạn
     Specification<Invoice> spec = Specification.where(InvoiceSpecifications.fetchOrderAndBuyer())
             .and(InvoiceSpecifications.isFarmerInvoice(farmer.getId())); // Spec mới
 
     if (status != null) spec = spec.and(InvoiceSpecifications.hasStatus(status));
+    if (paymentStatus != null) spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
     if (StringUtils.hasText(keyword)) {
       // Farmer có thể tìm theo mã HĐ, mã ĐH, tên người mua của hóa đơn họ
       spec = spec.and(Specification.anyOf(
@@ -329,6 +331,33 @@ public class InvoiceServiceImpl implements InvoiceService {
               InvoiceSpecifications.hasBuyerFullName(keyword) // Vẫn giữ vì farmer cần biết của buyer nào
       ));
     }
+    Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
+    return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<InvoiceSummaryResponse> getInvoicesForBuyer(Authentication authentication, InvoiceStatus status,  PaymentStatus paymentStatus, String keyword, Pageable pageable) {
+    User buyer = SecurityUtils.getCurrentAuthenticatedUser();
+
+    Specification<Invoice> spec = Specification.where(InvoiceSpecifications.fetchOrderAndBuyer()) // Fetch thông tin cần thiết
+            .and(InvoiceSpecifications.isBuyerInvoice(buyer.getId())); // Spec mới
+
+    if (status != null) {
+      spec = spec.and(InvoiceSpecifications.hasStatus(status));
+    }
+    if (paymentStatus != null) spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
+    if (StringUtils.hasText(keyword)) {
+      // Buyer có thể tìm theo mã HĐ hoặc mã ĐH
+      spec = spec.and(Specification.anyOf(
+              InvoiceSpecifications.hasInvoiceNumber(keyword),
+              InvoiceSpecifications.hasOrderCode(keyword)
+      ));
+    }
+
+    // Chỉ lấy các hóa đơn có phương thức thanh toán là INVOICE
+    spec = spec.and(InvoiceSpecifications.hasPaymentMethod(PaymentMethod.INVOICE));
+
+
     Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
     return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
   }

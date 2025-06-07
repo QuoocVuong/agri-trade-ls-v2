@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.ordering.domain.InvoiceStatus;
+import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.response.InvoiceSummaryResponse; // Cần tạo DTO này
 import com.yourcompany.agritrade.ordering.service.InvoiceService;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +25,10 @@ public class AdminInvoiceController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<InvoiceSummaryResponse>>> getAllInvoices(
             @RequestParam(required = false) InvoiceStatus status,
+            @RequestParam(required = false) PaymentStatus paymentStatus,
             @RequestParam(required = false) String keyword, // Tìm theo mã HĐ, mã ĐH, tên KH
             @PageableDefault(size = 20, sort = "issueDate,desc") Pageable pageable) {
-        Page<InvoiceSummaryResponse> invoices = invoiceService.getAllInvoicesForAdmin(status, keyword, pageable);
+        Page<InvoiceSummaryResponse> invoices = invoiceService.getAllInvoicesForAdmin(status, paymentStatus, keyword, pageable);
         return ResponseEntity.ok(ApiResponse.success(invoices));
     }
 
