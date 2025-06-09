@@ -1,9 +1,6 @@
 package com.yourcompany.agritrade.ordering.service.impl;
 
-import com.yourcompany.agritrade.catalog.domain.Product;
-import com.yourcompany.agritrade.catalog.domain.ProductImage;
-import com.yourcompany.agritrade.catalog.domain.ProductPricingTier;
-import com.yourcompany.agritrade.catalog.domain.ProductStatus;
+import com.yourcompany.agritrade.catalog.domain.*;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.OutOfStockException;
@@ -1410,11 +1407,47 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
       Product productRef = productRepository.findById(itemRequest.getProductId())
               .orElseThrow(() -> new ResourceNotFoundException("Product reference", "id", itemRequest.getProductId()));
 
+      int requestedQuantityFromForm  = itemRequest.getQuantity(); // Số lượng Farmer chốt
+
+      // 1. Lấy đơn vị Farmer đã chốt cho item này
+      MassUnit unitFarmerChot = MassUnit.fromString(itemRequest.getUnit());
+      if (unitFarmerChot == null) {
+        throw new BadRequestException("Đơn vị tính không hợp lệ cho sản phẩm '" + productRef.getName() + "': " + itemRequest.getUnit());
+      }
+
+      // 2. Quy đổi số lượng Farmer chốt về KG (hoặc đơn vị cơ sở của sản phẩm)
+      // Giả định Product.stockQuantity và Product.unit (đơn vị cơ sở) luôn là KG
+      // Nếu Product.unit có thể khác KG, bạn cần thêm bước quy đổi stockQuantity về KG trước khi so sánh.
+      // Ở đây, giả sử Product.unit luôn là KG.
+      BigDecimal quantityToDeductInKg = unitFarmerChot.convertToKg(new BigDecimal(requestedQuantityFromForm));
+
+      // === KIỂM TRA VÀ TRỪ KHO ===   // 3. Kiểm tra và trừ kho (stockQuantity của Product là số nguyên, lưu theo KG)
+      if (productRef.getStatus() != ProductStatus.PUBLISHED || productRef.isDeleted()) {
+        throw new BadRequestException("Nguồn cung '" + productRef.getName() + "' không khả dụng.");
+      }
+      int currentStockKg = productRef.getStockQuantity(); // Đây là số KG trong kho
+
+      if (new BigDecimal(currentStockKg).compareTo(quantityToDeductInKg) < 0) {
+        // Chuyển đổi stock hiện tại về đơn vị Farmer chốt để thông báo cho dễ hiểu
+        BigDecimal currentStockInFarmerUnit = unitFarmerChot.convertFromKg(new BigDecimal(currentStockKg));
+        throw new OutOfStockException(
+                "Không đủ tồn kho cho '" + productRef.getName() +
+                        "'. Hiện có: " + currentStockInFarmerUnit.stripTrailingZeros().toPlainString() + " " + unitFarmerChot.getDisplayName() +
+                        ", Yêu cầu: " + requestedQuantityFromForm + " " + unitFarmerChot.getDisplayName(),
+                currentStockKg // Trả về tồn kho theo đơn vị cơ sở (KG)
+        );
+      }
+      // Trừ kho (số nguyên KG)
+      productRef.setStockQuantity(currentStockKg - quantityToDeductInKg.intValue()); // Chuyển BigDecimal về int để trừ
+      productRef.setLastStockUpdate(LocalDateTime.now());
+      // productRepository.save(productRef); // Sẽ được cascade khi lưu Order
+
+      // 4. Tạo OrderItem
       OrderItem orderItem = new OrderItem();
       orderItem.setProduct(productRef); // Lưu tham chiếu đến sản phẩm gốc
-      orderItem.setProductName(itemRequest.getProductName());
-      orderItem.setUnit(itemRequest.getUnit());
-      orderItem.setQuantity(itemRequest.getQuantity());
+      orderItem.setProductName(itemRequest.getProductName()); // Tên Farmer chốt
+      orderItem.setUnit(unitFarmerChot.name());   // Đơn vị Farmer chốt
+      orderItem.setQuantity(requestedQuantityFromForm); // Số lượng Farmer chốt
       orderItem.setPricePerUnit(itemRequest.getPricePerUnit());
       BigDecimal itemTotalPrice = itemRequest.getPricePerUnit().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
       orderItem.setTotalPrice(itemTotalPrice);
@@ -1445,6 +1478,13 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     // Load lại đầy đủ để trả về
     return orderMapper.toOrderResponse(orderRepository.findByIdWithDetails(savedOrder.getId()).orElse(savedOrder));
   }
+
+  // Helper mới để quy đổi từ KG sang đơn vị đích (nếu cần cho OutOfStockException message)
+  private BigDecimal convertKgToUnit(BigDecimal kgQuantity, MassUnit targetUnit) {
+    if (targetUnit == null || kgQuantity == null) return BigDecimal.ZERO;
+    return targetUnit.convertFromKg(kgQuantity);
+  }
+
 
   @Override
   @Transactional

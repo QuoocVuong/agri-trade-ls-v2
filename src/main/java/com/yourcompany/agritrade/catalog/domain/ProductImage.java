@@ -24,7 +24,7 @@ public class ProductImage {
   @JoinColumn(name = "product_id", nullable = false)
   private Product product;
 
-  @Column(nullable = true)
+  @Transient
   private String imageUrl;
 
   @Column(nullable = false)
@@ -33,7 +33,7 @@ public class ProductImage {
   @Column(nullable = false)
   private int displayOrder = 0;
 
-  @Column(length = 1024, nullable = false)
+  @Column(length = 2048, nullable = false)
   private String blobPath;
 
   @CreationTimestamp
