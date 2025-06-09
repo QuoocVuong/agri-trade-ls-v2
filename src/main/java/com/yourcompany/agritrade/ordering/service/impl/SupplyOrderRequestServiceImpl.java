@@ -129,7 +129,7 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
 
     @Override
     @Transactional
-    public OrderResponse acceptSupplyOrderRequest(Authentication authentication, Long requestId) {
+    public SupplyOrderRequestResponse  acceptSupplyOrderRequest(Authentication authentication, Long requestId) {
         User farmer = SecurityUtils.getCurrentAuthenticatedUser();
         if (farmer.getRoles().stream().noneMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
             throw new AccessDeniedException("Only farmers can accept supply requests.");
@@ -145,67 +145,78 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
             throw new BadRequestException("Request cannot be accepted from its current status: " + supplyRequest.getStatus());
         }
 
-        // Tạo AgreedOrderRequest từ SupplyOrderRequest
-        AgreedOrderRequest agreedOrderDto = new AgreedOrderRequest();
-        agreedOrderDto.setBuyerId(supplyRequest.getBuyer().getId());
-        // farmerId sẽ được lấy từ Authentication trong orderService.createAgreedOrder
+//        // Tạo AgreedOrderRequest từ SupplyOrderRequest
+//        AgreedOrderRequest agreedOrderDto = new AgreedOrderRequest();
+//        agreedOrderDto.setBuyerId(supplyRequest.getBuyer().getId());
+//        // farmerId sẽ được lấy từ Authentication trong orderService.createAgreedOrder
+//
+//        AgreedOrderItemRequest agreedItem = new AgreedOrderItemRequest();
+//        agreedItem.setProductId(supplyRequest.getProduct().getId());
+//        agreedItem.setProductName(supplyRequest.getProduct().getName()); // Lấy tên gốc, Farmer có thể sửa khi tạo đơn
+//        agreedItem.setUnit(supplyRequest.getRequestedUnit());
+//        agreedItem.setQuantity(supplyRequest.getRequestedQuantity());
+//        // Giá: Ưu tiên giá đề xuất của buyer, nếu không có thì Farmer tự nhập khi tạo đơn
+//        // Hoặc Farmer có thể sửa giá này trong form tạo AgreedOrder
+//        agreedItem.setPricePerUnit(
+//                supplyRequest.getProposedPricePerUnit() != null ?
+//                        supplyRequest.getProposedPricePerUnit() :
+//                        (supplyRequest.getProduct().getReferenceWholesalePrice() != null ?
+//                                supplyRequest.getProduct().getReferenceWholesalePrice() :
+//                                BigDecimal.ZERO)
+//        );
+//
+//
+//
+//        agreedOrderDto.setItems(List.of(agreedItem));
+//
+//        // Tổng tiền: Farmer sẽ nhập/xác nhận lại khi tạo AgreedOrder.
+//        // Ở đây có thể tính tạm dựa trên proposedPrice hoặc referenceWholesalePrice
+//        BigDecimal tempTotal = BigDecimal.ZERO;
+//        if (supplyRequest.getProposedPricePerUnit() != null) {
+//            tempTotal = supplyRequest.getProposedPricePerUnit().multiply(BigDecimal.valueOf(supplyRequest.getRequestedQuantity()));
+//        } else if (supplyRequest.getProduct().getReferenceWholesalePrice() != null) {
+//            tempTotal = supplyRequest.getProduct().getReferenceWholesalePrice().multiply(BigDecimal.valueOf(supplyRequest.getRequestedQuantity()));
+//        }
+//        agreedOrderDto.setAgreedTotalAmount(tempTotal); // Farmer sẽ xác nhận lại
+//
+//        // Phương thức thanh toán: Farmer sẽ chọn khi tạo AgreedOrder. Mặc định là INVOICE.
+//        agreedOrderDto.setAgreedPaymentMethod(PaymentMethod.INVOICE);
+//
+//        // Copy thông tin giao hàng từ request
+//        agreedOrderDto.setShippingFullName(supplyRequest.getShippingFullName());
+//        agreedOrderDto.setShippingPhoneNumber(supplyRequest.getShippingPhoneNumber());
+//        agreedOrderDto.setShippingAddressDetail(supplyRequest.getShippingAddressDetail());
+//        agreedOrderDto.setShippingProvinceCode(supplyRequest.getShippingProvinceCode());
+//        agreedOrderDto.setShippingDistrictCode(supplyRequest.getShippingDistrictCode());
+//        agreedOrderDto.setShippingWardCode(supplyRequest.getShippingWardCode());
+//        agreedOrderDto.setExpectedDeliveryDate(supplyRequest.getExpectedDeliveryDate());
+//        agreedOrderDto.setNotes("Đơn hàng được tạo từ yêu cầu #" + supplyRequest.getId() + ". " + (supplyRequest.getBuyerNotes() != null ? supplyRequest.getBuyerNotes() : ""));
+//
+//        // Gọi OrderService để tạo "Đơn hàng thỏa thuận"
+//        // Authentication ở đây là của Farmer
+//        OrderResponse createdOrder = orderService.createAgreedOrder(authentication, agreedOrderDto);
+//
+//        supplyRequest.setStatus(SupplyOrderRequestStatus.FARMER_ACCEPTED);
+//        requestRepository.save(supplyRequest);
+//
+//        log.info("Farmer {} accepted SupplyOrderRequest {} and created Order {}",
+//                farmer.getId(), requestId, createdOrder.getOrderCode());
+//
+//        // Gửi thông báo cho Buyer
+//        // notificationService.sendSupplyOrderRequestAcceptedNotification(supplyRequest, createdOrder);
+//
+//        return createdOrder;
+        // *** LOGIC CHÍNH ĐƯỢC THAY ĐỔI ***
+        // Chỉ cập nhật trạng thái. Việc tạo Order sẽ do một API khác xử lý.
+        supplyRequest.setStatus(SupplyOrderRequestStatus.FARMER_ACCEPTED); // Trạng thái mới
+        SupplyOrderRequest savedRequest = requestRepository.save(supplyRequest);
 
-        AgreedOrderItemRequest agreedItem = new AgreedOrderItemRequest();
-        agreedItem.setProductId(supplyRequest.getProduct().getId());
-        agreedItem.setProductName(supplyRequest.getProduct().getName()); // Lấy tên gốc, Farmer có thể sửa khi tạo đơn
-        agreedItem.setUnit(supplyRequest.getRequestedUnit());
-        agreedItem.setQuantity(supplyRequest.getRequestedQuantity());
-        // Giá: Ưu tiên giá đề xuất của buyer, nếu không có thì Farmer tự nhập khi tạo đơn
-        // Hoặc Farmer có thể sửa giá này trong form tạo AgreedOrder
-        agreedItem.setPricePerUnit(
-                supplyRequest.getProposedPricePerUnit() != null ?
-                        supplyRequest.getProposedPricePerUnit() :
-                        (supplyRequest.getProduct().getReferenceWholesalePrice() != null ?
-                                supplyRequest.getProduct().getReferenceWholesalePrice() :
-                                BigDecimal.ZERO)
-        );
+        log.info("Farmer {} accepted SupplyOrderRequest {}. Status changed to FARMER_ACCEPTED.", farmer.getId(), requestId);
 
+        // (Tùy chọn) Gửi thông báo cho Buyer rằng yêu cầu đã được chấp nhận và đang chờ Farmer tạo đơn hàng.
+        // notificationService.sendSupplyRequestAcceptedNotification(savedRequest);
 
-
-        agreedOrderDto.setItems(List.of(agreedItem));
-
-        // Tổng tiền: Farmer sẽ nhập/xác nhận lại khi tạo AgreedOrder.
-        // Ở đây có thể tính tạm dựa trên proposedPrice hoặc referenceWholesalePrice
-        BigDecimal tempTotal = BigDecimal.ZERO;
-        if (supplyRequest.getProposedPricePerUnit() != null) {
-            tempTotal = supplyRequest.getProposedPricePerUnit().multiply(BigDecimal.valueOf(supplyRequest.getRequestedQuantity()));
-        } else if (supplyRequest.getProduct().getReferenceWholesalePrice() != null) {
-            tempTotal = supplyRequest.getProduct().getReferenceWholesalePrice().multiply(BigDecimal.valueOf(supplyRequest.getRequestedQuantity()));
-        }
-        agreedOrderDto.setAgreedTotalAmount(tempTotal); // Farmer sẽ xác nhận lại
-
-        // Phương thức thanh toán: Farmer sẽ chọn khi tạo AgreedOrder. Mặc định là BANK_TRANSFER.
-        agreedOrderDto.setAgreedPaymentMethod(PaymentMethod.BANK_TRANSFER);
-
-        // Copy thông tin giao hàng từ request
-        agreedOrderDto.setShippingFullName(supplyRequest.getShippingFullName());
-        agreedOrderDto.setShippingPhoneNumber(supplyRequest.getShippingPhoneNumber());
-        agreedOrderDto.setShippingAddressDetail(supplyRequest.getShippingAddressDetail());
-        agreedOrderDto.setShippingProvinceCode(supplyRequest.getShippingProvinceCode());
-        agreedOrderDto.setShippingDistrictCode(supplyRequest.getShippingDistrictCode());
-        agreedOrderDto.setShippingWardCode(supplyRequest.getShippingWardCode());
-        agreedOrderDto.setExpectedDeliveryDate(supplyRequest.getExpectedDeliveryDate());
-        agreedOrderDto.setNotes("Đơn hàng được tạo từ yêu cầu #" + supplyRequest.getId() + ". " + (supplyRequest.getBuyerNotes() != null ? supplyRequest.getBuyerNotes() : ""));
-
-        // Gọi OrderService để tạo "Đơn hàng thỏa thuận"
-        // Authentication ở đây là của Farmer
-        OrderResponse createdOrder = orderService.createAgreedOrder(authentication, agreedOrderDto);
-
-        supplyRequest.setStatus(SupplyOrderRequestStatus.FARMER_ACCEPTED);
-        requestRepository.save(supplyRequest);
-
-        log.info("Farmer {} accepted SupplyOrderRequest {} and created Order {}",
-                farmer.getId(), requestId, createdOrder.getOrderCode());
-
-        // Gửi thông báo cho Buyer
-        // notificationService.sendSupplyOrderRequestAcceptedNotification(supplyRequest, createdOrder);
-
-        return createdOrder;
+        return requestMapper.toSupplyOrderRequestResponse(savedRequest);
     }
 
     @Override

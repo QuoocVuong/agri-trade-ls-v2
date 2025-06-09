@@ -76,14 +76,6 @@ public class Product {
   @Column(nullable = false)
   private boolean b2bEnabled = false;
 
-  @Column(length = 50)
-  private String b2bUnit;
-
-  private Integer minB2bQuantity = 1;
-
-  @Column(precision = 15, scale = 2)
-  private BigDecimal b2bBasePrice;
-
   @Column(nullable = false)
   private Integer favoriteCount = 0;
 
@@ -94,12 +86,6 @@ public class Product {
       fetch = FetchType.LAZY)
   private Set<ProductImage> images = new HashSet<>();
 
-  @OneToMany(
-      mappedBy = "product",
-      cascade = CascadeType.ALL,
-      orphanRemoval = true,
-      fetch = FetchType.LAZY)
-  private Set<ProductPricingTier> pricingTiers = new HashSet<>();
 
   @Lob // @Lob nếu lý do dài
   private String rejectReason;
@@ -136,24 +122,6 @@ public class Product {
   @Column(nullable = false)
   private boolean isDeleted = false;
 
-  // Helper methods cho images/pricingTiers
-  public void addImage(ProductImage image) {
-    images.add(image);
-    image.setProduct(this);
-  }
 
-  public void removeImage(ProductImage image) {
-    images.remove(image);
-    image.setProduct(null);
-  }
 
-  public void addPricingTier(ProductPricingTier tier) {
-    pricingTiers.add(tier);
-    tier.setProduct(this);
-  }
-
-  public void removePricingTier(ProductPricingTier tier) {
-    pricingTiers.remove(tier);
-    tier.setProduct(null);
-  }
 }

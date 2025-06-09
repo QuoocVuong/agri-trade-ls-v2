@@ -25,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {
       CategoryMapper.class,
       ProductImageMapper.class,
-      ProductPricingTierMapper.class,
       FarmerInfoMapper.class // Dùng mapper riêng cho FarmerInfo
     })
 public abstract class ProductMapper {
@@ -43,12 +42,6 @@ public abstract class ProductMapper {
       qualifiedByName = "mapProductToFarmerInfo") // Dùng method tùy chỉnh
   @Mapping(target = "category", source = "category")
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")
-  @Mapping(target = "b2bUnit", source = "b2bUnit")
-  @Mapping(target = "b2bBasePrice", source = "b2bBasePrice")
-  @Mapping(target = "minB2bQuantity", source = "minB2bQuantity")
-  @Mapping(
-      target = "pricingTiers",
-      source = "pricingTiers") // MapStruct sẽ dùng ProductPricingTierMapper
   public abstract ProductSummaryResponse toProductSummaryResponse(Product product);
 
   @AfterMapping
@@ -70,15 +63,9 @@ public abstract class ProductMapper {
       source = "product",
       qualifiedByName = "mapProductToFarmerInfo") // Dùng method tùy chỉnh
   @Mapping(target = "images", source = "images") // MapStruct dùng ProductImageMapper (cho List)
-  @Mapping(
-      target = "pricingTiers",
-      source = "pricingTiers") // MapStruct dùng ProductPricingTierMapper (cho List)
   // relatedProducts cần xử lý riêng trong service, không map ở đây
   @Mapping(target = "relatedProducts", ignore = true)
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")
-  @Mapping(target = "b2bUnit", source = "b2bUnit")
-  @Mapping(target = "minB2bQuantity", source = "minB2bQuantity")
-  @Mapping(target = "b2bBasePrice", source = "b2bBasePrice")
   public abstract ProductDetailResponse toProductDetailResponse(Product product);
 
   // --- Request Mapper ---
@@ -91,7 +78,6 @@ public abstract class ProductMapper {
   @Mapping(target = "ratingCount", ignore = true)
   @Mapping(target = "favoriteCount", ignore = true)
   @Mapping(target = "images", ignore = true) // Sẽ xử lý riêng trong service
-  @Mapping(target = "pricingTiers", ignore = true) // Sẽ xử lý riêng trong service
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "version", ignore = true) // Bỏ qua version khi tạo mới
@@ -110,7 +96,6 @@ public abstract class ProductMapper {
   @Mapping(target = "ratingCount", ignore = true)
   @Mapping(target = "favoriteCount", ignore = true)
   @Mapping(target = "images", ignore = true) // <-- Bỏ qua collection
-  @Mapping(target = "pricingTiers", ignore = true) // <-- Bỏ qua collection
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")

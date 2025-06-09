@@ -103,6 +103,12 @@ public class Order {
       fetch = FetchType.LAZY)
   private Set<Payment> payments = new HashSet<>(); // Lịch sử thanh toán
 
+  // Thêm vào trong lớp Order.java
+
+  @OneToOne(fetch = FetchType.LAZY) // Một Order chỉ có thể đến từ một Request
+  @JoinColumn(name = "source_request_id", referencedColumnName = "id")
+  private SupplyOrderRequest sourceRequest;
+
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;

@@ -36,10 +36,11 @@ public class ProductDetailResponse {
 
   // Thông tin B2B
   private boolean b2bEnabled;
-  private String b2bUnit;
-  private Integer minB2bQuantity;
-  private BigDecimal b2bBasePrice;
-  private List<ProductPricingTierResponse> pricingTiers; // Dùng List
+  private LocalDate harvestDate;
+  private LocalDateTime lastStockUpdate;
+  private boolean negotiablePrice;
+  private String wholesaleUnit;
+  private BigDecimal referenceWholesalePrice;
 
   private List<ReviewResponse> reviews;
 
@@ -48,11 +49,6 @@ public class ProductDetailResponse {
       relatedProducts; // Dùng Summary DTO để tránh quá nhiều thông tin
 
 
-  private LocalDate harvestDate;
-  private LocalDateTime lastStockUpdate;
-  private boolean negotiablePrice;
-  private String wholesaleUnit;
-  private BigDecimal referenceWholesalePrice;
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;

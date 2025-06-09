@@ -50,6 +50,7 @@ public abstract class OrderMapper {
   @Mapping(target = "payments", source = "payments") // Dùng PaymentMapper
 
   @Mapping(target = "invoiceInfo", source = "order", qualifiedByName = "mapOrderToInvoiceInfo")
+  @Mapping(target = "sourceRequestId", source = "sourceRequest.id") // Lấy ID từ đối tượng sourceRequest lồng nhau
   public abstract OrderResponse toOrderResponse(Order order);
 
 

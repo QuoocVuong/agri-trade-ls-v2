@@ -22,7 +22,9 @@ public class SupplyOrderRequestResponse {
     private String shippingFullName;
     private String shippingPhoneNumber;
     private String shippingAddressDetail;
-    // ... (các trường địa chỉ khác) ...
+    private String shippingProvinceCode;
+    private String shippingDistrictCode;
+    private String shippingWardCode;
     private LocalDate expectedDeliveryDate;
     private SupplyOrderRequestStatus status;
     private String farmerResponseMessage;

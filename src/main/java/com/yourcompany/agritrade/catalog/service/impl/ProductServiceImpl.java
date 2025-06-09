@@ -3,14 +3,14 @@ package com.yourcompany.agritrade.catalog.service.impl;
 import com.github.slugify.Slugify;
 import com.yourcompany.agritrade.catalog.domain.*;
 import com.yourcompany.agritrade.catalog.dto.request.ProductImageRequest;
-import com.yourcompany.agritrade.catalog.dto.request.ProductPricingTierRequest;
+
 import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
 import com.yourcompany.agritrade.catalog.dto.response.SupplySourceResponse;
 import com.yourcompany.agritrade.catalog.mapper.ProductImageMapper;
 import com.yourcompany.agritrade.catalog.mapper.ProductMapper;
-import com.yourcompany.agritrade.catalog.mapper.ProductPricingTierMapper;
+
 import com.yourcompany.agritrade.catalog.repository.*;
 import com.yourcompany.agritrade.catalog.repository.specification.ProductSpecifications;
 import com.yourcompany.agritrade.catalog.service.ProductService;
@@ -29,7 +29,7 @@ import com.yourcompany.agritrade.usermanagement.dto.response.FarmerSummaryRespon
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
+
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -67,7 +67,6 @@ public class ProductServiceImpl implements ProductService {
   private final ReviewService reviewService;
   private static final int RELATED_PRODUCTS_LIMIT = 4; // Số lượng sản phẩm liên quan hiển thị
 
-  private final ProductPricingTierMapper productPricingTierMapper;
 
   private final NotificationService notificationService;
   private final EmailService emailService;
@@ -207,9 +206,6 @@ public class ProductServiceImpl implements ProductService {
     if (product.getImages() == null) {
       product.setImages(new HashSet<>());
     }
-    if (product.getPricingTiers() == null) {
-      product.setPricingTiers(new HashSet<>());
-    }
 
 
     //  các giá trị mặc định cho các trường NOT NULL
@@ -237,8 +233,6 @@ public class ProductServiceImpl implements ProductService {
     // Xử lý ảnh  (từ request DTO)
     updateProductImagesFromRequest(product, request.getImages()); // Gọi helper
 
-    // Xử lý ảnh và bậc giá
-    updatePricingTiers(product, request.isB2bEnabled(), request.getPricingTiers());
 
     Product savedProduct = productRepository.save(product);
     log.info("Product created with id: {} by farmer: {}", savedProduct.getId(), farmer.getId());
@@ -271,10 +265,8 @@ public class ProductServiceImpl implements ProductService {
     // 6. Cập nhật danh sách Ảnh
     updateProductImages(existingProduct, request.getImages());
 
-    // 7. Cập nhật danh sách Bậc giá B2B
-    updatePricingTiers(existingProduct, request.isB2bEnabled(), request.getPricingTiers());
 
-    // 8. Xử lý cập nhật Trạng thái sản phẩm
+    // 7. Xử lý cập nhật Trạng thái sản phẩm
     updateProductStatusForFarmer(request, existingProduct, previousStatus, wasPublished);
 
     if (request.getNegotiablePrice() != null) {
@@ -296,16 +288,16 @@ public class ProductServiceImpl implements ProductService {
       existingProduct.setLastStockUpdate(LocalDateTime.now());
     }
 
-    // 9. Lưu sản phẩm và các thay đổi liên quan
+    // 8. Lưu sản phẩm và các thay đổi liên quan
     Product savedProduct = productRepository.save(existingProduct);
     log.info("Updated product {} for farmer {}", productId, farmer.getId());
 
-    // 10. Gửi thông báo nếu trạng thái chuyển về PENDING_APPROVAL
+    // 9. Gửi thông báo nếu trạng thái chuyển về PENDING_APPROVAL
     if (savedProduct.getStatus() == ProductStatus.PENDING_APPROVAL && wasPublished) {
       log.info("Product {} requires re-approval after update.", savedProduct.getId());
     }
 
-    // 11. Load lại đầy đủ thông tin để trả về DTO chi tiết
+    // 10. Load lại đầy đủ thông tin để trả về DTO chi tiết
     // Gọi lại getMyProductById để đảm bảo fetch đúng các association
     return getMyProductById(authentication, savedProduct.getId());
   }
@@ -394,44 +386,6 @@ public class ProductServiceImpl implements ProductService {
     }
   }
 
-  private void updatePricingTiers(
-      Product product, Boolean isB2bAvailable, List<ProductPricingTierRequest> tierRequests) {
-    Set<ProductPricingTier> existingTiers = product.getPricingTiers();
-    if (existingTiers == null) {
-      existingTiers = new HashSet<>();
-      product.setPricingTiers(existingTiers);
-    }
-
-    // Xóa hết tier cũ nếu sản phẩm không còn là B2B hoặc request gửi list rỗng
-    if (Boolean.FALSE.equals(isB2bAvailable) || (tierRequests != null && tierRequests.isEmpty())) {
-      if (!existingTiers.isEmpty()) {
-        existingTiers.clear();
-        log.debug("Cleared pricing tiers for product {}", product.getId());
-      }
-      // Nếu không phải B2B thì không cần làm gì thêm với tier
-      if (Boolean.FALSE.equals(isB2bAvailable)) return; // Chỉ return nếu isB2bAvailable là FALSE
-    }
-
-    // Chỉ cập nhật nếu tierRequests được gửi (không phải null)
-    if (tierRequests != null) {
-      Set<ProductPricingTier> requestedTiers =
-          tierRequests.stream()
-              .map(
-                  req -> {
-                    ProductPricingTier tier =
-                        productPricingTierMapper.requestToProductPricingTier(req);
-                    tier.setProduct(product);
-                    return tier;
-                  })
-              .collect(Collectors.toSet());
-
-      // Dùng clear/addAll
-      existingTiers.clear();
-      existingTiers.addAll(requestedTiers);
-      log.debug("Updated pricing tiers for product {}", product.getId());
-    }
-    // Nếu tierRequests là null -> không làm gì, giữ nguyên tier cũ
-  }
 
   private void updateProductStatusForFarmer(
       ProductRequest request, Product product, ProductStatus previousStatus, boolean wasPublished) {
@@ -487,14 +441,11 @@ public class ProductServiceImpl implements ProductService {
     // Thêm kiểm tra cho các trường B2B
     if (!Objects.equals(existingProduct.isB2bEnabled(), request.isB2bEnabled())) return true;
     if (Boolean.TRUE.equals(request.isB2bEnabled())) {
-      if (request.getB2bUnit() != null
-          && !Objects.equals(existingProduct.getB2bUnit(), request.getB2bUnit())) return true;
-      if (request.getMinB2bQuantity() != null
-          && !Objects.equals(existingProduct.getMinB2bQuantity(), request.getMinB2bQuantity()))
-        return true;
-      if (request.getB2bBasePrice() != null
-          && (existingProduct.getB2bBasePrice() == null
-              || existingProduct.getB2bBasePrice().compareTo(request.getB2bBasePrice()) != 0))
+      if (request.getWholesaleUnit() != null
+          && !Objects.equals(existingProduct.getWholesaleUnit(), request.getWholesaleUnit())) return true;
+      if (request.getReferenceWholesalePrice() != null
+          && (existingProduct.getReferenceWholesalePrice() == null
+              || existingProduct.getReferenceWholesalePrice().compareTo(request.getReferenceWholesalePrice()) != 0))
         return true;
 
     }

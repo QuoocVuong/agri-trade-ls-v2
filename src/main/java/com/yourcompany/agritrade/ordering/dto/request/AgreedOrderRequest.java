@@ -25,6 +25,8 @@ public class AgreedOrderRequest {
     @NotNull
     private PaymentMethod agreedPaymentMethod; // Phương thức thanh toán đã thỏa thuận
 
+    private Long sourceRequestId; // ID của SupplyOrderRequest gốc (có thể null
+
     private String shippingAddressDetail; // Địa chỉ giao hàng thỏa thuận
     private String shippingProvinceCode;
     private String shippingDistrictCode;

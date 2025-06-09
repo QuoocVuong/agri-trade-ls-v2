@@ -81,6 +81,8 @@ public class OrderServiceImpl implements OrderService {
 
   private final FileStorageService fileStorageService;
 
+  private final SupplyOrderRequestRepository supplyOrderRequestRepository;
+
 
 
   @Value("${app.bank.accountName}")
@@ -749,22 +751,6 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   }
 
   private BigDecimal determinePrice(Product product, int quantity, OrderType type) {
-    // Logic xác định giá B2C/B2B, có thể dựa vào bậc giá
-    if (type == OrderType.B2B && product.isB2bEnabled()) {
-      // Tìm bậc giá phù hợp (nếu dùng pricing tiers)
-      BigDecimal tieredPrice =
-          product.getPricingTiers().stream()
-              .filter(tier -> quantity >= tier.getMinQuantity())
-              .max(
-                  Comparator.comparing(
-                      ProductPricingTier::getMinQuantity)) // Lấy bậc cao nhất đạt được
-              .map(ProductPricingTier::getPricePerUnit)
-              .orElse(product.getB2bBasePrice()); // Nếu không có bậc nào thì dùng giá base
-
-      if (tieredPrice != null) {
-        return tieredPrice;
-      }
-    }
     // Mặc định trả về giá B2C
     return product.getPrice();
   }
@@ -772,8 +758,8 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   private String determineUnit(Product product, OrderType type) {
     if (type == OrderType.B2B
         && product.isB2bEnabled()
-        && StringUtils.hasText(product.getB2bUnit())) {
-      return product.getB2bUnit();
+        && StringUtils.hasText(product.getWholesaleUnit())) {
+      return product.getWholesaleUnit();
     }
     return product.getUnit();
   }
@@ -1402,6 +1388,26 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     order.setNotes(request.getNotes());
     // order.setExpectedDeliveryDate(request.getExpectedDeliveryDate()); // Nếu có trường này trong Order
 
+    // *** LOGIC MỚI ĐỂ LIÊN KẾT VỚI REQUEST GỐC ***
+    if (request.getSourceRequestId() != null) {
+      // Tìm SupplyOrderRequest gốc từ ID trong request
+      SupplyOrderRequest sourceRequest = supplyOrderRequestRepository.findById(request.getSourceRequestId())
+              .orElseThrow(() -> new ResourceNotFoundException("SupplyOrderRequest", "id", request.getSourceRequestId()));
+
+      //  Kiểm tra xem request này có đúng là của farmer và buyer này không
+      if (!sourceRequest.getFarmer().getId().equals(farmer.getId()) || !sourceRequest.getBuyer().getId().equals(request.getBuyerId())) {
+        throw new BadRequestException("The source supply request does not match the order details.");
+      }
+      // Đảm bảo request đã được chấp nhận và chưa được xử lý ***
+      if (sourceRequest.getStatus() != SupplyOrderRequestStatus.FARMER_ACCEPTED) {
+        throw new BadRequestException("Cannot create an order from a request that has not been accepted. Current status: " + sourceRequest.getStatus());
+      }
+
+      // Gán liên kết
+      order.setSourceRequest(sourceRequest);
+    }
+
+
     BigDecimal calculatedSubTotal = BigDecimal.ZERO;
     for (AgreedOrderItemRequest itemRequest : request.getItems()) {
       Product productRef = productRepository.findById(itemRequest.getProductId())
@@ -1469,6 +1475,13 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     // Tạo Invoice nếu là phương thức INVOICE
     if (savedOrder.getPaymentMethod() == PaymentMethod.INVOICE) {
       invoiceService.getOrCreateInvoiceForOrder(savedOrder);
+    }
+
+    // (Tùy chọn) Cập nhật trạng thái của SupplyOrderRequest gốc thành ACCEPTED sau khi đã tạo Order thành công
+    if (order.getSourceRequest() != null) {
+      SupplyOrderRequest sourceRequest = order.getSourceRequest();
+      sourceRequest.setStatus(SupplyOrderRequestStatus.FARMER_ACCEPTED);
+      supplyOrderRequestRepository.save(sourceRequest);
     }
 
     // Gửi thông báo

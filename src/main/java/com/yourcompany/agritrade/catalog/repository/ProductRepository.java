@@ -124,10 +124,7 @@ public interface ProductRepository
           + "LEFT JOIN FETCH f.farmerProfile fp "
           + "LEFT JOIN FETCH p.category c "
           + "LEFT JOIN FETCH p.images img "
-          + // Fetch images
-          "LEFT JOIN FETCH p.pricingTiers pt "
-          + // Fetch pricing tiers
-          "WHERE p.id = :productId")
+          + "WHERE p.id = :productId")
   Optional<Product> findByIdWithDetails(@Param("productId") Long productId);
 
 

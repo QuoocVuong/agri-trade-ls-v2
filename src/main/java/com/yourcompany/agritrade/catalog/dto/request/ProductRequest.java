@@ -39,14 +39,6 @@ public class ProductRequest {
 
   private boolean b2bEnabled = false;
 
-  @Size(max = 50)
-  private String b2bUnit;
-
-  @Min(value = 1, message = "Minimum B2B quantity must be at least 1")
-  private Integer minB2bQuantity;
-
-  @PositiveOrZero(message = "B2B price must be non-negative")
-  private BigDecimal b2bBasePrice;
 
 
 
@@ -61,7 +53,4 @@ public class ProductRequest {
   @Valid
   private List<ProductImageRequest> images;
 
-  // Danh sách bậc giá B2B
-  @Valid // Validate các phần tử trong list
-  private List<ProductPricingTierRequest> pricingTiers;
 }

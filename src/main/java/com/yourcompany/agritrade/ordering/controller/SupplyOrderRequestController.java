@@ -3,7 +3,7 @@ package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.ordering.dto.request.SupplyOrderPlacementRequest;
-import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
+
 import com.yourcompany.agritrade.ordering.dto.response.SupplyOrderRequestResponse;
 import com.yourcompany.agritrade.ordering.service.SupplyOrderRequestService;
 import jakarta.validation.Valid;
@@ -64,11 +64,10 @@ public class SupplyOrderRequestController {
 
     @PostMapping("/{requestId}/accept")
     @PreAuthorize("hasRole('FARMER')")
-    public ResponseEntity<ApiResponse<OrderResponse>> acceptRequest(
+    public ResponseEntity<ApiResponse<SupplyOrderRequestResponse>> acceptRequest(
             Authentication authentication, @PathVariable Long requestId) {
-        // Service sẽ tạo Order từ Request này
-        OrderResponse createdOrder = requestService.acceptSupplyOrderRequest(authentication, requestId);
-        return ResponseEntity.ok(ApiResponse.success(createdOrder, "Supply request accepted and order created."));
+        SupplyOrderRequestResponse updatedRequest = requestService.acceptSupplyOrderRequest(authentication, requestId);
+        return ResponseEntity.ok(ApiResponse.success(updatedRequest, "Supply request accepted. You can now finalize and create the order."));
     }
 
     @PostMapping("/{requestId}/reject")

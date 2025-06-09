@@ -25,10 +25,6 @@ public class ProductSummaryResponse {
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
   private boolean b2bEnabled;
-  private String b2bUnit; //  đơn vị B2B
-  private BigDecimal b2bBasePrice; //  giá B2B cơ bản
-  private Integer minB2bQuantity; //  nếu cần ở Cart
-  private List<ProductPricingTierResponse> pricingTiers; // Dùng List
   private boolean isNew;
 
 

@@ -12,7 +12,7 @@ public interface SupplyOrderRequestService {
     Page<SupplyOrderRequestResponse> getMySentRequests(Authentication authentication, Pageable pageable);
     Page<SupplyOrderRequestResponse> getMyReceivedRequests(Authentication authentication, Pageable pageable);
     SupplyOrderRequestResponse getRequestDetails(Authentication authentication, Long requestId);
-    OrderResponse acceptSupplyOrderRequest(Authentication authentication, Long requestId /*, Optional: AgreedPrice, etc. */);
+    SupplyOrderRequestResponse  acceptSupplyOrderRequest(Authentication authentication, Long requestId /*, Optional: AgreedPrice, etc. */);
     SupplyOrderRequestResponse rejectSupplyOrderRequest(Authentication authentication, Long requestId, String reason);
      void cancelSupplyOrderRequestByBuyer(Authentication authentication, Long requestId); // Tùy chọn
 }
