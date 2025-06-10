@@ -6,6 +6,7 @@ import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.config.TestSecurityConfig;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.OrderType;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
@@ -85,7 +86,7 @@ class FarmerOrderControllerTest {
         @Test
         @DisplayName("GET /api/farmer/orders/my - Thành công với bộ lọc")
         void getMyOrdersAsFarmer_withFilters_success() throws Exception {
-            when(orderService.getMyOrdersAsFarmer(any(Authentication.class), eq("keyword"), eq(OrderStatus.PENDING), eq(PaymentMethod.COD), eq(PaymentStatus.PENDING), any(Pageable.class)))
+            when(orderService.getMyOrdersAsFarmer(any(Authentication.class), eq("keyword"), eq(OrderStatus.PENDING), eq(PaymentMethod.COD), eq(PaymentStatus.PENDING), eq(OrderType.B2B), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/farmer/orders/my")
@@ -93,6 +94,7 @@ class FarmerOrderControllerTest {
                             .param("status", "PENDING")
                             .param("paymentMethod", "COD")
                             .param("paymentStatus", "PENDING")
+                            .param("orderType", "B2B")
                             .param("page", "0")
                             .param("size", "15"))
                     .andExpect(status().isOk())
@@ -104,7 +106,7 @@ class FarmerOrderControllerTest {
         @Test
         @DisplayName("GET /api/farmer/orders/my - Thành công không có bộ lọc")
         void getMyOrdersAsFarmer_noFilters_success() throws Exception {
-            when(orderService.getMyOrdersAsFarmer(any(Authentication.class), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+            when(orderService.getMyOrdersAsFarmer(any(Authentication.class), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/farmer/orders/my"))
@@ -117,7 +119,7 @@ class FarmerOrderControllerTest {
         @DisplayName("GET /api/farmer/orders/my - Trạng thái không hợp lệ")
         void getMyOrdersAsFarmer_invalidStatus_callsServiceWithNullStatus() throws Exception {
             // Service sẽ nhận statusEnum là null nếu chuỗi status không hợp lệ
-            when(orderService.getMyOrdersAsFarmer(any(Authentication.class), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+            when(orderService.getMyOrdersAsFarmer(any(Authentication.class), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/farmer/orders/my")
@@ -125,7 +127,7 @@ class FarmerOrderControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success", is(true)));
 
-            verify(orderService).getMyOrdersAsFarmer(any(Authentication.class), isNull(), isNull(), isNull(), isNull(), any(Pageable.class));
+            verify(orderService).getMyOrdersAsFarmer(any(Authentication.class), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class));
         }
     }
 

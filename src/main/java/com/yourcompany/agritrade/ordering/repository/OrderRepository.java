@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -18,7 +19,7 @@ public interface OrderRepository
     extends JpaRepository<Order, Long>,
         JpaSpecificationExecutor<Order> { // Thêm JpaSpecificationExecutor
 
-  Optional<Order> findByOrderCode(String orderCode);
+//  Optional<Order> findByOrderCode(String orderCode);
 
   // Lấy đơn hàng của người mua (phân trang)
   @Query(
@@ -44,35 +45,53 @@ public interface OrderRepository
       countQuery = "SELECT count(o) FROM Order o WHERE o.farmer.id = :farmerId")
   Page<Order> findByFarmerIdWithDetails(Long farmerId, Pageable pageable);
 
-  // Phương thức này nên fetch các thông tin cần thiết để tránh N+1
-  // Ví dụ: fetch buyer, farmer, orderItems, product trong orderItems
-  @Query(
-      "SELECT o FROM Order o "
-          + "LEFT JOIN FETCH o.buyer b "
-          + "LEFT JOIN FETCH o.farmer f "
-          + "LEFT JOIN FETCH f.farmerProfile fp "
-          + // Fetch farmer profile để có bank info nếu chuyển cho farmer
-          "LEFT JOIN FETCH o.orderItems oi "
-          + "LEFT JOIN FETCH oi.product p "
-          + "LEFT JOIN FETCH p.images "
-          + // << QUAN TRỌNG: FETCH IMAGES
-          "LEFT JOIN FETCH p.category "
-          + "LEFT JOIN FETCH o.payments "
-          + "WHERE o.id = :orderId")
-  Optional<Order> findByIdWithDetails(@Param("orderId") Long orderId);
+  // để gợi ý cho Hibernate cách fetch dữ liệu.
+// Cách này thường ổn định và dễ bảo trì hơn.
+  @EntityGraph(attributePaths = {
+          "buyer",
+          "farmer",
+          "farmer.farmerProfile",
+          "orderItems",
+          "orderItems.product",
+          "payments"
+  })
+  Optional<Order> findById(Long orderId); // Ghi đè phương thức findById mặc định
 
 
-  // Lấy chi tiết đơn hàng theo Code (bao gồm items, payments)
-  @Query(
-      "SELECT o FROM Order o "
-          + "LEFT JOIN FETCH o.buyer b "
-          + "LEFT JOIN FETCH o.farmer f "
-          + "LEFT JOIN FETCH f.farmerProfile fp "
-          + "LEFT JOIN FETCH o.orderItems oi "
-          + "LEFT JOIN FETCH oi.product p "
-          + "LEFT JOIN FETCH o.payments "
-          + "WHERE o.orderCode = :orderCode")
-  Optional<Order> findByOrderCodeWithDetails(@Param("orderCode") String orderCode);
+//  @Query("SELECT o FROM Order o WHERE o.id = :orderId") // Thêm lại @Query đơn giản
+//  @EntityGraph(attributePaths = {
+//          "buyer",
+//          "farmer",
+//          "farmer.farmerProfile",
+//          "orderItems",
+//          "orderItems.product",
+//          "payments"
+//  })
+//  Optional<Order> findByIdWithDetails(@Param("orderId") Long orderId);
+
+  // Làm tương tự cho findByOrderCodeWithDetails nếu nó cũng gây lỗi
+  @EntityGraph(attributePaths = {
+          "buyer",
+          "farmer",
+          "farmer.farmerProfile",
+          "orderItems",
+          "orderItems.product",
+          "payments"
+  })
+  Optional<Order> findByOrderCode(String orderCode); // Ghi đè findByOrderCode
+
+
+//  // Lấy chi tiết đơn hàng theo Code (bao gồm items, payments)
+//  @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode") // Thêm lại @Query đơn giản
+//  @EntityGraph(attributePaths = {
+//          "buyer",
+//          "farmer",
+//          "farmer.farmerProfile",
+//          "orderItems",
+//          "orderItems.product",
+//          "payments"
+//  })
+//  Optional<Order> findByOrderCodeWithDetails(@Param("orderCode") String orderCode);
 
   // Tìm đơn hàng theo ID và Buyer ID (kiểm tra ownership)
   Optional<Order> findByIdAndBuyerId(Long orderId, Long buyerId);
@@ -207,4 +226,30 @@ public interface OrderRepository
 
   // Lấy các đơn hàng mới nhất (cho recent activities)
   List<Order> findTopNByOrderByCreatedAtDesc(Pageable pageable); // N là số lượng giới hạn
+
+  // Trong OrderRepository.java
+  @Query("SELECT o.buyer.id, SUM(o.totalAmount) as totalSpent " +
+          "FROM Order o " +
+          "WHERE o.status IN :statuses AND o.createdAt BETWEEN :start AND :end " +
+          "GROUP BY o.buyer.id " +
+          "ORDER BY totalSpent DESC")
+  List<Object[]> findTopBuyersByTotalSpent(
+          @Param("statuses") List<OrderStatus> statuses,
+          @Param("start") LocalDateTime start,
+          @Param("end") LocalDateTime end,
+          Pageable pageable);
+
+
+
+
+  @Query("SELECT o.farmer.id, SUM(o.totalAmount) as totalRevenue " +
+          "FROM Order o " +
+          "WHERE o.status IN :statuses AND o.createdAt BETWEEN :start AND :end " +
+          "GROUP BY o.farmer.id " +
+          "ORDER BY totalRevenue DESC")
+  List<Object[]> findTopFarmersByRevenue(
+          @Param("statuses") List<OrderStatus> statuses,
+          @Param("start") LocalDateTime start,
+          @Param("end") LocalDateTime end,
+          Pageable pageable);
 }

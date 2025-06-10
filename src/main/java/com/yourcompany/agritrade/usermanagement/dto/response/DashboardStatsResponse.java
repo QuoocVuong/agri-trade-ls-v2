@@ -3,6 +3,8 @@ package com.yourcompany.agritrade.usermanagement.dto.response; // Đặt trong u
 // common
 
 import java.math.BigDecimal;
+import java.util.Map;
+
 import lombok.Builder;
 import lombok.Data;
 
@@ -19,6 +21,8 @@ public class DashboardStatsResponse {
   private Long pendingOrders; // Đơn hàng mới/đang xử lý của farmer
   private Long lowStockProducts; // Sản phẩm sắp hết hàng của farmer
   private Long pendingReviewsOnMyProducts; // Review mới cho sp của farmer
+  private Long lowStockSupplies; // Nguồn cung B2B sắp hết
+  private Long pendingSupplyRequests; // Yêu cầu đặt hàng chờ xác nhận
 
   // Admin specific
   private Long totalUsers;
@@ -28,4 +32,7 @@ public class DashboardStatsResponse {
   private Long pendingFarmerApprovals;
   private Long pendingProductApprovals; // Nếu có quy trình duyệt sản phẩm
   private Long pendingReviews; // Tổng review chờ duyệt
+
+  private BigDecimal totalRevenuePreviousMonth; // Doanh thu tháng trước
+  private Map<String, Long> orderStatusDistribution; // Phân bổ trạng thái đơn hàng
 }

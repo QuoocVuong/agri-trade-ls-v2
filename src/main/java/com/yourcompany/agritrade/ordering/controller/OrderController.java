@@ -64,9 +64,10 @@ public class OrderController {
       @RequestParam(required = false) OrderStatus status,
       @RequestParam(required = false) PaymentMethod paymentMethod,
       @RequestParam(required = false) PaymentStatus paymentStatus,
+      @RequestParam(required = false) OrderType orderType,
       @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
-    Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsBuyer(authentication,keyword,status, paymentMethod, paymentStatus, pageable);
+    Page<OrderSummaryResponse> orders = orderService.getMyOrdersAsBuyer(authentication,keyword,status, paymentMethod, paymentStatus, orderType, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 

@@ -1,9 +1,7 @@
 package com.yourcompany.agritrade.ordering.repository.specification;
 
+import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.ordering.domain.Order;
-import com.yourcompany.agritrade.ordering.domain.OrderStatus;
-import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
-import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import jakarta.persistence.criteria.*;
@@ -170,6 +168,16 @@ public class OrderSpecifications {
         return criteriaBuilder.conjunction();
       }
       return criteriaBuilder.equal(root.get("paymentStatus"), paymentStatus);
+    };
+  }
+
+  /* Lọc theo loại đơn hàng (B2C hoặc B2B) */
+  public static Specification<Order> hasOrderType(OrderType orderType) {
+    return (root, query, criteriaBuilder) -> {
+      if (orderType == null) {
+        return criteriaBuilder.conjunction(); // Không lọc nếu orderType là null
+      }
+      return criteriaBuilder.equal(root.get("orderType"), orderType);
     };
   }
 

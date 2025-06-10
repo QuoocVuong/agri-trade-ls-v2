@@ -7,6 +7,7 @@ import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.config.TestSecurityConfig;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.OrderType;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
@@ -143,7 +144,7 @@ class OrderControllerTest {
         @Test
         @DisplayName("GET /api/orders/my - Thành công với bộ lọc")
         void getMyOrdersAsBuyer_withFilters_success() throws Exception {
-            when(orderService.getMyOrdersAsBuyer(any(Authentication.class), eq("keyword"), eq(OrderStatus.PENDING), eq(PaymentMethod.COD), eq(PaymentStatus.PENDING), any(Pageable.class)))
+            when(orderService.getMyOrdersAsBuyer(any(Authentication.class), eq("keyword"), eq(OrderStatus.PENDING), eq(PaymentMethod.COD), eq(PaymentStatus.PENDING), eq(OrderType.B2B), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/orders/my")
@@ -151,6 +152,7 @@ class OrderControllerTest {
                             .param("status", "PENDING")
                             .param("paymentMethod", "COD")
                             .param("paymentStatus", "PENDING")
+                            .param("orderType", "B2B")
                             .param("page", "0")
                             .param("size", "15"))
                     .andExpect(status().isOk())
@@ -162,7 +164,7 @@ class OrderControllerTest {
         @Test
         @DisplayName("GET /api/orders/my - Thành công không có bộ lọc")
         void getMyOrdersAsBuyer_noFilters_success() throws Exception {
-            when(orderService.getMyOrdersAsBuyer(any(Authentication.class), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+            when(orderService.getMyOrdersAsBuyer(any(Authentication.class),isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/orders/my"))

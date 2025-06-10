@@ -1,12 +1,11 @@
 package com.yourcompany.agritrade.usermanagement.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.DashboardStatsResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.RecentActivityResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.TimeSeriesDataPoint;
+import com.yourcompany.agritrade.usermanagement.dto.response.*;
 import com.yourcompany.agritrade.usermanagement.service.DashboardService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -59,5 +58,29 @@ public class AdminDashboardController {
   public ResponseEntity<ApiResponse<Map<String, Long>>> getPendingApprovalCounts() {
     Map<String, Long> counts = dashboardService.getPendingApprovalCounts();
     return ResponseEntity.ok(ApiResponse.success(counts));
+  }
+
+  // *** THÊM CÁC ENDPOINT MỚI ***
+
+  @GetMapping("/top-farmers")
+  public ResponseEntity<ApiResponse<List<FarmerSummaryResponse>>> getTopFarmers(
+          @RequestParam(defaultValue = "5") int limit) {
+    List<FarmerSummaryResponse> topFarmers = dashboardService.getTopPerformingFarmers(limit);
+    return ResponseEntity.ok(ApiResponse.success(topFarmers));
+  }
+
+  @GetMapping("/top-buyers")
+  public ResponseEntity<ApiResponse<List<UserResponse>>> getTopBuyers(
+          @RequestParam(defaultValue = "5") int limit) {
+    List<UserResponse> topBuyers = dashboardService.getTopSpendingBuyers(limit);
+    return ResponseEntity.ok(ApiResponse.success(topBuyers));
+  }
+
+  @GetMapping("/user-growth-chart")
+  public ResponseEntity<ApiResponse<List<TimeSeriesDataPoint<Long>>>> getUserGrowthChart(
+          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+    List<TimeSeriesDataPoint<Long>> data = dashboardService.getDailyUserRegistrations(startDate, endDate);
+    return ResponseEntity.ok(ApiResponse.success(data));
   }
 }

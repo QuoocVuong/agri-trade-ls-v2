@@ -2,6 +2,7 @@
 package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
+import com.yourcompany.agritrade.ordering.domain.SupplyOrderRequestStatus;
 import com.yourcompany.agritrade.ordering.dto.request.SupplyOrderPlacementRequest;
 
 import com.yourcompany.agritrade.ordering.dto.response.SupplyOrderRequestResponse;
@@ -40,8 +41,9 @@ public class SupplyOrderRequestController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<SupplyOrderRequestResponse>>> getMySentRequests(
             Authentication authentication,
+            @RequestParam(required = false) SupplyOrderRequestStatus status,
             @PageableDefault(size = 10, sort = "createdAt,desc") Pageable pageable) {
-        Page<SupplyOrderRequestResponse> requests = requestService.getMySentRequests(authentication, pageable);
+        Page<SupplyOrderRequestResponse> requests = requestService.getMySentRequests(authentication, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(requests));
     }
 
@@ -49,8 +51,9 @@ public class SupplyOrderRequestController {
     @PreAuthorize("hasRole('FARMER')")
     public ResponseEntity<ApiResponse<Page<SupplyOrderRequestResponse>>> getMyReceivedRequests(
             Authentication authentication,
+            @RequestParam(required = false) SupplyOrderRequestStatus status,
             @PageableDefault(size = 10, sort = "createdAt,desc") Pageable pageable) {
-        Page<SupplyOrderRequestResponse> requests = requestService.getMyReceivedRequests(authentication, pageable);
+        Page<SupplyOrderRequestResponse> requests = requestService.getMyReceivedRequests(authentication, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(requests));
     }
 

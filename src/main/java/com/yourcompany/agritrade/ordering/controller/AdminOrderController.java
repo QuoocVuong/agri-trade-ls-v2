@@ -1,19 +1,31 @@
 package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
+import com.yourcompany.agritrade.common.service.ExcelExportService;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.OrderType;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.ordering.service.OrderService;
+import org.springframework.core.io.InputStreamResource;
 import jakarta.validation.Valid;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -28,6 +40,9 @@ public class AdminOrderController {
 
   private final OrderService orderService;
 
+  @Autowired
+  private ExcelExportService excelExportService;
+
   // Lấy tất cả đơn hàng với bộ lọc
   @GetMapping
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getAllOrders(
@@ -35,13 +50,14 @@ public class AdminOrderController {
           @RequestParam(required = false) OrderStatus status,
           @RequestParam(required = false) PaymentMethod paymentMethod,
           @RequestParam(required = false) PaymentStatus paymentStatus,
+          @RequestParam(required = false) OrderType orderType,
           @RequestParam(required = false) Long buyerId,
           @RequestParam(required = false) Long farmerId,
           @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
 
 
     Page<OrderSummaryResponse> orders =
-        orderService.getAllOrdersForAdmin(keyword, status, paymentMethod, paymentStatus,   buyerId, farmerId, pageable);
+        orderService.getAllOrdersForAdmin(keyword, status, paymentMethod, paymentStatus, orderType,   buyerId, farmerId, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 
@@ -108,6 +124,32 @@ public class AdminOrderController {
     return ResponseEntity.ok(
         ApiResponse.success(
             updatedOrder, "Xác nhận thanh toán cho đơn hàng #" + orderId + " thành công."));
+  }
+
+  @GetMapping("/export")
+  public ResponseEntity<InputStreamResource> exportOrdersToExcel(
+          @RequestParam(required = false) String keyword,
+          @RequestParam(required = false) OrderStatus status,
+          @RequestParam(required = false) PaymentMethod paymentMethod,
+          @RequestParam(required = false) PaymentStatus paymentStatus,
+          @RequestParam(required = false) Long buyerId,
+          @RequestParam(required = false) Long farmerId,
+          @RequestParam(required = false) OrderType orderType
+  ) {
+    List<OrderSummaryResponse> ordersToExport = orderService.getAllOrdersForAdminExport(keyword, status, paymentMethod, paymentStatus, buyerId, farmerId, orderType);
+
+    try {
+      ByteArrayInputStream in = excelExportService.ordersToExcel(ordersToExport);
+      String filename = "don_hang_" + LocalDate.now().toString() + ".xlsx";
+      InputStreamResource file = new InputStreamResource(in);
+
+      return ResponseEntity.ok()
+              .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+              .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+              .body(file);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to export data to Excel file: " + e.getMessage());
+    }
   }
 
 }

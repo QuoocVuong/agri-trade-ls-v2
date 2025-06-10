@@ -6,6 +6,7 @@ import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.config.TestSecurityConfig;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.OrderType;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
@@ -88,7 +89,7 @@ class AdminOrderControllerTest {
         @Test
         @DisplayName("GET /api/admin/orders - Thành công với bộ lọc")
         void getAllOrders_withFilters_success() throws Exception {
-            when(orderService.getAllOrdersForAdmin(eq("keyword"), eq(OrderStatus.PENDING), eq(PaymentMethod.COD), eq(PaymentStatus.PENDING), eq(1L), eq(2L), any(Pageable.class)))
+            when(orderService.getAllOrdersForAdmin(eq("keyword"), eq(OrderStatus.PENDING), eq(PaymentMethod.COD), eq(PaymentStatus.PENDING), eq(OrderType.B2B), eq(1L), eq(2L), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/admin/orders")
@@ -96,6 +97,7 @@ class AdminOrderControllerTest {
                             .param("status", "PENDING")
                             .param("paymentMethod", "COD")
                             .param("paymentStatus", "PENDING")
+                            .param("orderType", "B2B")
                             .param("buyerId", "1")
                             .param("farmerId", "2")
                             .param("page", "0")
@@ -109,7 +111,7 @@ class AdminOrderControllerTest {
         @Test
         @DisplayName("GET /api/admin/orders - Thành công không có bộ lọc")
         void getAllOrders_noFilters_success() throws Exception {
-            when(orderService.getAllOrdersForAdmin(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+            when(orderService.getAllOrdersForAdmin(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/admin/orders"))
@@ -121,7 +123,7 @@ class AdminOrderControllerTest {
         @Test
         @DisplayName("GET /api/admin/orders - Trạng thái không hợp lệ")
         void getAllOrders_invalidStatus_callsServiceWithNullStatus() throws Exception {
-            when(orderService.getAllOrdersForAdmin(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+            when(orderService.getAllOrdersForAdmin(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                     .thenReturn(orderSummaryPage);
 
             mockMvc.perform(get("/api/admin/orders")
@@ -129,7 +131,7 @@ class AdminOrderControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success", is(true)));
 
-            verify(orderService).getAllOrdersForAdmin(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class));
+            verify(orderService).getAllOrdersForAdmin(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class));
         }
     }
 

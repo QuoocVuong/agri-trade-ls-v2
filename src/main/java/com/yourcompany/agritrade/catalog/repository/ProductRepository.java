@@ -97,6 +97,7 @@ public interface ProductRepository
 
   // Đếm sản phẩm sắp hết hàng của Farmer (ví dụ: < 5)
   Long countByFarmerIdAndStockQuantityLessThan(Long farmerId, int threshold);
+  Long countByFarmerIdAndB2bEnabledAndStockQuantityLessThan(Long farmerId, boolean b2bEnabled, int threshold);
 
 
   @Query(
@@ -126,6 +127,9 @@ public interface ProductRepository
           + "LEFT JOIN FETCH p.images img "
           + "WHERE p.id = :productId")
   Optional<Product> findByIdWithDetails(@Param("productId") Long productId);
+
+  @Query("SELECT p FROM Product p LEFT JOIN FETCH p.images WHERE p.id IN :ids")
+  List<Product> findByIdInWithImages(@Param("ids") List<Long> ids);
 
 
 

@@ -2,6 +2,8 @@ package com.yourcompany.agritrade.usermanagement.repository;
 
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.usermanagement.domain.User;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -60,6 +62,14 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
    * @return Danh sách các User là Farmer nổi bật.
    */
   List<User> findTopByRoles_NameOrderByFollowerCountDesc(RoleType roleType, Pageable pageable);
+
+  // Trong UserRepository.java
+  @Query("SELECT FUNCTION('DATE', u.createdAt) as registrationDate, COUNT(u.id) as userCount " +
+          "FROM User u " +
+          "WHERE u.createdAt BETWEEN :start AND :end " +
+          "GROUP BY registrationDate " +
+          "ORDER BY registrationDate ASC")
+  List<Object[]> findDailyUserRegistrations(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
 
 }

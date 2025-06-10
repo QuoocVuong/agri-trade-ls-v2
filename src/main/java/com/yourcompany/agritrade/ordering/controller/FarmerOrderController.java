@@ -2,6 +2,7 @@ package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.OrderType;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
@@ -35,11 +36,12 @@ public class FarmerOrderController {
           @RequestParam(required = false) OrderStatus status,
           @RequestParam(required = false) PaymentMethod paymentMethod,
           @RequestParam(required = false) PaymentStatus paymentStatus,
+          @RequestParam(required = false) OrderType orderType,
           @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
 
     Page<OrderSummaryResponse> orders =
-        orderService.getMyOrdersAsFarmer(authentication, keyword, status, paymentMethod, paymentStatus, pageable);
+        orderService.getMyOrdersAsFarmer(authentication, keyword, status, paymentMethod, paymentStatus, orderType, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 

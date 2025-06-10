@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.interaction.domain.ChatMessage;
 import com.yourcompany.agritrade.interaction.domain.ChatRoom;
 import com.yourcompany.agritrade.interaction.domain.MessageType;
@@ -16,6 +17,8 @@ import com.yourcompany.agritrade.interaction.mapper.ChatRoomMapper;
 import com.yourcompany.agritrade.interaction.repository.ChatMessageRepository;
 import com.yourcompany.agritrade.interaction.repository.ChatRoomRepository;
 import com.yourcompany.agritrade.interaction.service.ChatService;
+import com.yourcompany.agritrade.ordering.domain.SupplyOrderRequestStatus;
+import com.yourcompany.agritrade.ordering.repository.SupplyOrderRequestRepository;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.time.LocalDateTime;
@@ -45,6 +48,7 @@ public class ChatServiceImpl implements ChatService {
   private final ChatRoomMapper chatRoomMapper;
   private final ChatMessageMapper chatMessageMapper;
   private final SimpMessagingTemplate messagingTemplate;
+  private  final SupplyOrderRequestRepository supplyOrderRequestRepository;
 
   @Value("${app.frontend.url:http://localhost:4200}") // Lấy URL frontend
   private String frontendUrl;
@@ -97,6 +101,26 @@ public class ChatServiceImpl implements ChatService {
         chatRoomRepository
             .findRoomBetweenUsers(sender.getId(), recipient.getId())
             .orElseGet(() -> chatRoomRepository.save(new ChatRoom(sender, recipient)));
+
+
+    // Logic cập nhật trạng thái SupplyRequest khi Farmer bắt đầu chat
+    if (request.getContextProductId() != null && sender.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
+      // Cần inject SupplyOrderRequestRepository vào ChatServiceImpl
+      supplyOrderRequestRepository
+              .findByFarmerIdAndBuyerIdAndProductIdAndStatus(
+                      sender.getId(),
+                      recipient.getId(),
+                      request.getContextProductId(),
+                      SupplyOrderRequestStatus.PENDING_FARMER_ACTION
+              )
+              .forEach(req -> {
+                req.setStatus(SupplyOrderRequestStatus.NEGOTIATING);
+                supplyOrderRequestRepository.save(req);
+                log.info("SupplyOrderRequest {} status updated to NEGOTIATING due to chat initiation.", req.getId());
+                // (Tùy chọn) Gửi thông báo cập nhật trạng thái qua WebSocket cho cả hai bên
+              });
+    }
+
 
 
 

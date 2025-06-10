@@ -298,15 +298,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<Object>> handleGlobalException(
-      Exception ex, WebRequest request) { // Đổi kiểu trả về
-    String message = "An unexpected internal server error occurred. Please try again later.";
-    log.error("Unexpected error processing request: {}", request.getDescription(false), ex);
-    // Tạo ApiResponse
+      Exception ex, WebRequest request) {
+    // 1. Log lại toàn bộ lỗi chi tiết để  debug
+    log.error("Unexpected internal server error processing request: {}", request.getDescription(false), ex);
+
+    // 2. Chuẩn bị một thông báo lỗi thân thiện với người dùng
+    String userFriendlyMessage = "Đã có lỗi không mong muốn xảy ra từ hệ thống. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.";
+
+    // 3. Tạo đối tượng ApiResponse với thông báo thân thiện đó
+
     ApiResponse<Object> apiResponse =
-        ApiResponse.error(
-            HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            message,
-            ex.getMessage()); // Đưa lỗi gốc vào details
+            ApiResponse.error(
+                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    userFriendlyMessage,
+                    null // Không gửi chi tiết lỗi cho người dùng
+            );
+
+    // 4. Trả về ResponseEntity với mã lỗi 500
     return new ResponseEntity<>(apiResponse, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 }

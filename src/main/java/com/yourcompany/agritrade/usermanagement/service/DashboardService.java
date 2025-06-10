@@ -2,10 +2,8 @@ package com.yourcompany.agritrade.usermanagement.service;
 
 import com.yourcompany.agritrade.catalog.dto.response.TopProductResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.DashboardStatsResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.FarmerChartDataResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.RecentActivityResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.TimeSeriesDataPoint;
+import com.yourcompany.agritrade.usermanagement.dto.response.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -55,4 +53,8 @@ public interface DashboardService {
 
   /** Lấy số lượng các mục chờ duyệt */
   Map<String, Long> getPendingApprovalCounts(); // Trả về Map cho tiện
+
+  List<FarmerSummaryResponse> getTopPerformingFarmers(int limit);
+  List<UserResponse> getTopSpendingBuyers(int limit);
+  List<TimeSeriesDataPoint<Long>> getDailyUserRegistrations(LocalDate startDate, LocalDate endDate);
 }

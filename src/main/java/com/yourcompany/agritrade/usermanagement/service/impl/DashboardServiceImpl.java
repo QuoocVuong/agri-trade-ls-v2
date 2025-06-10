@@ -1,5 +1,6 @@
 package com.yourcompany.agritrade.usermanagement.service.impl;
 
+import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.domain.ProductImage;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.dto.response.TopProductResponse;
@@ -8,17 +9,19 @@ import com.yourcompany.agritrade.common.model.NotificationType;
 import com.yourcompany.agritrade.common.model.ReviewStatus;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.common.service.FileStorageService;
 import com.yourcompany.agritrade.interaction.repository.ReviewRepository;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.SupplyOrderRequestStatus;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.ordering.mapper.OrderMapper;
 import com.yourcompany.agritrade.ordering.repository.OrderRepository;
+import com.yourcompany.agritrade.ordering.repository.SupplyOrderRequestRepository;
 import com.yourcompany.agritrade.usermanagement.domain.User;
-import com.yourcompany.agritrade.usermanagement.dto.response.DashboardStatsResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.FarmerChartDataResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.RecentActivityResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.TimeSeriesDataPoint;
+import com.yourcompany.agritrade.usermanagement.dto.response.*;
+import com.yourcompany.agritrade.usermanagement.mapper.FarmerSummaryMapper;
+import com.yourcompany.agritrade.usermanagement.mapper.UserMapper;
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import com.yourcompany.agritrade.usermanagement.service.DashboardService;
@@ -56,6 +59,12 @@ public class DashboardServiceImpl implements DashboardService {
   private final ReviewRepository reviewRepository;
   private final OrderMapper orderMapper; // Inject OrderMapper
 
+  private final FarmerSummaryMapper farmerSummaryMapper;
+  private final UserMapper userMapper;
+
+  private final SupplyOrderRequestRepository supplyOrderRequestRepository;
+  private final FileStorageService fileStorageService;
+
   private static final int LOW_STOCK_THRESHOLD = 5; // Ngưỡng tồn kho thấp
   private static final List<OrderStatus> PENDING_ORDER_STATUSES =
       Arrays.asList(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PROCESSING);
@@ -71,22 +80,23 @@ public class DashboardServiceImpl implements DashboardService {
     LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
     LocalDateTime monthEnd = todayEnd; // Tính đến hiện tại của tháng
 
-    long totalOrdersToday =
-        orderRepository.countByFarmerIdAndCreatedAtBetween(farmerId, todayStart, todayEnd);
-    long totalOrdersThisMonth =
-        orderRepository.countByFarmerIdAndCreatedAtBetween(farmerId, monthStart, monthEnd);
-    BigDecimal totalRevenueToday =
-        orderRepository.sumTotalAmountByFarmerIdAndStatusInAndCreatedAtBetween(
+    long totalOrdersToday = orderRepository.countByFarmerIdAndCreatedAtBetween(farmerId, todayStart, todayEnd);
+    long totalOrdersThisMonth = orderRepository.countByFarmerIdAndCreatedAtBetween(farmerId, monthStart, monthEnd);
+    BigDecimal totalRevenueToday = orderRepository.sumTotalAmountByFarmerIdAndStatusInAndCreatedAtBetween(
             farmerId, REVENUE_ORDER_STATUSES, todayStart, todayEnd);
-    BigDecimal totalRevenueThisMonth =
-        orderRepository.sumTotalAmountByFarmerIdAndStatusInAndCreatedAtBetween(
+    BigDecimal totalRevenueThisMonth = orderRepository.sumTotalAmountByFarmerIdAndStatusInAndCreatedAtBetween(
             farmerId, REVENUE_ORDER_STATUSES, monthStart, monthEnd);
     long pendingOrders =
         orderRepository.countByFarmerIdAndStatusIn(farmerId, PENDING_ORDER_STATUSES);
-    long lowStockProducts =
-        productRepository.countByFarmerIdAndStockQuantityLessThan(farmerId, LOW_STOCK_THRESHOLD);
-    long pendingReviews =
-        reviewRepository.countByProductFarmerIdAndStatus(farmerId, ReviewStatus.PENDING);
+    // Query cho sản phẩm B2C sắp hết ( b2bEnabled=false)
+    long lowStockProducts = productRepository.countByFarmerIdAndB2bEnabledAndStockQuantityLessThan(farmerId, false, LOW_STOCK_THRESHOLD);
+    long pendingReviews = reviewRepository.countByProductFarmerIdAndStatus(farmerId, ReviewStatus.PENDING);
+    // Query cho nguồn cung B2B sắp hết (b2bEnabled=true)
+    long lowStockSupplies = productRepository.countByFarmerIdAndB2bEnabledAndStockQuantityLessThan(farmerId, true, LOW_STOCK_THRESHOLD);
+
+    // Query cho yêu cầu đang chờ xử lý
+    long pendingSupplyRequests = supplyOrderRequestRepository.countByFarmerIdAndStatus(farmerId, SupplyOrderRequestStatus.PENDING_FARMER_ACTION);
+
 
     return DashboardStatsResponse.builder()
         .totalOrdersToday(totalOrdersToday)
@@ -95,6 +105,8 @@ public class DashboardServiceImpl implements DashboardService {
         .totalRevenueThisMonth(totalRevenueThisMonth)
         .pendingOrders(pendingOrders)
         .lowStockProducts(lowStockProducts)
+        .lowStockSupplies(lowStockSupplies) // << Thêm dữ liệu mới
+        .pendingSupplyRequests(pendingSupplyRequests) // << Thêm dữ liệu mới
         .pendingReviewsOnMyProducts(pendingReviews)
         .build();
   }
@@ -115,40 +127,47 @@ public class DashboardServiceImpl implements DashboardService {
       Authentication authentication, int limit) {
     User farmer = getUserFromAuthentication(authentication);
     Pageable pageable = PageRequest.of(0, limit);
-    // Gọi phương thức repo mới
-    List<TopProductResponse> topProducts =
-        productRepository.findTopSellingProductsByFarmerWithoutThumbnail(farmer.getId(), pageable);
+    // 1. Lấy dữ liệu tổng hợp (ID, tên, số lượng, doanh thu) từ repository
+    List<TopProductResponse> topProductsStats = productRepository.findTopSellingProductsByFarmerWithoutThumbnail(farmer.getId(), pageable);
 
-    // Lấy danh sách Product ID
-    List<Long> productIds =
-        topProducts.stream().map(TopProductResponse::getProductId).collect(Collectors.toList());
-
-    if (!productIds.isEmpty()) {
-
-
-      // Tạm thời query từng cái (không tối ưu)
-      topProducts.forEach(
-          tp -> {
-            productRepository
-                .findById(tp.getProductId())
-                .ifPresent(
-                    product -> {
-                      String thumbnailUrl =
-                          product.getImages().stream() // Giả sử images được fetch hoặc query riêng
-                              .filter(ProductImage::isDefault)
-                              .findFirst()
-                              .or(
-                                  () ->
-                                      product.getImages().stream()
-                                          .min(Comparator.comparing(ProductImage::getId)))
-                              .map(ProductImage::getImageUrl)
-                              .orElse(null);
-                      tp.setThumbnailUrl(thumbnailUrl);
-                    });
-          });
+    if (topProductsStats.isEmpty()) {
+      return Collections.emptyList();
     }
-    return topProducts;
+
+    // 2. Lấy danh sách các ID sản phẩm từ kết quả trên
+    List<Long> productIds = topProductsStats.stream()
+            .map(TopProductResponse::getProductId)
+            .collect(Collectors.toList());
+
+    // 3. Truy vấn một lần duy nhất để lấy tất cả các sản phẩm tương ứng (bao gồm cả ảnh)
+    // Cần một query mới trong ProductRepository để fetch images hiệu quả
+    List<Product> productsWithImages = productRepository.findByIdInWithImages(productIds);
+
+    // 4. Tạo một Map để dễ dàng tra cứu sản phẩm theo ID
+    Map<Long, Product> productMap = productsWithImages.stream()
+            .collect(Collectors.toMap(Product::getId, product -> product));
+
+    // 5. Lặp qua danh sách thống kê và gán thumbnailUrl
+    for (TopProductResponse stat : topProductsStats) {
+      Product product = productMap.get(stat.getProductId());
+      if (product != null && product.getImages() != null && !product.getImages().isEmpty()) {
+        // Logic tìm ảnh thumbnail (ưu tiên ảnh default, sau đó đến ảnh đầu tiên)
+        String thumbnailUrl = product.getImages().stream()
+                .filter(ProductImage::isDefault)
+                .findFirst()
+                .or(() -> product.getImages().stream().min(Comparator.comparing(ProductImage::getId))) // Lấy ảnh đầu tiên nếu không có default
+                .map(img -> fileStorageService.getFileUrl(img.getBlobPath())) // Lấy URL đã ký
+                .orElse("assets/images/placeholder-image.png"); // Ảnh dự phòng
+
+        stat.setThumbnailUrl(thumbnailUrl);
+      } else {
+        stat.setThumbnailUrl("assets/images/placeholder-image.png"); // Ảnh dự phòng
+      }
+    }
+
+    return topProductsStats;
   }
+
 
   // ===== IMPLEMENT PHƯƠNG THỨC MỚI CHO FARMER ORDER COUNT CHART =====
   @Override
@@ -286,6 +305,10 @@ public class DashboardServiceImpl implements DashboardService {
     LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
     LocalDateTime monthEnd = todayEnd;
 
+    // Tính toán cho tháng trước
+    LocalDateTime previousMonthStart = monthStart.minusMonths(1);
+    LocalDateTime previousMonthEnd = monthStart.minusNanos(1);
+
     long totalOrdersToday = orderRepository.countByCreatedAtBetween(todayStart, todayEnd);
     long totalOrdersThisMonth = orderRepository.countByCreatedAtBetween(monthStart, monthEnd);
     BigDecimal totalRevenueToday =
@@ -294,6 +317,16 @@ public class DashboardServiceImpl implements DashboardService {
     BigDecimal totalRevenueThisMonth =
         orderRepository.sumTotalAmountByStatusInAndCreatedAtBetween(
             REVENUE_ORDER_STATUSES, monthStart, monthEnd);
+
+    // *** THÊM QUERY MỚI ***
+    BigDecimal totalRevenuePreviousMonth = orderRepository.sumTotalAmountByStatusInAndCreatedAtBetween(REVENUE_ORDER_STATUSES, previousMonthStart, previousMonthEnd);
+
+    // *** THÊM LOGIC LẤY PHÂN BỔ TRẠNG THÁI ***
+    Map<String, Long> orderStatusDistribution = new HashMap<>();
+    for (OrderStatus status : OrderStatus.values()) {
+      orderStatusDistribution.put(status.name(), orderRepository.countByStatus(status));
+    }
+
 
     long totalUsers =
         userRepository.count(); // Đếm tất cả user (bao gồm cả đã xóa mềm nếu không có @Where)
@@ -324,6 +357,8 @@ public class DashboardServiceImpl implements DashboardService {
         .pendingFarmerApprovals(getPendingApprovalCounts().getOrDefault("farmers", 0L))
         .pendingProductApprovals(getPendingApprovalCounts().getOrDefault("products", 0L))
         .pendingReviews(getPendingApprovalCounts().getOrDefault("reviews", 0L))
+        .totalRevenuePreviousMonth(totalRevenuePreviousMonth) // << Thêm dữ liệu mới
+        .orderStatusDistribution(orderStatusDistribution)   // << Thêm dữ liệu mới
         .build();
   }
 
@@ -501,5 +536,78 @@ public class DashboardServiceImpl implements DashboardService {
         "Unexpected date type returned from query: {}",
         dateObject != null ? dateObject.getClass().getName() : "null");
     return null; // Hoặc throw exception
+  }
+
+  @Override
+  public List<FarmerSummaryResponse> getTopPerformingFarmers(int limit) {
+    // Lấy top farmer dựa trên doanh thu tháng này
+    LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+    LocalDateTime monthEnd = LocalDate.now().atTime(LocalTime.MAX);
+    Pageable pageable = PageRequest.of(0, limit);
+
+    // Cần một query mới trong OrderRepository để lấy top farmer theo doanh thu
+    // Ví dụ: findTopFarmersByRevenue(statuses, start, end, pageable)
+    // Dưới đây là cách triển khai giả định
+    List<Object[]> topFarmerData = orderRepository.findTopFarmersByRevenue(REVENUE_ORDER_STATUSES, monthStart, monthEnd, pageable);
+
+    List<Long> farmerIds = topFarmerData.stream().map(row -> (Long) row[0]).collect(Collectors.toList());
+    if (farmerIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<User> farmers = userRepository.findAllById(farmerIds);
+    Map<Long, User> farmerMap = farmers.stream().collect(Collectors.toMap(User::getId, user -> user));
+
+    return farmerIds.stream()
+            .map(farmerMap::get)
+            .filter(Objects::nonNull)
+            .map(user -> farmerSummaryMapper.toFarmerSummaryResponse(user, user.getFarmerProfile()))
+            .collect(Collectors.toList());
+  }
+
+  @Override
+  public List<UserResponse> getTopSpendingBuyers(int limit) {
+    LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+    LocalDateTime monthEnd = LocalDate.now().atTime(LocalTime.MAX);
+    Pageable pageable = PageRequest.of(0, limit);
+
+    List<Object[]> topBuyerData = orderRepository.findTopBuyersByTotalSpent(REVENUE_ORDER_STATUSES, monthStart, monthEnd, pageable);
+
+    List<Long> buyerIds = topBuyerData.stream().map(row -> (Long) row[0]).collect(Collectors.toList());
+    if (buyerIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<User> buyers = userRepository.findAllById(buyerIds);
+    // Sắp xếp lại theo thứ tự của topBuyerData
+    Map<Long, User> buyerMap = buyers.stream().collect(Collectors.toMap(User::getId, user -> user));
+
+    return buyerIds.stream()
+            .map(buyerMap::get)
+            .filter(Objects::nonNull)
+            .map(userMapper::toUserResponse)
+            .collect(Collectors.toList());
+  }
+
+  @Override
+  public List<TimeSeriesDataPoint<Long>> getDailyUserRegistrations(LocalDate startDate, LocalDate endDate) {
+    LocalDateTime startDateTime = startDate.atStartOfDay();
+    LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+    List<Object[]> results = userRepository.findDailyUserRegistrations(startDateTime, endDateTime);
+
+    Map<LocalDate, Long> countsMap = results.stream()
+            .filter(result -> result != null && result.length > 1 && result[0] != null && result[1] != null)
+            .collect(Collectors.toMap(
+                    result -> parseDateFromResult(result[0]),
+                    result -> (Long) result[1]
+            ));
+
+    List<LocalDate> dateRange = Stream.iterate(startDate, date -> date.plusDays(1))
+            .limit(startDate.until(endDate).getDays() + 1)
+            .toList();
+
+    return dateRange.stream()
+            .map(date -> new TimeSeriesDataPoint<>(date, countsMap.getOrDefault(date, 0L)))
+            .collect(Collectors.toList());
   }
 }

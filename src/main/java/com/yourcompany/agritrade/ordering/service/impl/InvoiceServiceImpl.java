@@ -95,7 +95,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     // Lấy chi tiết Order để hiển thị thông tin đầy đủ
     Order order =
         orderRepository
-            .findByIdWithDetails(invoice.getOrder().getId())
+            .findById(invoice.getOrder().getId())
             .orElseThrow(
                 () -> new ResourceNotFoundException("Order", "id", invoice.getOrder().getId()));
 

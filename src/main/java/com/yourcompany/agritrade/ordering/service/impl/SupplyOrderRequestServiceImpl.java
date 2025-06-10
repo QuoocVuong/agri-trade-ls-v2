@@ -17,6 +17,7 @@ import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.SupplyOrderRequestResponse;
 import com.yourcompany.agritrade.ordering.mapper.SupplyOrderRequestMapper;
 import com.yourcompany.agritrade.ordering.repository.SupplyOrderRequestRepository;
+import com.yourcompany.agritrade.ordering.repository.specification.SupplyOrderRequestSpecifications;
 import com.yourcompany.agritrade.ordering.service.OrderService; // Inject OrderService
 import com.yourcompany.agritrade.notification.service.NotificationService; // Inject NotificationService
 import com.yourcompany.agritrade.common.util.SecurityUtils;
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -97,20 +99,29 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
 
     @Override
     @Transactional(readOnly = true)
-    public Page<SupplyOrderRequestResponse> getMySentRequests(Authentication authentication, Pageable pageable) {
+    public Page<SupplyOrderRequestResponse> getMySentRequests(Authentication authentication, SupplyOrderRequestStatus status, Pageable pageable) {
         User buyer = SecurityUtils.getCurrentAuthenticatedUser();
-        return requestRepository.findByBuyerIdOrderByCreatedAtDesc(buyer.getId(), pageable)
+
+        Specification<SupplyOrderRequest> spec = Specification
+                .where(SupplyOrderRequestSpecifications.forBuyer(buyer.getId()))
+                .and(SupplyOrderRequestSpecifications.hasStatus(status));
+
+        return requestRepository.findAll(spec, pageable)
                 .map(requestMapper::toSupplyOrderRequestResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<SupplyOrderRequestResponse> getMyReceivedRequests(Authentication authentication, Pageable pageable) {
+    public Page<SupplyOrderRequestResponse> getMyReceivedRequests(Authentication authentication, SupplyOrderRequestStatus status, Pageable pageable) {
         User farmer = SecurityUtils.getCurrentAuthenticatedUser();
         if (farmer.getRoles().stream().noneMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
             throw new AccessDeniedException("User is not a farmer.");
         }
-        return requestRepository.findByFarmerIdOrderByCreatedAtDesc(farmer.getId(), pageable)
+        Specification<SupplyOrderRequest> spec = Specification
+                .where(SupplyOrderRequestSpecifications.forFarmer(farmer.getId()))
+                .and(SupplyOrderRequestSpecifications.hasStatus(status));
+
+        return requestRepository.findAll(spec, pageable)
                 .map(requestMapper::toSupplyOrderRequestResponse);
     }
 

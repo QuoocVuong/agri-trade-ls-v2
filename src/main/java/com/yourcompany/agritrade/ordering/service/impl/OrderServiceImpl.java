@@ -45,6 +45,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
@@ -348,20 +349,21 @@ public class OrderServiceImpl implements OrderService {
 
     // Load lại đầy đủ thông tin để trả về (do save ban đầu có thể chưa flush hết)
     return createdOrders.stream()
-        .map(o -> orderRepository.findByIdWithDetails(o.getId()).orElse(o)) // Load lại
+        .map(o -> orderRepository.findById(o.getId()).orElse(o)) // Load lại
         .map(orderMapper::toOrderResponse)
         .collect(Collectors.toList());
   }
 
   @Override
   @Transactional(readOnly = true)
-  public Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus,  Pageable pageable) {
+  public Page<OrderSummaryResponse> getMyOrdersAsBuyer(Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, OrderType orderType,  Pageable pageable) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser();
     Specification<Order> spec = Specification.where(OrderSpecifications.byBuyer(buyer.getId()))
             .and(OrderSpecifications.hasStatus(status))
             .and(OrderSpecifications.buyerSearch(keyword))
             .and(OrderSpecifications.hasPaymentMethod(paymentMethod))
-            .and(OrderSpecifications.hasPaymentStatus(paymentStatus));
+            .and(OrderSpecifications.hasPaymentStatus(paymentStatus))
+            .and(OrderSpecifications.hasOrderType(orderType));
 
     Page<Order> orderPage = orderRepository.findAll(spec, pageable);
     return orderMapper.toOrderSummaryResponsePage(orderPage);
@@ -370,13 +372,14 @@ public class OrderServiceImpl implements OrderService {
 
 @Override
 @Transactional(readOnly = true)
-public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Pageable pageable) {
+public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authentication, String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus,  OrderType orderType, Pageable pageable) {
   User farmer = SecurityUtils.getCurrentAuthenticatedUser();
   Specification<Order> spec = Specification.where(OrderSpecifications.byFarmer(farmer.getId()))
           .and(OrderSpecifications.hasStatus(status))
           .and(OrderSpecifications.farmerSearch(keyword)) // Sử dụng farmerSearch
           .and(OrderSpecifications.hasPaymentMethod(paymentMethod))
-          .and(OrderSpecifications.hasPaymentStatus(paymentStatus));
+          .and(OrderSpecifications.hasPaymentStatus(paymentStatus))
+          .and(OrderSpecifications.hasOrderType(orderType));
 
 
   Page<Order> orderPage = orderRepository.findAll(spec, pageable);
@@ -387,13 +390,14 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   @Override
   @Transactional(readOnly = true)
   public Page<OrderSummaryResponse> getAllOrdersForAdmin(
-      String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Long buyerId, Long farmerId, Pageable pageable) {
+      String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus,  OrderType orderType, Long buyerId, Long farmerId, Pageable pageable) {
     Specification<Order> spec =
         Specification.where(OrderSpecifications.hasStatus(status))
             .and(OrderSpecifications.byBuyer(buyerId))
             .and(OrderSpecifications.byFarmer(farmerId))
             .and(OrderSpecifications.hasPaymentMethod(paymentMethod))
-            .and(OrderSpecifications.hasPaymentStatus(paymentStatus));
+            .and(OrderSpecifications.hasPaymentStatus(paymentStatus))
+            .and(OrderSpecifications.hasOrderType(orderType));
 
 
     if (StringUtils.hasText(keyword)) {
@@ -418,7 +422,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     User user = SecurityUtils.getCurrentAuthenticatedUser();
     Order order =
         orderRepository
-            .findByIdWithDetails(orderId)
+            .findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
     boolean isAdmin =
@@ -443,7 +447,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     User user = SecurityUtils.getCurrentAuthenticatedUser();
     Order order =
         orderRepository
-            .findByOrderCodeWithDetails(orderCode)
+            .findByOrderCode(orderCode)
             .orElseThrow(() -> new ResourceNotFoundException("Order", "code", orderCode));
 
     boolean isAdmin =
@@ -465,7 +469,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
   public OrderResponse getOrderDetailsForAdmin(Long orderId) {
     Order order =
         orderRepository
-            .findByIdWithDetails(orderId)
+            .findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
     populateProductImageUrlsInOrder(order); // << GỌI HELPER TRƯỚC KHI MAP
     return orderMapper.toOrderResponse(order);
@@ -519,7 +523,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     notificationService.sendOrderStatusUpdateNotification(
         updatedOrder, currentStatus); // Gọi hàm gửi thông báo
 
-    return getOrderDetailsForAdmin(orderId); // Load lại đầy đủ để trả về
+    return getOrderDetails(authentication, orderId); // Load lại đầy đủ để trả về
   }
 
 
@@ -537,8 +541,8 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
 
     // Bước 1: Lấy thông tin đơn hàng cùng với các mục hàng và người mua/bán
-    // Sử dụng một phương thức repository có JOIN FETCH để tối ưu
-    Order order = orderRepository.findByIdWithDetails(orderId) // Giả sử findByIdWithDetails fetch cả orderItems, buyer, farmer
+    // Sử dụng một phương thức repository để tối ưu
+    Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
     // Bước 2: Kiểm tra quyền hủy đơn hàng
@@ -564,10 +568,9 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     // (NotificationService nên tự xử lý việc gửi cho buyer và farmer nếu cần)
     notificationService.sendOrderCancellationNotification(cancelledOrder);
 
-    // Bước 7: Load lại đầy đủ thông tin (nếu cần, hoặc mapper đã xử lý) và trả về
-    // Nếu findByIdWithDetails ở trên đã fetch đủ, có thể không cần load lại
-    // Tuy nhiên, để chắc chắn, có thể load lại hoặc đảm bảo mapper xử lý đúng
-    Order finalCancelledOrder = orderRepository.findByIdWithDetails(cancelledOrder.getId())
+    // Bước 7: Load lại đầy đủ thông tin và trả về
+
+    Order finalCancelledOrder = orderRepository.findById(cancelledOrder.getId())
             .orElseThrow(() -> new IllegalStateException("Cancelled order not found after saving: " + cancelledOrder.getId()));
     // Đảm bảo hình ảnh sản phẩm được populate nếu OrderResponse cần
     populateProductImageUrlsInOrder(finalCancelledOrder);
@@ -1183,7 +1186,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
     User user = SecurityUtils.getCurrentAuthenticatedUser();
     Order order =
         orderRepository
-            .findByIdWithDetails(orderId) // Dùng query có fetch
+            .findById(orderId) // Dùng query có fetch
             .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
     boolean isAdmin =
@@ -1489,7 +1492,7 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
 
     log.info("Agreed order {} created by user {}.", savedOrder.getOrderCode(), actor.getEmail());
     // Load lại đầy đủ để trả về
-    return orderMapper.toOrderResponse(orderRepository.findByIdWithDetails(savedOrder.getId()).orElse(savedOrder));
+    return orderMapper.toOrderResponse(orderRepository.findById(savedOrder.getId()).orElse(savedOrder));
   }
 
   // Helper mới để quy đổi từ KG sang đơn vị đích (nếu cần cho OutOfStockException message)
@@ -1542,5 +1545,29 @@ public Page<OrderSummaryResponse> getMyOrdersAsFarmer(Authentication authenticat
 //     }
 //     return note.toString();
 // }
+
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<OrderSummaryResponse> getAllOrdersForAdminExport(String keyword, OrderStatus status, PaymentMethod paymentMethod, PaymentStatus paymentStatus, Long buyerId, Long farmerId, OrderType orderType) {
+    Specification<Order> spec = Specification.where(OrderSpecifications.hasStatus(status))
+            .and(OrderSpecifications.byBuyer(buyerId))
+            .and(OrderSpecifications.byFarmer(farmerId))
+            .and(OrderSpecifications.hasPaymentMethod(paymentMethod))
+            .and(OrderSpecifications.hasPaymentStatus(paymentStatus))
+            .and(OrderSpecifications.hasOrderType(orderType));
+
+    if (StringUtils.hasText(keyword)) {
+      spec = spec.and(Specification.anyOf(
+              OrderSpecifications.hasOrderCode(keyword),
+              OrderSpecifications.hasBuyerName(keyword),
+              OrderSpecifications.hasFarmerName(keyword)
+      ));
+    }
+
+    // Sử dụng Sort nhưng không dùng Pageable
+    List<Order> orders = orderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+    return orderMapper.toOrderSummaryResponseList(orders);
+  }
 
 }
