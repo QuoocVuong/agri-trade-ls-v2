@@ -126,7 +126,6 @@ public class CartServiceImpl implements CartService {
                       + " do thay đổi tồn kho.";
               adjustmentType = "ADJUSTED";
             }
-
           }
         }
       }
@@ -217,7 +216,6 @@ public class CartServiceImpl implements CartService {
           "Not enough stock for product: " + product.getName(),
           currentStock // Truyền số lượng tồn thực tế
           );
-
     }
 
     Optional<CartItem> existingItemOpt =
@@ -239,7 +237,6 @@ public class CartServiceImpl implements CartService {
                 + ")",
             currentStock // Vẫn là số lượng tồn thực tế
             );
-
       }
       cartItem.setQuantity(newTotalQuantity);
       log.info(
@@ -299,7 +296,6 @@ public class CartServiceImpl implements CartService {
           "Not enough stock for product: " + product.getName(),
           currentStock // Truyền số lượng tồn thực tế
           );
-
     }
 
     cartItem.setQuantity(request.getQuantity());

@@ -59,7 +59,6 @@ public class FollowServiceImpl implements FollowService {
 
     updateFollowCounts(follower.getId(), followingId, true); // Gọi hàm cập nhật count
 
-
     log.info("User {} started following user {}", follower.getId(), followingId);
     // Gửi thông báo cho người được follow
     notificationService.sendNewFollowerNotification(following, follower); // Gọi NotificationService
@@ -144,7 +143,6 @@ public class FollowServiceImpl implements FollowService {
         .findByEmail(email)
         .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
   }
-
 
   private void updateFollowCounts(Long followerId, Long followingId, boolean isFollowing) {
     User follower = userRepository.findById(followerId).orElse(null);

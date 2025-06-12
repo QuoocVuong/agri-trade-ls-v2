@@ -91,8 +91,7 @@ public class AuthController {
   }
 
   @PostMapping("/refresh-token")
-  public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(
-      @RequestBody String refreshToken) {
+  public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(@RequestBody String refreshToken) {
 
     String cleanRefreshToken = refreshToken.replace("\"", "");
     LoginResponse newTokens = userService.refreshToken(cleanRefreshToken);

@@ -2,7 +2,6 @@ package com.yourcompany.agritrade.usermanagement.repository;
 
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.usermanagement.domain.User;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -18,8 +17,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
   Boolean existsByEmail(String email);
 
   Boolean existsByPhoneNumber(String phoneNumber);
-
-
 
   // Nếu cần tìm user bất kể trạng thái isDeleted (ví dụ: kiểm tra email tồn tại tuyệt đối)
   @Query(
@@ -64,12 +61,12 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
   List<User> findTopByRoles_NameOrderByFollowerCountDesc(RoleType roleType, Pageable pageable);
 
   // Trong UserRepository.java
-  @Query("SELECT FUNCTION('DATE', u.createdAt) as registrationDate, COUNT(u.id) as userCount " +
-          "FROM User u " +
-          "WHERE u.createdAt BETWEEN :start AND :end " +
-          "GROUP BY registrationDate " +
-          "ORDER BY registrationDate ASC")
-  List<Object[]> findDailyUserRegistrations(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
-
-
+  @Query(
+      "SELECT FUNCTION('DATE', u.createdAt) as registrationDate, COUNT(u.id) as userCount "
+          + "FROM User u "
+          + "WHERE u.createdAt BETWEEN :start AND :end "
+          + "GROUP BY registrationDate "
+          + "ORDER BY registrationDate ASC")
+  List<Object[]> findDailyUserRegistrations(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

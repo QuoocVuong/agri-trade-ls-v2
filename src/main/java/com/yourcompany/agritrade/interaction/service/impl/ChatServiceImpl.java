@@ -1,7 +1,5 @@
 package com.yourcompany.agritrade.interaction.service.impl;
 
-import com.yourcompany.agritrade.catalog.domain.Product;
-import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
@@ -48,9 +46,9 @@ public class ChatServiceImpl implements ChatService {
   private final ChatRoomMapper chatRoomMapper;
   private final ChatMessageMapper chatMessageMapper;
   private final SimpMessagingTemplate messagingTemplate;
-  private  final SupplyOrderRequestRepository supplyOrderRequestRepository;
+  private final SupplyOrderRequestRepository supplyOrderRequestRepository;
 
-  @Value("${app.frontend.url:http://localhost:4200}") // Lấy URL frontend
+  @Value("${app.frontend.url}") // Lấy URL frontend
   private String frontendUrl;
 
   @Override
@@ -102,45 +100,48 @@ public class ChatServiceImpl implements ChatService {
             .findRoomBetweenUsers(sender.getId(), recipient.getId())
             .orElseGet(() -> chatRoomRepository.save(new ChatRoom(sender, recipient)));
 
-
     // Logic cập nhật trạng thái SupplyRequest khi Farmer bắt đầu chat
-    if (request.getContextProductId() != null && sender.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
+    if (request.getContextProductId() != null
+        && sender.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_FARMER)) {
       // Cần inject SupplyOrderRequestRepository vào ChatServiceImpl
       supplyOrderRequestRepository
-              .findByFarmerIdAndBuyerIdAndProductIdAndStatus(
-                      sender.getId(),
-                      recipient.getId(),
-                      request.getContextProductId(),
-                      SupplyOrderRequestStatus.PENDING_FARMER_ACTION
-              )
-              .forEach(req -> {
+          .findByFarmerIdAndBuyerIdAndProductIdAndStatus(
+              sender.getId(),
+              recipient.getId(),
+              request.getContextProductId(),
+              SupplyOrderRequestStatus.PENDING_FARMER_ACTION)
+          .forEach(
+              req -> {
                 req.setStatus(SupplyOrderRequestStatus.NEGOTIATING);
                 supplyOrderRequestRepository.save(req);
-                log.info("SupplyOrderRequest {} status updated to NEGOTIATING due to chat initiation.", req.getId());
+                log.info(
+                    "SupplyOrderRequest {} status updated to NEGOTIATING due to chat initiation.",
+                    req.getId());
                 // (Tùy chọn) Gửi thông báo cập nhật trạng thái qua WebSocket cho cả hai bên
               });
     }
 
-
-
-
-    boolean shouldSendContextMessage = request.getContextProductId() != null &&
-            request.getContextProductName() != null &&
-            !hasRecentContextMessage(room.getId(), request.getContextProductId(), sender.getId());
+    boolean shouldSendContextMessage =
+        request.getContextProductId() != null
+            && request.getContextProductName() != null
+            && !hasRecentContextMessage(
+                room.getId(), request.getContextProductId(), sender.getId());
 
     if (shouldSendContextMessage) {
       String productLink = "#"; // Link mặc định
       if (request.getContextProductSlug() != null) {
 
-         productLink = frontendUrl + "/supply-sources/detail/" + request.getContextProductSlug();
+        productLink = frontendUrl + "/supply-sources/detail/" + request.getContextProductSlug();
       }
 
-      String contextMessageContent = String.format(
+      String contextMessageContent =
+          String.format(
               "Tôi quan tâm đến sản phẩm: %s (ID: %d).",
               request.getContextProductName(),
               request.getContextProductId(),
-              String.format("Thông tin sản phẩm đang quan tâm: <a href='%s' target='_blank'>%s</a> (ID: %d)", productLink, request.getContextProductName(), request.getContextProductId())
-      );
+              String.format(
+                  "Thông tin sản phẩm đang quan tâm: <a href='%s' target='_blank'>%s</a> (ID: %d)",
+                  productLink, request.getContextProductName(), request.getContextProductId()));
 
       ChatMessage contextMessage = new ChatMessage();
       contextMessage.setRoom(room);
@@ -148,7 +149,8 @@ public class ChatServiceImpl implements ChatService {
       contextMessage.setRecipient(recipient);
       contextMessage.setContent(contextMessageContent);
       contextMessage.setMessageType(MessageType.SYSTEM); // Đánh dấu là tin nhắn hệ thống/ngữ cảnh
-      contextMessage.setSentAt(LocalDateTime.now().minusNanos(1000000)); // Gửi trước tin nhắn chính một chút
+      contextMessage.setSentAt(
+          LocalDateTime.now().minusNanos(1000000)); // Gửi trước tin nhắn chính một chút
       contextMessage.setRead(false); // Ban đầu chưa đọc
       ChatMessage savedContextMessage = chatMessageRepository.save(contextMessage);
 
@@ -156,9 +158,13 @@ public class ChatServiceImpl implements ChatService {
       ChatMessageResponse contextDto = chatMessageMapper.toChatMessageResponse(savedContextMessage);
       String recipientContextDest = "/user/" + recipient.getEmail() + "/queue/messages";
       messagingTemplate.convertAndSend(recipientContextDest, contextDto);
-      String senderContextDest = "/user/" + sender.getEmail() + "/queue/messages"; // Gửi lại cho người gửi để họ cũng thấy
+      String senderContextDest =
+          "/user/" + sender.getEmail() + "/queue/messages"; // Gửi lại cho người gửi để họ cũng thấy
       messagingTemplate.convertAndSend(senderContextDest, contextDto);
-      log.info("Sent SYSTEM context product message for product ID {} to room {}", request.getContextProductId(), room.getId());
+      log.info(
+          "Sent SYSTEM context product message for product ID {} to room {}",
+          request.getContextProductId(),
+          room.getId());
 
       // Cập nhật lastMessage của phòng nếu đây là tin nhắn đầu tiên
       // (Tin nhắn người dùng sẽ ghi đè sau)
@@ -170,15 +176,12 @@ public class ChatServiceImpl implements ChatService {
       }
     }
 
-
-
-
     // Tạo và lưu tin nhắn
     ChatMessage message = new ChatMessage();
     message.setRoom(room);
     message.setSender(sender);
     message.setRecipient(recipient);
-    message.setContent(request.getContent());  // Nội dung người dùng nhập
+    message.setContent(request.getContent()); // Nội dung người dùng nhập
     message.setMessageType(request.getMessageType());
     message.setSentAt(LocalDateTime.now()); // Gán thời gian gửi
     message.setRead(false); // Tin nhắn mới chưa đọc
@@ -219,14 +222,22 @@ public class ChatServiceImpl implements ChatService {
   private boolean hasRecentContextMessage(Long roomId, Long contextProductId, Long senderId) {
     // Tìm 5 tin nhắn cuối cùng trong phòng của sender này
     Pageable recentMessagesPageable = PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "sentAt"));
-    Page<ChatMessage> recentMessages = chatMessageRepository.findByRoomIdAndSenderIdOrderBySentAtDesc(roomId, senderId, recentMessagesPageable);
+    Page<ChatMessage> recentMessages =
+        chatMessageRepository.findByRoomIdAndSenderIdOrderBySentAtDesc(
+            roomId, senderId, recentMessagesPageable);
 
     for (ChatMessage msg : recentMessages.getContent()) {
-      if (msg.getMessageType() == MessageType.SYSTEM &&
-              msg.getContent() != null && // Thêm kiểm tra null cho content
-              msg.getContent().contains("(ID: " + contextProductId + ")")) { // Kiểm tra nội dung
-        if (msg.getSentAt().isAfter(LocalDateTime.now().minusMinutes(1))) { // Giảm thời gian kiểm tra xuống 1 phút
-          log.debug("Recent SYSTEM message for product {} in room {} by sender {} found. Skipping duplicate.", contextProductId, roomId, senderId);
+      if (msg.getMessageType() == MessageType.SYSTEM
+          && msg.getContent() != null
+          && // Thêm kiểm tra null cho content
+          msg.getContent().contains("(ID: " + contextProductId + ")")) { // Kiểm tra nội dung
+        if (msg.getSentAt()
+            .isAfter(LocalDateTime.now().minusMinutes(1))) { // Giảm thời gian kiểm tra xuống 1 phút
+          log.debug(
+              "Recent SYSTEM message for product {} in room {} by sender {} found. Skipping duplicate.",
+              contextProductId,
+              roomId,
+              senderId);
           return true;
         }
       }

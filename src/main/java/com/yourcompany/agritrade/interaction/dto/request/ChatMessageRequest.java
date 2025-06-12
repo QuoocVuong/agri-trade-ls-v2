@@ -28,5 +28,5 @@ public class ChatMessageRequest {
   private String contextProductName;
   private String contextProductSlug;
 
-   private String contextProductThumbnailUrl;
+  private String contextProductThumbnailUrl;
 }

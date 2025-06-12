@@ -36,8 +36,6 @@ public class FarmerProfileServiceImpl implements FarmerProfileService {
       Authentication authentication, FarmerProfileRequest request) {
     User user = getUserFromAuthentication(authentication);
 
-
-
     boolean isNewProfile =
         !farmerProfileRepository.existsById(user.getId()); // Kiểm tra xem có phải tạo mới không
 
@@ -97,5 +95,4 @@ public class FarmerProfileServiceImpl implements FarmerProfileService {
         .findByEmail(email)
         .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
   }
-
 }

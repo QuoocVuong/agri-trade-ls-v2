@@ -23,5 +23,4 @@ public class AddressResponse {
   private boolean isDefault;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
-
 }

@@ -52,8 +52,7 @@ public class UserSpecification {
         return cb.conjunction();
       }
 
-      Join<User, FarmerProfile> profileJoin =
-          root.join("farmerProfile", JoinType.LEFT);
+      Join<User, FarmerProfile> profileJoin = root.join("farmerProfile", JoinType.LEFT);
       return cb.equal(profileJoin.get("verificationStatus"), status);
     };
   }

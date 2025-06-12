@@ -28,13 +28,10 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-
-
 @RestControllerAdvice
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-
 
   @Override
   protected ResponseEntity<Object> handleMethodArgumentNotValid(
@@ -160,8 +157,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return new ResponseEntity<>(apiResponse, httpStatus);
   }
 
-
-
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ApiResponse<Object>> handleMethodArgumentTypeMismatch( // Đổi kiểu trả về
       MethodArgumentTypeMismatchException ex, WebRequest request) {
@@ -282,36 +277,43 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return new ResponseEntity<>(apiResponse, HttpStatus.CONFLICT);
   }
 
-  @ExceptionHandler(StorageFileNotFoundException.class) // Handler cụ thể cho StorageFileNotFoundException
+  @ExceptionHandler(
+      StorageFileNotFoundException.class) // Handler cụ thể cho StorageFileNotFoundException
   public ResponseEntity<ApiResponse<Object>> handleStorageFileNotFound(
-          StorageFileNotFoundException ex, WebRequest request) {
-    log.warn("Storage File Not Found: {} for request: {}", ex.getMessage(), request.getDescription(false));
+      StorageFileNotFoundException ex, WebRequest request) {
+    log.warn(
+        "Storage File Not Found: {} for request: {}",
+        ex.getMessage(),
+        request.getDescription(false));
     ApiResponse<Object> apiResponse =
-            ApiResponse.error(
-                    HttpStatus.NOT_FOUND.value(), // Trả về 404
-                    ex.getMessage(), // Message từ exception
-                    null // Không có details cụ thể
+        ApiResponse.error(
+            HttpStatus.NOT_FOUND.value(), // Trả về 404
+            ex.getMessage(), // Message từ exception
+            null // Không có details cụ thể
             );
     return new ResponseEntity<>(apiResponse, HttpStatus.NOT_FOUND);
   }
-
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<Object>> handleGlobalException(
       Exception ex, WebRequest request) {
     // 1. Log lại toàn bộ lỗi chi tiết để  debug
-    log.error("Unexpected internal server error processing request: {}", request.getDescription(false), ex);
+    log.error(
+        "Unexpected internal server error processing request: {}",
+        request.getDescription(false),
+        ex);
 
     // 2. Chuẩn bị một thông báo lỗi thân thiện với người dùng
-    String userFriendlyMessage = "Đã có lỗi không mong muốn xảy ra từ hệ thống. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.";
+    String userFriendlyMessage =
+        "Đã có lỗi không mong muốn xảy ra từ hệ thống. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.";
 
     // 3. Tạo đối tượng ApiResponse với thông báo thân thiện đó
 
     ApiResponse<Object> apiResponse =
-            ApiResponse.error(
-                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                    userFriendlyMessage,
-                    null // Không gửi chi tiết lỗi cho người dùng
+        ApiResponse.error(
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            userFriendlyMessage,
+            null // Không gửi chi tiết lỗi cho người dùng
             );
 
     // 4. Trả về ResponseEntity với mã lỗi 500

@@ -2,17 +2,14 @@ package com.yourcompany.agritrade.catalog.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
+import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-
-import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
 import lombok.Data;
 
-
 @Data
-
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProductDetailResponse {
   private Long id;
@@ -47,8 +44,6 @@ public class ProductDetailResponse {
   // Thêm trường mới cho sản phẩm liên quan
   private List<ProductSummaryResponse>
       relatedProducts; // Dùng Summary DTO để tránh quá nhiều thông tin
-
-
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;

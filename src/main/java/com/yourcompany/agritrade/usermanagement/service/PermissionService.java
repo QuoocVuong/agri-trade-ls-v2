@@ -8,8 +8,6 @@ import java.util.List;
 public interface PermissionService {
   List<PermissionResponse> getAllPermissions();
 
-
-
   // Thêm các phương thức mới
   PermissionResponse createPermission(PermissionRequest request);
 

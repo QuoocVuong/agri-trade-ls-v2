@@ -4,7 +4,6 @@ package com.yourcompany.agritrade.usermanagement.dto.response; // Đặt trong u
 
 import java.math.BigDecimal;
 import java.util.Map;
-
 import lombok.Builder;
 import lombok.Data;
 

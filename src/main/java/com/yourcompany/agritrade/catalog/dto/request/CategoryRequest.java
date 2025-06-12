@@ -16,10 +16,8 @@ public class CategoryRequest {
 
   private String description;
 
-
   @Size(max = 2048)
   private String imageUrl;
-
 
   @Size(max = 1024)
   private String blobPath;

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  backend:
+    build: . # Build từ Dockerfile hiện tại
+    container_name: agritrade-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env # << NẠP CÁC BIẾN TỪ FILE .env
+    environment:
+      # Kích hoạt profile 'prod' cho môi trường production
+      - SPRING_PROFILES_ACTIVE=prod
+      # Cấu hình múi giờ cho JVM để giải quyết vấn đề lệch giờ
+      - TZ=Asia/Ho_Chi_Minh
+      # Cấu hình URL kết nối DB, sử dụng biến từ .env và thêm timezone
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-db:3306/${DB_DATABASE}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
+      # Các biến còn lại sẽ được nạp tự động từ file .env
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+    networks:
+      - agritrade-network
+
+  mysql-db:
+    image: mysql:8.0
+    container_name: agritrade-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD} # Lấy từ .env
+      - MYSQL_DATABASE=${DB_DATABASE}      # Lấy từ .env
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"  # << MỞ PORT RA NGOÀI >>
+    networks:
+      - agritrade-network
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  redis-cache:
+    image: redis:6.2-alpine
+    container_name: agritrade-redis
+    networks:
+      - agritrade-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  agritrade-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

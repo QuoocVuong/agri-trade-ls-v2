@@ -20,7 +20,6 @@ public class FarmerProfileController {
 
   // Endpoint để Farmer tạo hoặc cập nhật profile của chính mình
   @PutMapping("/me")
-
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<FarmerProfileResponse>> createOrUpdateMyProfile(
       Authentication authentication, @Valid @RequestBody FarmerProfileRequest request) {
@@ -32,13 +31,9 @@ public class FarmerProfileController {
   // Endpoint để xem profile của một Farmer bất kỳ (có thể dùng cho public hoặc user đã login)
 
   @GetMapping("/{userId}")
-
   public ResponseEntity<ApiResponse<FarmerProfileResponse>> getFarmerProfile(
       @PathVariable Long userId) {
     FarmerProfileResponse response = farmerProfileService.getFarmerProfile(userId);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
-
-
-
 }

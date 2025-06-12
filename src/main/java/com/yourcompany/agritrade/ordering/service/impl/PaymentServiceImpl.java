@@ -107,7 +107,8 @@ public class PaymentServiceImpl implements PaymentService {
     if (payment.getStatus() == PaymentTransactionStatus.PENDING) {
       if (paymentSuccess) {
         payment.setStatus(PaymentTransactionStatus.SUCCESS);
-        payment.setTransactionCode(callbackData.getTransactionCode()); // LƯU LẠI MÃ GIAO DỊCH CỔNG TT
+        payment.setTransactionCode(
+            callbackData.getTransactionCode()); // LƯU LẠI MÃ GIAO DỊCH CỔNG TT
         payment.setPaymentTime(LocalDateTime.now()); // Hoặc lấy từ callback
         payment.setGatewayMessage("Payment successful via " + gateway);
         order.setPaymentStatus(PaymentStatus.PAID);

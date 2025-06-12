@@ -12,10 +12,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Entity
 @Table(
     name = "payments",
-    uniqueConstraints = {
-      @UniqueConstraint(
-          columnNames = "transactionCode")
-    })
+    uniqueConstraints = {@UniqueConstraint(columnNames = "transactionCode")})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -4,9 +4,7 @@ import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import lombok.Data;
-
 
 @Data
 public class ProductSummaryResponse {
@@ -26,7 +24,6 @@ public class ProductSummaryResponse {
   private LocalDateTime updatedAt;
   private boolean b2bEnabled;
   private boolean isNew;
-
 
   private LocalDate harvestDate;
   private LocalDateTime lastStockUpdate;

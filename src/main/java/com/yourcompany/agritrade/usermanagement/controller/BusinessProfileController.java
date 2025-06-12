@@ -20,7 +20,6 @@ public class BusinessProfileController {
 
   // Endpoint để Business Buyer tạo hoặc cập nhật profile của chính mình
   @PutMapping("/me")
-
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<ApiResponse<BusinessProfileResponse>> createOrUpdateMyProfile(
       Authentication authentication, @Valid @RequestBody BusinessProfileRequest request) {
@@ -39,6 +38,4 @@ public class BusinessProfileController {
     BusinessProfileResponse response = businessProfileService.getBusinessProfile(userId);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
-
-
 }

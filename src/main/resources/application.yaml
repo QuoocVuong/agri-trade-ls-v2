@@ -1,95 +1,69 @@
 server:
-  port: ${SERVER_PORT:8080} # Biến môi trường: SERVER_PORT, giá trị mặc định: 8080
+  # Port sẽ được định nghĩa trong docker-compose hoặc profile cụ thể
+  forward-headers-strategy: framework
 
 spring:
+  profiles:
+    active: dev
   application:
-    name: agri-trade # Tên ứng dụng
-
-  datasource:
-    url:  ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/agri_trade_ls_v2_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  data:
-    redis:
-      host: ${SPRING_REDIS_HOST:localhost}
-      port: ${SPRING_REDIS_PORT:6379}
-      password: ${SPRING_REDIS_PASSWORD:} # Để trống nếu không có mật khẩu, hoặc đặt giá trị mặc định nếu muốn
-      # database: ${SPRING_REDIS_DATABASE:0}
-      # timeout: ${SPRING_REDIS_TIMEOUT:3000ms}
-
+    name: agri-trade-ls
   jpa:
     hibernate:
-      ddl-auto: update # Để Flyway quản lý schema
+      ddl-auto: none # Để Flyway hoặc profile cụ thể quản lý (validate/update)
     show-sql: false
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.MySQLDialect # Hoặc phiên bản mới hơn
-
+        dialect: org.hibernate.dialect.MySQLDialect
   flyway:
-    enabled: false
-
+    enabled: false # Tắt mặc định, sẽ bật trong profile nếu cần
   mail:
     host: ${SPRING_MAIL_HOST:smtp.sendgrid.net}
     port: ${SPRING_MAIL_PORT:587}
-    username: ${SPRING_MAIL_USERNAME:apikey}                         # GIÁ TRỊ CỐ ĐỊNH
-    password: ${SPRING_MAIL_PASSWORD}         # THAY THẾ BẰNG API KEY CỦA BẠN
+    username: ${SPRING_MAIL_USERNAME:apikey}
+    password: ${SPRING_MAIL_PASSWORD} # Sẽ lấy từ biến môi trường
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
-      # mail.debug: true # Bật nếu muốn xem log chi tiết khi gửi mail (chỉ cho dev)
-
-  # Cấu hình cho JWT (Sẽ dùng ở Bước 10)
   security:
     jwt:
-      secret: ${JWT_SECRET}  # Thay bằng key bí mật thực sự dài và an toàn
-      expiration-ms:  3600000 # 1 giờ cho access token
+      secret: ${JWT_SECRET}
+      expiration-ms: 3600000
       refresh-token:
-        expiration-ms: 604800000 # 7 ngày cho refresh token
+        expiration-ms: 604800000
 
-# Cấu hình cho SpringDoc OpenAPI (Swagger UI)
 springdoc:
   api-docs:
-    path: /api-docs # Đường dẫn tới file JSON/YAML mô tả API
+    path: /api-docs
   swagger-ui:
-    path: /swagger-ui.html # Đường dẫn tới giao diện Swagger UI
+    path: /swagger-ui.html
     display-request-duration: true
     groups-order: DESC
     operations-sorter: method
 
-# Cấu hình Log (ví dụ)
 logging:
   level:
     root: INFO
-    com.yourcompany.agritradels: DEBUG # Log chi tiết hơn cho package của bạn
+    com.yourcompany.agritrade: DEBUG
     org.springframework.web: INFO
     org.springframework.security: INFO
 
-
-
-
-
 google:
   auth:
-    client-id: ${GOOGLE_CLIENT_ID}  # Thay bằng Client ID của bạn
-    # issuer: https://accounts.google.com # Issuer mặc định
-
+    client-id: ${GOOGLE_CLIENT_ID}
 
 firebase:
   storage:
-    bucket-name: ${FIREBASE_STORAGE_BUCKET_NAME} # <<< THAY BẰNG TÊN BUCKET CỦA BẠN
-    service-account-key-path: ${FIREBASE_SERVICE_ACCOUNT_KEY_PATH:classpath:firebase-service-account-key.json} # Đường dẫn tới file key
-    # (Tùy chọn) Base URL công khai nếu bucket của bạn public hoặc bạn muốn tạo URL không cần ký
-    # public-base-url: https://storage.googleapis.com/your-project-id.appspot.com
+    bucket-name: ${FIREBASE_STORAGE_BUCKET_NAME}
+    service-account-key-path: ${FIREBASE_SERVICE_ACCOUNT_KEY_PATH:classpath:firebase-service-account-key.json}
 
 payment:
   vnpay:
     version: "2.1.0"
-    tmnCode: ${VNPAY_TMN_CODE} # Lấy từ VNPay Portal
-    hashSecret: ${VNPAY_HASH_SECRET} # Lấy từ VNPay Portal
-    url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html" # URL cổng thanh toán TEST
-    apiUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction" # URL API truy vấn (nếu cần)
+    tmnCode: ${VNPAY_TMN_CODE}
+    hashSecret: ${VNPAY_HASH_SECRET}
+    url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+    apiUrl: "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction"
   momo:
     partnerCode: YOUR_MOMO_PARTNER_CODE
     accessKey: YOUR_MOMO_ACCESS_KEY
@@ -99,47 +73,13 @@ payment:
     refundUrl: ${MOMO_REFUND_URL:https://test-payment.momo.vn/v2/gateway/api/refund}
 
 app:
-  frontend:
-    url: "http://localhost:4200" # hoặc domain FE thật của bạn
-    vnpayReturnUrl: "${app.frontend.url}/payment/vnpay/result"
-    momoReturnUrl: ${app.frontend.url}/payment/momo/result
-
-  admin:
-    email: admin@gmail.com
-    password: 1
-    fullname: Quản Trị Viên
-
-  backend:
-    url: "http://localhost:8080" # URL cũ
-    #url: "https://a006-2001-ee0-41c1-2963-ecf3-6bad-eaca-9b58.ngrok-free.app" # hoặc domain BE thật của bạn
-    vnpayIpnUrl: "${app.backend.url}/api/payments/callback/vnpay/ipn"
-    momoIpnUrl: ${app.backend.url}/api/payments/callback/momo/ipn
-
-
-  bank:
-    accountName: CONG TY TNHH AGRI TRADE
-    accountNumber: "666366668888"
-    nameDisplay: Ngân hàng Kỹ thương Việt Nam (Techcombank)
-    bin: "970407"  # Mã BIN của Techcombank
-    # template: không cần nếu frontend tự render QR
-    qr:
-      template: compact2  # Template của VietQR.io
-      serviceUrlBase: https://img.vietqr.io/image  # Dịch vụ tạo ảnh QR
-    frontend:
-      url: http://localhost:4200  # URL Frontend
-
+  # Các giá trị cụ thể của app sẽ được định nghĩa trong từng profile
   mail:
-    from: ${APP_MAIL_FROM:lanhquocvuong26@gmail.com} # THAY THẾ BẰNG EMAIL NGƯỜI GỬI ĐÃ XÁC MINH VỚI SENDGRID
+    from: ${APP_MAIL_FROM:lanhquocvuong26@gmail.com}
     sender-name: "AgriTrade Platform"
-#    frontend:
-#      url: http://localhost:4200
   scheduler:
     invoice:
-      cron: "0 0 1 * * ?"        # Chạy vào 1:00 AM hàng ngày
-      #cron: "0 */2 * * * ?"   # Để test: Chạy mỗi 2 phút
-      due_soon_days_before: 3  # Số ngày nhắc trước khi hóa đơn đến hạn
-      overdue_admin_notify_after_days: 7 # Số ngày quá hạn thì báo Admin (tùy chọn)
-      payment_terms_days: 30 # Hoặc 2, hoặc -1 để test
-      # payment_terms_days: 30 # Giá trị mặc định cho production
-
-
+      cron: "0 0 1 * * ?"
+      due_soon_days_before: 3
+      overdue_admin_notify_after_days: 7
+      payment_terms_days: 30

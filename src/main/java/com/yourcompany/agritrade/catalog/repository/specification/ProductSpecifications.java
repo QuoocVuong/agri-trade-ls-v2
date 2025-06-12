@@ -12,7 +12,6 @@ import org.springframework.util.StringUtils;
 
 public class ProductSpecifications {
 
-
   public static Specification<Product> fetchFarmerAndProfile() {
     return (root, query, cb) -> {
       // Chỉ thực hiện fetch khi query không phải là count query
@@ -27,8 +26,6 @@ public class ProductSpecifications {
       return cb.conjunction();
     };
   }
-
-
 
   // Specification: Lấy sản phẩm có trạng thái PUBLISHED
   public static Specification<Product> isPublished() {
@@ -74,7 +71,6 @@ public class ProductSpecifications {
     };
   }
 
-
   public static Specification<Product> hasMinPrice(BigDecimal minPrice) {
     if (minPrice == null) {
       return null;
@@ -99,8 +95,6 @@ public class ProductSpecifications {
     return (root, query, criteriaBuilder) ->
         criteriaBuilder.greaterThanOrEqualTo(root.get("averageRating"), minRating);
   }
-
-
 
   // Specification: Lọc theo trạng thái (dùng cho Admin)
   public static Specification<Product> hasStatus(String statusString) {
@@ -138,11 +132,11 @@ public class ProductSpecifications {
       }
       // Join Product -> User (farmer) -> FarmerProfile
       Join<Product, User> farmerJoin = root.join("farmer", JoinType.INNER);
-      Join<User, FarmerProfile> profileJoin = farmerJoin.join("farmerProfile", JoinType.INNER); // INNER vì muốn lọc theo profile
+      Join<User, FarmerProfile> profileJoin =
+          farmerJoin.join("farmerProfile", JoinType.INNER); // INNER vì muốn lọc theo profile
       return criteriaBuilder.equal(profileJoin.get("wardCode"), wardCode);
     };
   }
-
 
   public static Specification<Product> isB2cProduct() {
     return (root, query, criteriaBuilder) -> criteriaBuilder.isFalse(root.get("b2bEnabled"));
@@ -151,6 +145,4 @@ public class ProductSpecifications {
   public static Specification<Product> isB2bSupply() {
     return (root, query, criteriaBuilder) -> criteriaBuilder.isTrue(root.get("b2bEnabled"));
   }
-
-
 }

@@ -22,16 +22,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('FARMER')")
 public class FarmerInvoiceController {
-    private final InvoiceService invoiceService;
+  private final InvoiceService invoiceService;
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<Page<InvoiceSummaryResponse>>> getMyInvoices(
-            Authentication authentication,
-            @RequestParam(required = false) InvoiceStatus status,
-            @RequestParam(required = false) PaymentStatus paymentStatus,
-            @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 15, sort = "issueDate,desc") Pageable pageable) {
-        Page<InvoiceSummaryResponse> invoices = invoiceService.getInvoicesForFarmer(authentication, status, paymentStatus, keyword, pageable);
-        return ResponseEntity.ok(ApiResponse.success(invoices));
-    }
+  @GetMapping
+  public ResponseEntity<ApiResponse<Page<InvoiceSummaryResponse>>> getMyInvoices(
+      Authentication authentication,
+      @RequestParam(required = false) InvoiceStatus status,
+      @RequestParam(required = false) PaymentStatus paymentStatus,
+      @RequestParam(required = false) String keyword,
+      @PageableDefault(size = 15, sort = "issueDate,desc") Pageable pageable) {
+    Page<InvoiceSummaryResponse> invoices =
+        invoiceService.getInvoicesForFarmer(
+            authentication, status, paymentStatus, keyword, pageable);
+    return ResponseEntity.ok(ApiResponse.success(invoices));
+  }
 }

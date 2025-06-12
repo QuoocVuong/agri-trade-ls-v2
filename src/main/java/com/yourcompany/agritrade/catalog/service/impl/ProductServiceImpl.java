@@ -3,14 +3,12 @@ package com.yourcompany.agritrade.catalog.service.impl;
 import com.github.slugify.Slugify;
 import com.yourcompany.agritrade.catalog.domain.*;
 import com.yourcompany.agritrade.catalog.dto.request.ProductImageRequest;
-
 import com.yourcompany.agritrade.catalog.dto.request.ProductRequest;
 import com.yourcompany.agritrade.catalog.dto.response.ProductDetailResponse;
 import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
 import com.yourcompany.agritrade.catalog.dto.response.SupplySourceResponse;
 import com.yourcompany.agritrade.catalog.mapper.ProductImageMapper;
 import com.yourcompany.agritrade.catalog.mapper.ProductMapper;
-
 import com.yourcompany.agritrade.catalog.repository.*;
 import com.yourcompany.agritrade.catalog.repository.specification.ProductSpecifications;
 import com.yourcompany.agritrade.catalog.service.ProductService;
@@ -29,7 +27,6 @@ import com.yourcompany.agritrade.usermanagement.dto.response.FarmerSummaryRespon
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.math.BigDecimal;
-
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -44,7 +41,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization; // SỬA LẠI IMPORT NÀY
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
@@ -67,14 +64,11 @@ public class ProductServiceImpl implements ProductService {
   private final ReviewService reviewService;
   private static final int RELATED_PRODUCTS_LIMIT = 4; // Số lượng sản phẩm liên quan hiển thị
 
-
   private final NotificationService notificationService;
   private final EmailService emailService;
 
-
   @Value("${firebase.storage.public-base-url:#{null}}") // Inject giá trị từ application.yml
   private String publicBaseUrl;
-
 
   // --- Farmer Methods ---
 
@@ -99,23 +93,21 @@ public class ProductServiceImpl implements ProductService {
                   status.name())); //  sử dụng specification, truyền tên Enum
     }
 
-
     Page<Product> productPage = productRepository.findAll(spec, pageable);
 
     //  Gọi populateImageUrls cho mỗi sản phẩm TRƯỚC KHI MAP
-    productPage
-        .getContent()
-        .forEach(this::populateImageUrls);
+    productPage.getContent().forEach(this::populateImageUrls);
 
     return productPage.map(productMapper::toProductSummaryResponse);
   }
 
-
   @Override
   @Transactional(readOnly = true)
-  public Page<ProductSummaryResponse> getMyB2CProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
+  public Page<ProductSummaryResponse> getMyB2CProducts(
+      Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
     User farmer = getUserFromAuthentication(authentication); // Hàm helper của bạn
-    Specification<Product> spec = Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
+    Specification<Product> spec =
+        Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
             .and(ProductSpecifications.isB2cProduct()); // Lọc b2bEnabled = false
 
     if (StringUtils.hasText(keyword)) {
@@ -132,9 +124,11 @@ public class ProductServiceImpl implements ProductService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<ProductSummaryResponse> getMySupplyProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
+  public Page<ProductSummaryResponse> getMySupplyProducts(
+      Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
     User farmer = getUserFromAuthentication(authentication);
-    Specification<Product> spec = Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
+    Specification<Product> spec =
+        Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
             .and(ProductSpecifications.isB2bSupply()); // Lọc b2bEnabled = true
 
     if (StringUtils.hasText(keyword)) {
@@ -148,8 +142,6 @@ public class ProductServiceImpl implements ProductService {
     productPage.getContent().forEach(this::populateImageUrls);
     return productPage.map(productMapper::toProductSummaryResponse);
   }
-
-
 
   // Phương thức helper để điền imageUrls
   private void populateImageUrls(Product product) {
@@ -202,11 +194,9 @@ public class ProductServiceImpl implements ProductService {
 
     Product product = productMapper.requestToProduct(request);
 
-
     if (product.getImages() == null) {
       product.setImages(new HashSet<>());
     }
-
 
     //  các giá trị mặc định cho các trường NOT NULL
     if (product.getAverageRating() == null) {
@@ -223,7 +213,6 @@ public class ProductServiceImpl implements ProductService {
       product.setLastStockUpdate(LocalDateTime.now());
     }
 
-
     product.setSlug(slug);
     product.setFarmer(farmer);
     product.setCategory(category);
@@ -233,12 +222,14 @@ public class ProductServiceImpl implements ProductService {
     // Xử lý ảnh  (từ request DTO)
     updateProductImagesFromRequest(product, request.getImages()); // Gọi helper
 
-
     Product savedProduct = productRepository.save(product);
     log.info("Product created with id: {} by farmer: {}", savedProduct.getId(), farmer.getId());
 
-    Product reloadedProduct = productRepository.findByIdWithDetails(savedProduct.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Product", "id", savedProduct.getId()));
+    Product reloadedProduct =
+        productRepository
+            .findByIdWithDetails(savedProduct.getId())
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Product", "id", savedProduct.getId()));
     return productMapper.toProductDetailResponse(reloadedProduct);
   }
 
@@ -265,7 +256,6 @@ public class ProductServiceImpl implements ProductService {
     // 6. Cập nhật danh sách Ảnh
     updateProductImages(existingProduct, request.getImages());
 
-
     // 7. Xử lý cập nhật Trạng thái sản phẩm
     updateProductStatusForFarmer(request, existingProduct, previousStatus, wasPublished);
 
@@ -276,14 +266,16 @@ public class ProductServiceImpl implements ProductService {
       existingProduct.setHarvestDate(request.getHarvestDate());
     }
     if (request.getWholesaleUnit() != null) {
-      existingProduct.setWholesaleUnit(request.getWholesaleUnit().isBlank() ? null : request.getWholesaleUnit());
+      existingProduct.setWholesaleUnit(
+          request.getWholesaleUnit().isBlank() ? null : request.getWholesaleUnit());
     }
     if (request.getReferenceWholesalePrice() != null) {
       existingProduct.setReferenceWholesalePrice(request.getReferenceWholesalePrice());
     }
 
     // Cập nhật lastStockUpdate nếu stockQuantity thay đổi
-    if (request.getStockQuantity() != null && !request.getStockQuantity().equals(existingProduct.getStockQuantity())) {
+    if (request.getStockQuantity() != null
+        && !request.getStockQuantity().equals(existingProduct.getStockQuantity())) {
 
       existingProduct.setLastStockUpdate(LocalDateTime.now());
     }
@@ -386,7 +378,6 @@ public class ProductServiceImpl implements ProductService {
     }
   }
 
-
   private void updateProductStatusForFarmer(
       ProductRequest request, Product product, ProductStatus previousStatus, boolean wasPublished) {
     ProductStatus requestedStatus = request.getStatus();
@@ -442,12 +433,14 @@ public class ProductServiceImpl implements ProductService {
     if (!Objects.equals(existingProduct.isB2bEnabled(), request.isB2bEnabled())) return true;
     if (Boolean.TRUE.equals(request.isB2bEnabled())) {
       if (request.getWholesaleUnit() != null
-          && !Objects.equals(existingProduct.getWholesaleUnit(), request.getWholesaleUnit())) return true;
+          && !Objects.equals(existingProduct.getWholesaleUnit(), request.getWholesaleUnit()))
+        return true;
       if (request.getReferenceWholesalePrice() != null
           && (existingProduct.getReferenceWholesalePrice() == null
-              || existingProduct.getReferenceWholesalePrice().compareTo(request.getReferenceWholesalePrice()) != 0))
-        return true;
-
+              || existingProduct
+                      .getReferenceWholesalePrice()
+                      .compareTo(request.getReferenceWholesalePrice())
+                  != 0)) return true;
     }
     return false;
   }
@@ -462,7 +455,6 @@ public class ProductServiceImpl implements ProductService {
     productRepository.delete(product);
     log.info("Product soft deleted with id: {} by farmer: {}", productId, farmer.getId());
   }
-
 
   // tìm kiếm like % .... %
   @Override
@@ -492,7 +484,6 @@ public class ProductServiceImpl implements ProductService {
             .and(ProductSpecifications.fetchFarmerAndProfile())
             .and(ProductSpecifications.isB2cProduct());
 
-
     // Thêm các điều kiện lọc mới vào Specification
     if (minPrice != null) {
       spec = spec.and(ProductSpecifications.hasMinPrice(BigDecimal.valueOf(minPrice)));
@@ -514,8 +505,6 @@ public class ProductServiceImpl implements ProductService {
     return productPage.map(productMapper::toProductSummaryResponse);
   }
 
-
-
   @Override
   @Transactional(readOnly = true)
   public ProductDetailResponse getPublicProductBySlug(String slug) {
@@ -530,8 +519,10 @@ public class ProductServiceImpl implements ProductService {
 
     //  LẤY VÀ GÁN ĐÁNH GIÁ CHO SẢN PHẨM
     //  có phân trang ở đây, hoặc lấy một số lượng nhất định
-    Pageable reviewPageable = PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")); //  lấy 5 review mới nhất
-    Page<ReviewResponse> productReviewsPage = reviewService.getApprovedReviewsByProduct(product.getId(), reviewPageable);
+    Pageable reviewPageable =
+        PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")); //  lấy 5 review mới nhất
+    Page<ReviewResponse> productReviewsPage =
+        reviewService.getApprovedReviewsByProduct(product.getId(), reviewPageable);
     if (productReviewsPage != null) {
       response.setReviews(productReviewsPage.getContent());
     } else {
@@ -557,15 +548,15 @@ public class ProductServiceImpl implements ProductService {
     ProductDetailResponse response = productMapper.toProductDetailResponse(product);
     response.setRelatedProducts(findRelatedProducts(product));
 
-    //LẤY VÀ GÁN ĐÁNH GIÁ CHO SẢN PHẨM
+    // LẤY VÀ GÁN ĐÁNH GIÁ CHO SẢN PHẨM
     Pageable reviewPageable = PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt"));
-    Page<ReviewResponse> productReviewsPage = reviewService.getApprovedReviewsByProduct(product.getId(), reviewPageable);
+    Page<ReviewResponse> productReviewsPage =
+        reviewService.getApprovedReviewsByProduct(product.getId(), reviewPageable);
     if (productReviewsPage != null) {
       response.setReviews(productReviewsPage.getContent());
     } else {
       response.setReviews(Collections.emptyList());
     }
-
 
     return response;
   }
@@ -577,10 +568,7 @@ public class ProductServiceImpl implements ProductService {
     log.debug("Fetching public products for farmer ID: {} with pageable: {}", farmerId, pageable);
 
     //  Kiểm tra xem farmerId có tồn tại không
-    if (!userRepository.existsByIdAndRoles_Name(
-        farmerId,
-        RoleType
-            .ROLE_FARMER)) {
+    if (!userRepository.existsByIdAndRoles_Name(farmerId, RoleType.ROLE_FARMER)) {
       log.warn("Attempted to fetch products for non-existent or non-farmer user ID: {}", farmerId);
       return Page.empty(pageable); // Trả về trang rỗng
     }
@@ -595,8 +583,6 @@ public class ProductServiceImpl implements ProductService {
     // Map kết quả Page<Product> sang Page<ProductSummaryResponse>
     return productPage.map(productMapper::toProductSummaryResponse);
   }
-
-
 
   // --- Admin Methods ---
 
@@ -646,24 +632,17 @@ public class ProductServiceImpl implements ProductService {
               .findById(savedProduct.getFarmer().getId())
               .orElse(null); // Lấy lại farmer từ DB
 
-
-
-
       if (farmer != null) {
         notificationService.sendProductApprovedNotification(
             savedProduct, farmer); // Truyền farmer đã load
         emailService.sendProductApprovedEmailToFarmer(
             savedProduct, farmer); // Truyền farmer đã load
-
       }
-
 
       // Trả về response - cần load lại đầy đủ thông tin product
 
       Product reloadedProduct =
-          productRepository
-              .findByIdWithDetails(savedProduct.getId())
-              .orElse(savedProduct);
+          productRepository.findByIdWithDetails(savedProduct.getId()).orElse(savedProduct);
       return productMapper.toProductDetailResponse(reloadedProduct);
     } else {
       log.warn(
@@ -690,8 +669,6 @@ public class ProductServiceImpl implements ProductService {
       //  TẢI TRƯỚC THÔNG TIN FARMER
       User farmer = userRepository.findById(savedProduct.getFarmer().getId()).orElse(null);
 
-
-
       if (farmer != null) {
         notificationService.sendProductRejectedNotification(
             savedProduct, reason, farmer); // Truyền farmer
@@ -704,12 +681,9 @@ public class ProductServiceImpl implements ProductService {
             productId);
       }
 
-
       // Trả về response - cần load lại đầy đủ
       Product reloadedProduct =
-          productRepository
-              .findByIdWithDetails(savedProduct.getId())
-              .orElse(savedProduct);
+          productRepository.findByIdWithDetails(savedProduct.getId()).orElse(savedProduct);
       return productMapper.toProductDetailResponse(reloadedProduct);
     } else {
       //  xử lý lỗi BadRequestException
@@ -781,13 +755,12 @@ public class ProductServiceImpl implements ProductService {
   }
 
   // --- Helper mới xử lý ảnh từ DTO ---
-  private void updateProductImagesFromRequest(Product product, List<ProductImageRequest> imageRequests) {
-
+  private void updateProductImagesFromRequest(
+      Product product, List<ProductImageRequest> imageRequests) {
 
     if (product.getImages() == null) {
       product.setImages(new HashSet<>());
     }
-
 
     if (imageRequests == null) {
       return;
@@ -799,7 +772,8 @@ public class ProductServiceImpl implements ProductService {
             .collect(Collectors.toMap(ProductImage::getId, Function.identity()));
 
     Set<ProductImage> updatedImages = new HashSet<>();
-    Set<Long> requestImageIds = new HashSet<>(); // Lưu ID của các ảnh có trong request (để biết ảnh nào cần xóa)
+    Set<Long> requestImageIds =
+        new HashSet<>(); // Lưu ID của các ảnh có trong request (để biết ảnh nào cần xóa)
     boolean hasDefaultInRequest = false;
     boolean hasDefault = false;
 
@@ -822,7 +796,8 @@ public class ProductServiceImpl implements ProductService {
         image.setDisplayOrder(imgReq.getDisplayOrder() != null ? imgReq.getDisplayOrder() : order);
 
         // Nếu blobPath trong request khác với blobPath hiện tại của ảnh -> ảnh đã được thay thế
-        if (StringUtils.hasText(imgReq.getBlobPath()) && !imgReq.getBlobPath().equals(oldBlobPathThisImage)) {
+        if (StringUtils.hasText(imgReq.getBlobPath())
+            && !imgReq.getBlobPath().equals(oldBlobPathThisImage)) {
           if (StringUtils.hasText(oldBlobPathThisImage)) {
             blobPathsToDeleteAfterCommit.add(oldBlobPathThisImage); // Đánh dấu blob cũ để xóa
           }
@@ -852,8 +827,10 @@ public class ProductServiceImpl implements ProductService {
     // Đảm bảo có ảnh default nếu list không rỗng và chưa có default nào được set từ request
     if (!updatedImages.isEmpty() && !hasDefaultInRequest) {
       updatedImages.stream()
-              .min(Comparator.comparingInt(ProductImage::getDisplayOrder).thenComparing(ProductImage::getId))
-              .ifPresent(img -> img.setDefault(true));
+          .min(
+              Comparator.comparingInt(ProductImage::getDisplayOrder)
+                  .thenComparing(ProductImage::getId))
+          .ifPresent(img -> img.setDefault(true));
     }
 
     // Xác định các ảnh cũ cần xóa khỏi DB và storage
@@ -867,17 +844,18 @@ public class ProductServiceImpl implements ProductService {
       }
     }
 
-
     //  xóa trực tiếp nếu cần
     if (!imagesToRemoveFromDb.isEmpty()) {
       productImageRepository.deleteAll(imagesToRemoveFromDb);
-      log.debug("Marked {} old image entities for deletion from DB for product {}", imagesToRemoveFromDb.size(), product.getId());
+      log.debug(
+          "Marked {} old image entities for deletion from DB for product {}",
+          imagesToRemoveFromDb.size(),
+          product.getId());
     }
 
     // Cập nhật collection trong product entity
     product.getImages().clear();
     product.getImages().addAll(updatedImages);
-
 
     // Đăng ký việc xóa các blob cũ sau khi transaction commit thành công
     if (!blobPathsToDeleteAfterCommit.isEmpty()) {
@@ -885,35 +863,38 @@ public class ProductServiceImpl implements ProductService {
     }
   }
 
-
-
   private void registerBlobsForDeletionAfterCommit(List<String> blobPaths) {
     if (blobPaths == null || blobPaths.isEmpty()) {
       return;
     }
 
     if (TransactionSynchronizationManager.isActualTransactionActive()) {
-      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-        @Override
-        public void afterCommit() {
-          log.info("Transaction committed. Proceeding to delete {} blob(s) from storage.", blobPaths.size());
-          deleteBlobsFromStorage(blobPaths);
-        }
-        // Bạn cũng có thể implement afterCompletion để xử lý trường hợp rollback nếu cần
-        // @Override
-        // public void afterCompletion(int status) {
-        //     if (status == STATUS_ROLLED_BACK) {
-        //         log.warn("Transaction rolled back. Blobs scheduled for deletion will not be deleted: {}", blobPaths);
-        //     }
-        // }
-      });
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              log.info(
+                  "Transaction committed. Proceeding to delete {} blob(s) from storage.",
+                  blobPaths.size());
+              deleteBlobsFromStorage(blobPaths);
+            }
+            // Bạn cũng có thể implement afterCompletion để xử lý trường hợp rollback nếu cần
+            // @Override
+            // public void afterCompletion(int status) {
+            //     if (status == STATUS_ROLLED_BACK) {
+            //         log.warn("Transaction rolled back. Blobs scheduled for deletion will not be
+            // deleted: {}", blobPaths);
+            //     }
+            // }
+          });
     } else {
-      log.warn("No active transaction. Deleting {} blob(s) immediately. This might be risky if subsequent operations fail. Blobs: {}", blobPaths.size(), blobPaths);
+      log.warn(
+          "No active transaction. Deleting {} blob(s) immediately. This might be risky if subsequent operations fail. Blobs: {}",
+          blobPaths.size(),
+          blobPaths);
       deleteBlobsFromStorage(blobPaths);
     }
   }
-
-
 
   private void deleteBlobsFromStorage(List<String> blobPaths) {
     for (String blobPath : blobPaths) {
@@ -922,12 +903,14 @@ public class ProductServiceImpl implements ProductService {
         log.info("Successfully deleted blob from storage: {}", blobPath);
       } catch (Exception e) {
 
-        log.error("Failed to delete blob from storage after commit: {}. Error: {}", blobPath, e.getMessage(), e);
-
+        log.error(
+            "Failed to delete blob from storage after commit: {}. Error: {}",
+            blobPath,
+            e.getMessage(),
+            e);
       }
     }
   }
-
 
   // Helper Method mới để tìm sản phẩm liên quan
   private List<ProductSummaryResponse> findRelatedProducts(Product currentProduct) {
@@ -969,18 +952,28 @@ public class ProductServiceImpl implements ProductService {
     return productMapper.toProductSummaryResponseList(related);
   }
 
-
   @Override
   @Transactional(readOnly = true)
   public Page<SupplySourceResponse> findSupplySources(
-          String productKeyword, Integer categoryId, String provinceCode, String districtCode, String wardCode,
-          Integer minQuantityNeeded, Pageable pageable) {
-    log.debug("Finding supply sources with productKeyword: {}, categoryId: {}, provinceCode: {}, districtCode: {}, minQuantity: {}",
-            productKeyword, categoryId, provinceCode, districtCode, minQuantityNeeded);
+      String productKeyword,
+      Integer categoryId,
+      String provinceCode,
+      String districtCode,
+      String wardCode,
+      Integer minQuantityNeeded,
+      Pageable pageable) {
+    log.debug(
+        "Finding supply sources with productKeyword: {}, categoryId: {}, provinceCode: {}, districtCode: {}, minQuantity: {}",
+        productKeyword,
+        categoryId,
+        provinceCode,
+        districtCode,
+        minQuantityNeeded);
 
     // 1. Tạo Specification để tìm Product phù hợp
-    Specification<Product> productSpec = Specification.where(ProductSpecifications.isPublished())// Chỉ sản phẩm đã published
-                                                      .and(ProductSpecifications.isB2bSupply());
+    Specification<Product> productSpec =
+        Specification.where(ProductSpecifications.isPublished()) // Chỉ sản phẩm đã published
+            .and(ProductSpecifications.isB2bSupply());
 
     if (StringUtils.hasText(productKeyword)) {
       productSpec = productSpec.and(ProductSpecifications.hasKeyword(productKeyword));
@@ -991,79 +984,90 @@ public class ProductServiceImpl implements ProductService {
     // Lọc sản phẩm theo tỉnh/huyện của nông dân
     if (StringUtils.hasText(provinceCode)) {
       productSpec = productSpec.and(ProductSpecifications.inProvince(provinceCode));
-
     }
     if (StringUtils.hasText(wardCode)) {
       productSpec = productSpec.and(ProductSpecifications.inWard(wardCode));
     }
     if (minQuantityNeeded != null && minQuantityNeeded > 0) {
       // Lọc những sản phẩm có stockQuantity >= minQuantityNeeded
-      productSpec = productSpec.and((root, query, cb) ->
-              cb.greaterThanOrEqualTo(root.get("stockQuantity"), minQuantityNeeded)
-      );
+      productSpec =
+          productSpec.and(
+              (root, query, cb) ->
+                  cb.greaterThanOrEqualTo(root.get("stockQuantity"), minQuantityNeeded));
     }
 
     // Thêm fetch join để lấy thông tin farmer và farmerProfile cùng lúc
     productSpec = productSpec.and(ProductSpecifications.fetchFarmerAndProfile());
-
 
     // 2. Tìm các Product thỏa mãn
 
     Page<Product> products = productRepository.findAll(productSpec, pageable);
 
     // 3. Chuyển đổi Page<Product> sang Page<SupplySourceResponse>
-    List<SupplySourceResponse> supplySources = products.getContent().stream()
-            .map(product -> {
-              User farmer = product.getFarmer();
-              FarmerProfile farmerProfile = farmer.getFarmerProfile(); // Đã được fetch
+    List<SupplySourceResponse> supplySources =
+        products.getContent().stream()
+            .map(
+                product -> {
+                  User farmer = product.getFarmer();
+                  FarmerProfile farmerProfile = farmer.getFarmerProfile(); // Đã được fetch
 
-              if (farmerProfile == null) {
-                log.warn("FarmerProfile not found for farmer {} of product {}", farmer.getId(), product.getId());
-                return null; // Bỏ qua nếu không có profile
-              }
+                  if (farmerProfile == null) {
+                    log.warn(
+                        "FarmerProfile not found for farmer {} of product {}",
+                        farmer.getId(),
+                        product.getId());
+                    return null; // Bỏ qua nếu không có profile
+                  }
 
-              // Lọc thêm theo districtCode của FarmerProfile
-              if (StringUtils.hasText(districtCode) && !districtCode.equals(farmerProfile.getDistrictCode())) {
-                return null; // Bỏ qua nếu huyện không khớp
-              }
+                  // Lọc thêm theo districtCode của FarmerProfile
+                  if (StringUtils.hasText(districtCode)
+                      && !districtCode.equals(farmerProfile.getDistrictCode())) {
+                    return null; // Bỏ qua nếu huyện không khớp
+                  }
 
-              SupplySourceResponse ssr = new SupplySourceResponse();
-              // Map thông tin Farmer
-              FarmerSummaryResponse farmerInfo = new FarmerSummaryResponse();
-              farmerInfo.setUserId(farmer.getId());
-              farmerInfo.setFarmerId(farmer.getId());
-              farmerInfo.setFullName(farmer.getFullName());
-              farmerInfo.setAvatarUrl(farmer.getAvatarUrl());
-              farmerInfo.setFarmName(farmerProfile.getFarmName());
-              farmerInfo.setProvinceCode(farmerProfile.getProvinceCode());
-              // farmerInfo.setFollowerCount(farmer.getFollowerCount());
-              ssr.setFarmerInfo(farmerInfo);
+                  SupplySourceResponse ssr = new SupplySourceResponse();
+                  // Map thông tin Farmer
+                  FarmerSummaryResponse farmerInfo = new FarmerSummaryResponse();
+                  farmerInfo.setUserId(farmer.getId());
+                  farmerInfo.setFarmerId(farmer.getId());
+                  farmerInfo.setFullName(farmer.getFullName());
+                  farmerInfo.setAvatarUrl(farmer.getAvatarUrl());
+                  farmerInfo.setFarmName(farmerProfile.getFarmName());
+                  farmerInfo.setProvinceCode(farmerProfile.getProvinceCode());
+                  // farmerInfo.setFollowerCount(farmer.getFollowerCount());
+                  ssr.setFarmerInfo(farmerInfo);
 
-              ssr.setProductId(product.getId());
-              ssr.setProductName(product.getName());
-              ssr.setProductSlug(product.getSlug());
+                  ssr.setProductId(product.getId());
+                  ssr.setProductName(product.getName());
+                  ssr.setProductSlug(product.getSlug());
 
-              // Lấy thumbnail URL
-              String thumbnailUrl = product.getImages().stream()
-                      .filter(ProductImage::isDefault)
-                      .findFirst()
-                      .or(() -> product.getImages().stream().min(Comparator.comparingInt(ProductImage::getDisplayOrder)))
-                      .map(img -> fileStorageService.getFileUrl(img.getBlobPath())) // Gọi getFileUrl
-                      .orElse("assets/images/placeholder-image.png"); // Placeholder
-              ssr.setThumbnailUrl(thumbnailUrl);
+                  // Lấy thumbnail URL
+                  String thumbnailUrl =
+                      product.getImages().stream()
+                          .filter(ProductImage::isDefault)
+                          .findFirst()
+                          .or(
+                              () ->
+                                  product.getImages().stream()
+                                      .min(Comparator.comparingInt(ProductImage::getDisplayOrder)))
+                          .map(
+                              img ->
+                                  fileStorageService.getFileUrl(
+                                      img.getBlobPath())) // Gọi getFileUrl
+                          .orElse("assets/images/placeholder-image.png"); // Placeholder
+                  ssr.setThumbnailUrl(thumbnailUrl);
 
-              ssr.setCurrentStockQuantity(product.getStockQuantity());
-              ssr.setWholesaleUnit(product.getWholesaleUnit());
-              ssr.setReferenceWholesalePrice(product.getReferenceWholesalePrice());
-              ssr.setHarvestDate(product.getHarvestDate());
-              ssr.setLastStockUpdate(product.getLastStockUpdate());
-              ssr.setNegotiablePrice(product.isNegotiablePrice());
-              return ssr;
-            })
+                  ssr.setCurrentStockQuantity(product.getStockQuantity());
+                  ssr.setWholesaleUnit(product.getWholesaleUnit());
+                  ssr.setReferenceWholesalePrice(product.getReferenceWholesalePrice());
+                  ssr.setHarvestDate(product.getHarvestDate());
+                  ssr.setLastStockUpdate(product.getLastStockUpdate());
+                  ssr.setNegotiablePrice(product.isNegotiablePrice());
+                  return ssr;
+                })
             .filter(Objects::nonNull) // Loại bỏ các kết quả null
             .collect(Collectors.toList());
 
     return new PageImpl<>(supplySources, pageable, products.getTotalElements());
-
   }
 }

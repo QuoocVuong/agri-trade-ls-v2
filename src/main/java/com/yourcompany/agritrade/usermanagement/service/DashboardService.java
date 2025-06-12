@@ -3,7 +3,6 @@ package com.yourcompany.agritrade.usermanagement.service;
 import com.yourcompany.agritrade.catalog.dto.response.TopProductResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -24,16 +23,11 @@ public interface DashboardService {
   //  PHƯƠNG THỨC MỚI CHO FARMER CHART
   /** Lấy dữ liệu số lượng đơn hàng theo ngày cho biểu đồ Farmer */
   List<FarmerChartDataResponse> getFarmerOrderCountChartData(
-      Authentication authentication,
-      LocalDate startDate,
-      LocalDate endDate);
+      Authentication authentication, LocalDate startDate, LocalDate endDate);
 
   /** Lấy dữ liệu doanh thu theo ngày cho biểu đồ Farmer */
   List<FarmerChartDataResponse> getFarmerRevenueChartData(
-      Authentication authentication,
-      LocalDate startDate,
-      LocalDate endDate);
-
+      Authentication authentication, LocalDate startDate, LocalDate endDate);
 
   /** Lấy thống kê tổng quan cho dashboard Admin */
 
@@ -55,6 +49,8 @@ public interface DashboardService {
   Map<String, Long> getPendingApprovalCounts(); // Trả về Map cho tiện
 
   List<FarmerSummaryResponse> getTopPerformingFarmers(int limit);
+
   List<UserResponse> getTopSpendingBuyers(int limit);
+
   List<TimeSeriesDataPoint<Long>> getDailyUserRegistrations(LocalDate startDate, LocalDate endDate);
 }

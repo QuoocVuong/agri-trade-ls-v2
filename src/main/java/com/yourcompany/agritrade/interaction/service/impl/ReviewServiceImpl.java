@@ -100,11 +100,8 @@ public class ReviewServiceImpl implements ReviewService {
 
     updateProductAverageRating(product.getId());
 
-
-
     // notificationService.sendReviewPendingNotification(savedReview); // Xóa hoặc comment dòng này
-    notificationService.sendReviewApprovedNotification(
-        savedReview);
+    notificationService.sendReviewApprovedNotification(savedReview);
 
     return reviewMapper.toReviewResponse(savedReview);
   }
@@ -151,8 +148,6 @@ public class ReviewServiceImpl implements ReviewService {
 
     return reviewMapper.toReviewResponsePage(reviewPage);
   }
-
-
 
   // --- Admin Methods ---
 
@@ -245,8 +240,6 @@ public class ReviewServiceImpl implements ReviewService {
                         + email)); // Ném lỗi nếu không thấy user trong DB
   }
 
-
-
   private Review findReviewById(Long reviewId) {
     return reviewRepository
         .findById(reviewId)
@@ -263,7 +256,6 @@ public class ReviewServiceImpl implements ReviewService {
     }
   }
 
-
   private void updateProductAverageRating(Long productId) {
     log.info("===> START updateProductAverageRating for productId: {}", productId);
     Optional<Product> productOpt = productRepository.findById(productId);
@@ -273,87 +265,128 @@ public class ReviewServiceImpl implements ReviewService {
       return;
     }
     Product product = productOpt.get();
-    log.info("===> Found product: {}, current avgRating: {}, current ratingCount: {}",
-            product.getName(), product.getAverageRating(), product.getRatingCount());
+    log.info(
+        "===> Found product: {}, current avgRating: {}, current ratingCount: {}",
+        product.getName(),
+        product.getAverageRating(),
+        product.getRatingCount());
 
-    Optional<Object[]> resultOpt = reviewRepository.getAverageRatingAndCountByProductIdAndStatus(
-            productId, ReviewStatus.APPROVED
-    );
+    Optional<Object[]> resultOpt =
+        reviewRepository.getAverageRatingAndCountByProductIdAndStatus(
+            productId, ReviewStatus.APPROVED);
 
     float newAverageRating = 0.0f;
     int newRatingCount = 0;
 
     if (resultOpt.isPresent()) {
       Object[] outerArray = resultOpt.get(); // Đây là mảng Object[] bên ngoài
-      log.info("===> Query result outerArray for productId {}: {}", productId, Arrays.toString(outerArray));
+      log.info(
+          "===> Query result outerArray for productId {}: {}",
+          productId,
+          Arrays.toString(outerArray));
 
       // Kiểm tra xem phần tử đầu tiên có phải là một mảng và có đủ 2 phần tử không
       if (outerArray.length > 0 && outerArray[0] instanceof Object[]) {
         Object[] innerArray = (Object[]) outerArray[0]; // Đây là mảng [AVG, COUNT]
-        log.info("===> Query result innerArray for productId {}: {}", productId, Arrays.toString(innerArray));
+        log.info(
+            "===> Query result innerArray for productId {}: {}",
+            productId,
+            Arrays.toString(innerArray));
 
         if (innerArray.length == 2) {
           Double avgRatingDouble = null;
           if (innerArray[0] instanceof Number) {
             avgRatingDouble = ((Number) innerArray[0]).doubleValue();
           } else if (innerArray[0] != null) {
-            log.warn("===> Unexpected type for average rating from innerArray[0]: {}", innerArray[0].getClass().getName());
+            log.warn(
+                "===> Unexpected type for average rating from innerArray[0]: {}",
+                innerArray[0].getClass().getName());
           }
 
           Long ratingCountLong = 0L;
           if (innerArray[1] instanceof Number) {
             ratingCountLong = ((Number) innerArray[1]).longValue();
           } else if (innerArray[1] != null) {
-            log.warn("===> Unexpected type for rating count from innerArray[1]: {}", innerArray[1].getClass().getName());
+            log.warn(
+                "===> Unexpected type for rating count from innerArray[1]: {}",
+                innerArray[1].getClass().getName());
           }
 
-          log.info("===> Parsed from innerArray for product {}: avgRatingDouble={}, ratingCountLong={}",
-                  productId, avgRatingDouble, ratingCountLong);
+          log.info(
+              "===> Parsed from innerArray for product {}: avgRatingDouble={}, ratingCountLong={}",
+              productId,
+              avgRatingDouble,
+              ratingCountLong);
 
           if (avgRatingDouble != null && ratingCountLong > 0) {
-            newAverageRating = BigDecimal.valueOf(avgRatingDouble)
-                    .setScale(1, RoundingMode.HALF_UP).floatValue();
+            newAverageRating =
+                BigDecimal.valueOf(avgRatingDouble).setScale(1, RoundingMode.HALF_UP).floatValue();
             newRatingCount = ratingCountLong.intValue();
           } else {
-            log.info("===> No valid ratings or count is zero from innerArray for product {}. Setting ratings to 0.", productId);
+            log.info(
+                "===> No valid ratings or count is zero from innerArray for product {}. Setting ratings to 0.",
+                productId);
           }
         } else {
-          log.warn("===> Inner array from query for productId {} did not return 2 elements (length: {}). Setting ratings to 0.", productId, innerArray.length);
+          log.warn(
+              "===> Inner array from query for productId {} did not return 2 elements (length: {}). Setting ratings to 0.",
+              productId,
+              innerArray.length);
         }
       } else {
-        // Trường hợp này có thể xảy ra nếu không có review nào và query trả về một mảng rỗng hoặc một cấu trúc khác
-        // Hoặc nếu query chỉ trả về một giá trị đơn (ví dụ chỉ COUNT là 0 và AVG là NULL không được trả về như một phần tử)
+        // Trường hợp này có thể xảy ra nếu không có review nào và query trả về một mảng rỗng hoặc
+        // một cấu trúc khác
+        // Hoặc nếu query chỉ trả về một giá trị đơn (ví dụ chỉ COUNT là 0 và AVG là NULL không được
+        // trả về như một phần tử)
         // Kiểm tra xem có phải là trường hợp COUNT = 0 không
-        if (outerArray.length == 1 && outerArray[0] instanceof Number && ((Number)outerArray[0]).longValue() == 0) {
-          log.info("===> Query returned a single count of 0 for product {}. Setting ratings to 0.", productId);
+        if (outerArray.length == 1
+            && outerArray[0] instanceof Number
+            && ((Number) outerArray[0]).longValue() == 0) {
+          log.info(
+              "===> Query returned a single count of 0 for product {}. Setting ratings to 0.",
+              productId);
         } else {
-          log.warn("===> Query result outerArray for productId {} was not in the expected format (Object[] containing [AVG, COUNT]). Length: {}. Content: {}. Setting ratings to 0.",
-                  productId, outerArray.length, Arrays.toString(outerArray));
+          log.warn(
+              "===> Query result outerArray for productId {} was not in the expected format (Object[] containing [AVG, COUNT]). Length: {}. Content: {}. Setting ratings to 0.",
+              productId,
+              outerArray.length,
+              Arrays.toString(outerArray));
         }
       }
     } else {
-      log.info("===> No result from rating/count query for productId {}. Setting ratings to 0.", productId);
+      log.info(
+          "===> No result from rating/count query for productId {}. Setting ratings to 0.",
+          productId);
     }
 
-    log.info("===> Calculated for product {}: newAverageRating={}, newRatingCount={}",
-            productId, newAverageRating, newRatingCount);
+    log.info(
+        "===> Calculated for product {}: newAverageRating={}, newRatingCount={}",
+        productId,
+        newAverageRating,
+        newRatingCount);
 
-    if (product.getAverageRating() != newAverageRating || product.getRatingCount() != newRatingCount) {
+    if (product.getAverageRating() != newAverageRating
+        || product.getRatingCount() != newRatingCount) {
       product.setAverageRating(newAverageRating);
       product.setRatingCount(newRatingCount);
-      log.info("===> Product {} stats CHANGED. Attempting to save: avgRating={}, ratingCount={}",
-              product.getId(), newAverageRating, newRatingCount);
+      log.info(
+          "===> Product {} stats CHANGED. Attempting to save: avgRating={}, ratingCount={}",
+          product.getId(),
+          newAverageRating,
+          newRatingCount);
       try {
         productRepository.save(product);
         log.info("===> Product {} stats successfully SAVED.", product.getId());
       } catch (Exception e) {
-        log.error("===> ERROR saving product {} after updating rating stats: {}", product.getId(), e.getMessage(), e);
+        log.error(
+            "===> ERROR saving product {} after updating rating stats: {}",
+            product.getId(),
+            e.getMessage(),
+            e);
       }
     } else {
       log.info("===> No change in rating stats for product {}. Skipping save.", product.getId());
     }
     log.info("===> END updateProductAverageRating for productId: {}", productId);
   }
-
-
 }

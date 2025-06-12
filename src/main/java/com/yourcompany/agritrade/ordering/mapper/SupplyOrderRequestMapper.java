@@ -7,13 +7,17 @@ import com.yourcompany.agritrade.usermanagement.mapper.UserMapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring", uses = {UserMapper.class, ProductMapper.class})
+@Mapper(
+    componentModel = "spring",
+    uses = {UserMapper.class, ProductMapper.class})
 public interface SupplyOrderRequestMapper {
 
-    @Mapping(target = "buyer", source = "buyer")
-    @Mapping(target = "farmer", source = "farmer")
-    @Mapping(target = "product", source = "product") // MapStruct sẽ dùng toProductInfoResponse từ ProductMapper
-    SupplyOrderRequestResponse toSupplyOrderRequestResponse(SupplyOrderRequest supplyOrderRequest);
+  @Mapping(target = "buyer", source = "buyer")
+  @Mapping(target = "farmer", source = "farmer")
+  @Mapping(
+      target = "product",
+      source = "product") // MapStruct sẽ dùng toProductInfoResponse từ ProductMapper
+  SupplyOrderRequestResponse toSupplyOrderRequestResponse(SupplyOrderRequest supplyOrderRequest);
 
-    // Không cần mapper từ Request DTO sang Entity ở đây vì Service sẽ làm thủ công
+  // Không cần mapper từ Request DTO sang Entity ở đây vì Service sẽ làm thủ công
 }

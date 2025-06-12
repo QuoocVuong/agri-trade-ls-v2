@@ -9,13 +9,11 @@ import lombok.Data;
 public class ProductImageRequest {
   private Long id; // ID của ảnh
 
-  @NotBlank(
-      message = "Image URL is required for preview or reference")
+  @NotBlank(message = "Image URL is required for preview or reference")
   @Size(max = 2048)
   private String imageUrl; // URL ảnh
 
-  @NotBlank(
-      message = "Blob path is required")
+  @NotBlank(message = "Blob path is required")
   @Size(max = 1024)
   private String blobPath;
 

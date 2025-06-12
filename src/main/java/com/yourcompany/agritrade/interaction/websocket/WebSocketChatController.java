@@ -26,7 +26,6 @@ public class WebSocketChatController {
   private final ChatService chatService;
   private final SimpMessagingTemplate messagingTemplate;
 
-
   @MessageMapping("/chat.sendMessage")
   public void sendMessage(
       @Payload ChatMessageRequest messageRequest, SimpMessageHeaderAccessor headerAccessor) {
@@ -40,14 +39,12 @@ public class WebSocketChatController {
     chatService.sendMessage(authentication, messageRequest);
   }
 
-
   @MessageMapping("/chat.markRead")
   public void markMessagesAsRead(@Payload Long roomId, SimpMessageHeaderAccessor headerAccessor) {
     Authentication authentication = getAuthentication(headerAccessor);
     log.info("WS Received: /chat.markRead from {} for room {}", authentication.getName(), roomId);
     chatService.markMessagesAsRead(authentication, roomId);
   }
-
 
   // Xử lý lỗi WebSocket tập trung
   @MessageExceptionHandler({

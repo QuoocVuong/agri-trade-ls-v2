@@ -18,8 +18,7 @@ public abstract class ProductImageMapper {
   @Mapping(target = "imageUrl", ignore = true) // Ignore vì sẽ tạo động
   public abstract ProductImageResponse toProductImageResponse(ProductImage image);
 
-  public abstract List<ProductImageResponse> toProductImageResponseList(
-      List<ProductImage> images);
+  public abstract List<ProductImageResponse> toProductImageResponseList(List<ProductImage> images);
 
   @AfterMapping
   protected void populateImageUrl(
@@ -32,8 +31,7 @@ public abstract class ProductImageMapper {
         response.setImageUrl("assets/images/placeholder-image.png");
       }
     } else {
-      response.setImageUrl(
-          "assets/images/placeholder-image.png");
+      response.setImageUrl("assets/images/placeholder-image.png");
     }
   }
 
@@ -41,9 +39,7 @@ public abstract class ProductImageMapper {
   @Mapping(target = "id", ignore = true) // ID sẽ tự tạo
   @Mapping(target = "product", ignore = true) // Product sẽ được set trong service
   @Mapping(target = "createdAt", ignore = true)
-  @Mapping(
-      target = "imageUrl",
-      ignore = true) //  Không map imageUrl từ request vào entity
+  @Mapping(target = "imageUrl", ignore = true) //  Không map imageUrl từ request vào entity
   // blobPath sẽ được map từ request
   public abstract ProductImage requestToProductImage(ProductImageRequest request);
 

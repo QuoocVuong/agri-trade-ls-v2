@@ -66,7 +66,6 @@ public interface UserService {
 
   UserResponse updateUserRoles(Long id, Set<RoleType> roles);
 
-
   /**
    * Lấy danh sách nông dân nổi bật (ví dụ: theo số người theo dõi).
    *
@@ -74,7 +73,6 @@ public interface UserService {
    * @return Danh sách FarmerSummaryResponse.
    */
   List<FarmerSummaryResponse> getFeaturedFarmers(int limit);
-
 
   /**
    * Tìm kiếm và lọc danh sách Farmer công khai (đã được duyệt).
@@ -87,8 +85,6 @@ public interface UserService {
   Page<FarmerSummaryResponse> searchPublicFarmers(
       String keyword, String provinceCode, Pageable pageable);
 
-
-
   // --- PHƯƠNG THỨC CHO XỬ LÝ LOGIN VÀ TOKEN ---
   /**
    * Xử lý việc xác thực thành công, tạo tokens và lưu refresh token.
@@ -96,9 +92,7 @@ public interface UserService {
    * @param authentication Đối tượng Authentication đã được xác thực.
    * @return LoginResponse chứa accessToken, refreshToken và thông tin user.
    */
-  LoginResponse processLoginAuthentication(
-      Authentication authentication);
-
+  LoginResponse processLoginAuthentication(Authentication authentication);
 
   /**
    * Xử lý đăng nhập bằng Google ID Token. Xác thực token, tìm hoặc tạo người dùng, và trả về JWT
@@ -109,8 +103,6 @@ public interface UserService {
    */
   LoginResponse processGoogleLogin(String idTokenString)
       throws GeneralSecurityException, IOException;
-
-
 
   /**
    * Làm mới access token bằng cách sử dụng refresh token.

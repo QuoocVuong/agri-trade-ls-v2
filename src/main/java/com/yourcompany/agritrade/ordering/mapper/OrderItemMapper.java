@@ -22,8 +22,6 @@ public interface OrderItemMapper {
       qualifiedByName = "mapProductToThumbnailUrl") // Lấy ảnh từ ProductMapper nếu cần
   ProductInfoResponse productToProductInfoResponse(Product product);
 
-
-
   // Map OrderItem sang OrderItemResponse
   @Mapping(target = "product", source = "product") // Map Product entity sang ProductInfoResponse
   OrderItemResponse toOrderItemResponse(OrderItem orderItem);
@@ -54,7 +52,6 @@ public interface OrderItemMapper {
         .min(Comparator.comparingInt(ProductImage::getDisplayOrder)) // Sắp xếp theo displayOrder
         .map(ProductImage::getImageUrl)
         .orElse(
-
             product.getImages().stream().findFirst().map(ProductImage::getImageUrl).orElse(null));
   }
 }

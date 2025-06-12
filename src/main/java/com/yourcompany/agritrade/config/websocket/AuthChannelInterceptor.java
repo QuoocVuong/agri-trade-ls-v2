@@ -44,7 +44,6 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
                 new UsernamePasswordAuthenticationToken(
                     userDetails, null, userDetails.getAuthorities());
 
-
             accessor.setUser(authentication);
             log.info("STOMP CONNECT authenticated for user: {}", username);
           } else {
@@ -76,7 +75,6 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
           "STOMP SEND received for user: {} to destination: {}",
           (user != null ? user.getName() : "anonymous"),
           accessor.getDestination());
-
     }
 
     return message;

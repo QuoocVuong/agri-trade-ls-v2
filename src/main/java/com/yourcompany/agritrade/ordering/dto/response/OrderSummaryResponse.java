@@ -19,5 +19,4 @@ public class OrderSummaryResponse {
 
   private String buyerName;
   private String farmerName;
-
 }

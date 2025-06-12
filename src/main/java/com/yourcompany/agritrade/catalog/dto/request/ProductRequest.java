@@ -39,18 +39,11 @@ public class ProductRequest {
 
   private boolean b2bEnabled = false;
 
-
-
-
   private LocalDate harvestDate;
 
   private Boolean negotiablePrice;
   private String wholesaleUnit;
   private BigDecimal referenceWholesalePrice;
 
-
-
-  @Valid
-  private List<ProductImageRequest> images;
-
+  @Valid private List<ProductImageRequest> images;
 }

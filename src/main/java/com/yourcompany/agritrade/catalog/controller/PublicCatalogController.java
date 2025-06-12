@@ -76,7 +76,6 @@ public class PublicCatalogController {
     return ResponseEntity.ok(ApiResponse.success(product));
   }
 
-
   @GetMapping("/farmer/{farmerId}/products")
   public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> getProductsByFarmerPublic(
       @PathVariable Long farmerId,
@@ -89,18 +88,24 @@ public class PublicCatalogController {
 
   @GetMapping("/supply-sources")
   public ResponseEntity<ApiResponse<Page<SupplySourceResponse>>> findSupplySources(
-          @RequestParam(required = false) String productKeyword,
-          @RequestParam(required = false) Integer categoryId,
-          @RequestParam(required = false) String provinceCode,
-          @RequestParam(required = false) String districtCode,
-          @RequestParam(required = false) String wardCode,
-          @RequestParam(required = false) Integer minQuantityNeeded,
-          @PageableDefault(size = 10, sort = "farmerInfo.farmName,asc") Pageable pageable) {
+      @RequestParam(required = false) String productKeyword,
+      @RequestParam(required = false) Integer categoryId,
+      @RequestParam(required = false) String provinceCode,
+      @RequestParam(required = false) String districtCode,
+      @RequestParam(required = false) String wardCode,
+      @RequestParam(required = false) Integer minQuantityNeeded,
+      @PageableDefault(size = 10, sort = "farmerInfo.farmName,asc") Pageable pageable) {
 
     // Gọi service
-    Page<SupplySourceResponse> supplySources = productService.findSupplySources(
-            productKeyword, categoryId, provinceCode, districtCode, wardCode, minQuantityNeeded, pageable
-    );
+    Page<SupplySourceResponse> supplySources =
+        productService.findSupplySources(
+            productKeyword,
+            categoryId,
+            provinceCode,
+            districtCode,
+            wardCode,
+            minQuantityNeeded,
+            pageable);
     return ResponseEntity.ok(ApiResponse.success(supplySources));
   }
 }

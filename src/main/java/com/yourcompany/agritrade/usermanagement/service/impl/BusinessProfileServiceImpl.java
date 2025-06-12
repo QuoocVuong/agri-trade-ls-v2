@@ -35,8 +35,6 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
       Authentication authentication, BusinessProfileRequest request) {
     User user = getUserFromAuthentication(authentication);
 
-
-
     // Kiểm tra xem profile đã tồn tại chưa để biết là tạo mới hay cập nhật
     boolean isNewProfile = !businessProfileRepository.existsById(user.getId());
 
@@ -55,7 +53,6 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
     // Nếu profile đã tồn tại (cập nhật)
     if (profile.getUserId() != null) {
       businessProfileMapper.updateBusinessProfileFromRequest(request, profile);
-
     }
 
     // Lưu profile (tạo mới hoặc cập nhật)
@@ -87,7 +84,6 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
         businessProfileRepository
             .findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("BusinessProfile", "userId", userId));
-
 
     return businessProfileMapper.toBusinessProfileResponse(profile);
   }

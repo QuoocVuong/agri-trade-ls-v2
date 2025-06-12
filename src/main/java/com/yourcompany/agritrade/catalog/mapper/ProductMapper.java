@@ -19,7 +19,6 @@ import java.util.Set;
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
 
-
 @Mapper(
     componentModel = "spring",
     uses = {
@@ -100,18 +99,14 @@ public abstract class ProductMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "b2bEnabled", source = "b2bEnabled")
   @Mapping(target = "version", ignore = true) // Không map version
-
   public abstract void updateProductFromRequest(
       ProductRequest request, @MappingTarget Product product);
-
 
   @Mapping(
       target = "thumbnailUrl",
       source = "images",
       qualifiedByName = "getDefaultImageUrl") // Lấy ảnh thumbnail
   public abstract ProductInfoResponse toProductInfoResponse(Product product);
-
-
 
   // --- Helper Methods ---
   @Named("getDefaultImageUrl")
@@ -147,7 +142,6 @@ public abstract class ProductMapper {
 
     FarmerProfile profile = farmer.getFarmerProfile();
 
-
     FarmerInfoResponse info = farmerInfoMapper.toFarmerInfoResponse(farmer, profile);
 
     // Fallback logic
@@ -159,7 +153,4 @@ public abstract class ProductMapper {
 
     return info;
   }
-
-
-
 }

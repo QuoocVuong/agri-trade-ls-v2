@@ -10,5 +10,4 @@ public interface RoleService {
   RoleResponse getRoleById(Integer id);
 
   RoleResponse updateRolePermissions(Integer id, RoleUpdateRequest request);
-
 }

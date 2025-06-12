@@ -59,8 +59,7 @@ public class FileController {
             .map(
                 file -> {
                   String blobPath = fileStorageService.store(file, type);
-                  String fileDownloadUri =
-                      fileStorageService.getFileUrl(blobPath);
+                  String fileDownloadUri = fileStorageService.getFileUrl(blobPath);
                   return new FileUploadResponse(
                       blobPath, fileDownloadUri, file.getContentType(), file.getSize());
                 })
@@ -100,8 +99,7 @@ public class FileController {
   // được xóa
   public ResponseEntity<ApiResponse<Void>> deleteFile(HttpServletRequest request) {
 
-    String finalBlobPath =
-        extractBlobPath(request, "");
+    String finalBlobPath = extractBlobPath(request, "");
 
     if (!StringUtils.hasText(finalBlobPath)) {
       return ResponseEntity.badRequest()
@@ -156,7 +154,6 @@ public class FileController {
     AntPathMatcher apm = new AntPathMatcher();
     String extractedPath = apm.extractPathWithinPattern(bestMatchPattern, path);
 
-
     if (StringUtils.hasText(endpointPrefix)
         && extractedPath.startsWith(
             endpointPrefix.startsWith("/") ? endpointPrefix.substring(1) : endpointPrefix)) {
@@ -185,7 +182,6 @@ public class FileController {
         else if (filename.endsWith(".jpg") || filename.endsWith(".jpeg"))
           contentType = MediaType.IMAGE_JPEG_VALUE;
         else if (filename.endsWith(".gif")) contentType = MediaType.IMAGE_GIF_VALUE;
-
       }
     }
     return contentType != null ? contentType : "application/octet-stream";

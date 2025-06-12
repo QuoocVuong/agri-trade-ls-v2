@@ -10,9 +10,7 @@ import com.yourcompany.agritrade.ordering.dto.request.OrderStatusUpdateRequest;
 import com.yourcompany.agritrade.ordering.dto.response.OrderResponse;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.ordering.service.OrderService;
-import org.springframework.core.io.InputStreamResource;
 import jakarta.validation.Valid;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDate;
@@ -29,7 +27,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -40,24 +37,23 @@ public class AdminOrderController {
 
   private final OrderService orderService;
 
-  @Autowired
-  private ExcelExportService excelExportService;
+  @Autowired private ExcelExportService excelExportService;
 
   // Lấy tất cả đơn hàng với bộ lọc
   @GetMapping
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getAllOrders(
-          @RequestParam(required = false) String keyword,
-          @RequestParam(required = false) OrderStatus status,
-          @RequestParam(required = false) PaymentMethod paymentMethod,
-          @RequestParam(required = false) PaymentStatus paymentStatus,
-          @RequestParam(required = false) OrderType orderType,
-          @RequestParam(required = false) Long buyerId,
-          @RequestParam(required = false) Long farmerId,
-          @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
-
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) OrderStatus status,
+      @RequestParam(required = false) PaymentMethod paymentMethod,
+      @RequestParam(required = false) PaymentStatus paymentStatus,
+      @RequestParam(required = false) OrderType orderType,
+      @RequestParam(required = false) Long buyerId,
+      @RequestParam(required = false) Long farmerId,
+      @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
 
     Page<OrderSummaryResponse> orders =
-        orderService.getAllOrdersForAdmin(keyword, status, paymentMethod, paymentStatus, orderType,   buyerId, farmerId, pageable);
+        orderService.getAllOrdersForAdmin(
+            keyword, status, paymentMethod, paymentStatus, orderType, buyerId, farmerId, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 
@@ -86,8 +82,7 @@ public class AdminOrderController {
   @PostMapping("/{orderId}/cancel")
   @PreAuthorize("hasAuthority('ORDER_CANCEL_ALL') or hasRole('ADMIN')") // Ví dụ dùng permission
   public ResponseEntity<ApiResponse<OrderResponse>> cancelOrderByAdmin(
-      Authentication authentication,
-      @PathVariable Long orderId) {
+      Authentication authentication, @PathVariable Long orderId) {
     OrderResponse cancelledOrder = orderService.cancelOrder(authentication, orderId);
     return ResponseEntity.ok(
         ApiResponse.success(cancelledOrder, "Order cancelled successfully by admin"));
@@ -96,15 +91,12 @@ public class AdminOrderController {
   @PostMapping("/{orderId}/confirm-bank-transfer")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<ApiResponse<OrderResponse>> confirmBankTransfer(
-      @PathVariable Long orderId,
-      @RequestBody(required = false)
-          Map<String, String> payload) {
+      @PathVariable Long orderId, @RequestBody(required = false) Map<String, String> payload) {
     String bankTransactionCode = payload != null ? payload.get("bankTransactionCode") : null;
     OrderResponse updatedOrder =
         orderService.confirmBankTransferPayment(orderId, bankTransactionCode);
     return ResponseEntity.ok(ApiResponse.success(updatedOrder, "Bank transfer confirmed."));
   }
-
 
   @PostMapping("/{orderId}/confirm-payment")
   public ResponseEntity<ApiResponse<OrderResponse>> confirmOrderPayment(
@@ -113,10 +105,7 @@ public class AdminOrderController {
       @RequestBody(required = false)
           Map<String, String> payload) { // Có thể nhận ghi chú, mã giao dịch từ Admin
     String adminNotes = payload != null ? payload.get("notes") : null;
-    String transactionReference =
-        payload != null
-            ? payload.get("transactionReference")
-            : null;
+    String transactionReference = payload != null ? payload.get("transactionReference") : null;
 
     OrderResponse updatedOrder =
         orderService.confirmOrderPaymentByAdmin(
@@ -128,15 +117,16 @@ public class AdminOrderController {
 
   @GetMapping("/export")
   public ResponseEntity<InputStreamResource> exportOrdersToExcel(
-          @RequestParam(required = false) String keyword,
-          @RequestParam(required = false) OrderStatus status,
-          @RequestParam(required = false) PaymentMethod paymentMethod,
-          @RequestParam(required = false) PaymentStatus paymentStatus,
-          @RequestParam(required = false) Long buyerId,
-          @RequestParam(required = false) Long farmerId,
-          @RequestParam(required = false) OrderType orderType
-  ) {
-    List<OrderSummaryResponse> ordersToExport = orderService.getAllOrdersForAdminExport(keyword, status, paymentMethod, paymentStatus, buyerId, farmerId, orderType);
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) OrderStatus status,
+      @RequestParam(required = false) PaymentMethod paymentMethod,
+      @RequestParam(required = false) PaymentStatus paymentStatus,
+      @RequestParam(required = false) Long buyerId,
+      @RequestParam(required = false) Long farmerId,
+      @RequestParam(required = false) OrderType orderType) {
+    List<OrderSummaryResponse> ordersToExport =
+        orderService.getAllOrdersForAdminExport(
+            keyword, status, paymentMethod, paymentStatus, buyerId, farmerId, orderType);
 
     try {
       ByteArrayInputStream in = excelExportService.ordersToExcel(ordersToExport);
@@ -144,12 +134,13 @@ public class AdminOrderController {
       InputStreamResource file = new InputStreamResource(in);
 
       return ResponseEntity.ok()
-              .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
-              .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-              .body(file);
+          .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+          .contentType(
+              MediaType.parseMediaType(
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+          .body(file);
     } catch (IOException e) {
       throw new RuntimeException("Failed to export data to Excel file: " + e.getMessage());
     }
   }
-
 }

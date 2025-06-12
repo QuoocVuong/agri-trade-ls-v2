@@ -1,0 +1,42 @@
+server:
+  port: 8080
+
+spring:
+  # Cấu hình DB cho local
+  datasource:
+    url: jdbc:mysql://localhost:3306/agri_trade_ls_v2_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
+    username: root
+    password: root
+  # Cấu hình Redis cho local
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  # Cho phép Hibernate tự tạo/cập nhật DB khi dev
+  jpa:
+    hibernate:
+      ddl-auto: update
+  # Bật Flyway khi dev nếu bạn muốn
+  flyway:
+    enabled: false
+
+app:
+  # URL cho môi trường dev
+  # URL cho môi trường dev
+  frontend:
+    url: "http://localhost:4200"
+  backend:
+    url: "http://localhost:8080" # Hoặc dùng ngrok nếu cần test callback từ bên ngoài
+  # Các URL callback sẽ được xây dựng từ 2 URL trên
+  bank:
+    accountName: CONG TY TNHH AGRI TRADE
+    accountNumber: "666366668888"
+    nameDisplay: Ngân hàng Kỹ thương Việt Nam (Techcombank)
+    bin: "970407"
+    qr:
+      template: compact2
+      serviceUrlBase: https://img.vietqr.io/image
+  admin:
+    email: admin@gmail.com
+    password: 1
+    fullname: Quản Trị Viên

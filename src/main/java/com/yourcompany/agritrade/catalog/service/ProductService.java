@@ -9,7 +9,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
-
 public interface ProductService {
 
   // Cho Farmer
@@ -39,7 +38,6 @@ public interface ProductService {
 
   ProductDetailResponse getPublicProductById(Long id);
 
-
   /**
    * Lấy danh sách sản phẩm công khai (PUBLISHED) của một Farmer cụ thể.
    *
@@ -48,8 +46,6 @@ public interface ProductService {
    * @return Trang chứa các ProductSummaryResponse.
    */
   Page<ProductSummaryResponse> getPublicProductsByFarmerId(Long farmerId, Pageable pageable);
-
-
 
   // Cho Admin
   Page<ProductSummaryResponse> getAllProductsForAdmin(
@@ -64,22 +60,20 @@ public interface ProductService {
 
   void forceDeleteProduct(Long productId); // Xóa vật lý
 
-
   Page<SupplySourceResponse> findSupplySources(
-          String productKeyword,
-          Integer categoryId,
-          String provinceCode,
-          String districtCode,
-          String wardCode,
-          Integer minQuantityNeeded, // Số lượng tối thiểu người mua cần
-          Pageable pageable
-  );
-
+      String productKeyword,
+      Integer categoryId,
+      String provinceCode,
+      String districtCode,
+      String wardCode,
+      Integer minQuantityNeeded, // Số lượng tối thiểu người mua cần
+      Pageable pageable);
 
   // Lấy sản phẩm B2C của Farmer
-  Page<ProductSummaryResponse> getMyB2CProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable);
+  Page<ProductSummaryResponse> getMyB2CProducts(
+      Authentication authentication, String keyword, ProductStatus status, Pageable pageable);
 
   // Lấy nguồn cung B2B của Farmer
-  Page<ProductSummaryResponse> getMySupplyProducts(Authentication authentication, String keyword, ProductStatus status, Pageable pageable);
-
+  Page<ProductSummaryResponse> getMySupplyProducts(
+      Authentication authentication, String keyword, ProductStatus status, Pageable pageable);
 }

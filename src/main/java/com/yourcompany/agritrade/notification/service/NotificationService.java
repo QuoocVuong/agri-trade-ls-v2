@@ -62,8 +62,7 @@ public interface NotificationService {
   void sendFarmerProfileApprovedNotification(FarmerProfile profile);
 
   /** Gửi thông báo khi hồ sơ Farmer bị từ chối */
-  void sendFarmerProfileRejectedNotification(
-      FarmerProfile profile, String reason);
+  void sendFarmerProfileRejectedNotification(FarmerProfile profile, String reason);
 
   // --- Follow Related ---
   /** Gửi thông báo cho user khi có người mới theo dõi họ */
@@ -76,10 +75,10 @@ public interface NotificationService {
   /** Gửi thông báo cho user khi review của họ bị từ chối */
   void sendReviewRejectedNotification(Review review);
 
-
   // --- Invoice Related ---
   void sendOverdueInvoiceReminderToBuyer(Invoice invoice);
-  void sendDueSoonInvoiceReminderToBuyer(Invoice invoice);
-  void sendOverdueInvoiceNotificationToAdmin(Invoice invoice);
 
+  void sendDueSoonInvoiceReminderToBuyer(Invoice invoice);
+
+  void sendOverdueInvoiceNotificationToAdmin(Invoice invoice);
 }

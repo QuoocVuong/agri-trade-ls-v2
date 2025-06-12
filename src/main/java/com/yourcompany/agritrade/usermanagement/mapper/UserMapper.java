@@ -23,20 +23,15 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
   protected FarmerProfileMapper farmerProfileMapper;
   @Autowired protected BusinessProfileMapper businessProfileMapper;
 
-
   @Autowired protected WebSocketEventListener presenceService;
-
-
 
   // Chỉ map các trường cơ bản từ User sang UserResponse
   @Mapping(source = "roles", target = "roles", qualifiedByName = "rolesToRoleNames")
-
   @Named("toUserResponse") // *** Đặt tên cho phương thức nà
   public abstract UserResponse toUserResponse(User user);
 
   // Mapping cho UserProfileResponse (kết hợp)
   @Mapping(source = "roles", target = "roles", qualifiedByName = "rolesToRoleNames")
-
   public abstract UserProfileResponse toUserProfileResponse(User user);
 
   //  THÊM PHƯƠNG THỨC MAP SANG UserInfoSimpleResponse
@@ -49,8 +44,6 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
 
   // THÊM PHƯƠNG THỨC MAP LIST SANG UserInfoSimpleResponse
   public abstract List<UserInfoSimpleResponse> toUserInfoSimpleResponseList(List<User> users);
-
-
 
   @Named("rolesToRoleNames")
   Set<String> rolesToRoleNames(Set<Role> roles) { // Bỏ default khi là abstract class

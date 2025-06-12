@@ -39,7 +39,6 @@ public class CategoryServiceImpl implements CategoryService {
         categoryRepository.findAll(
             Sort.by(Sort.Direction.ASC, "name")); // Lấy tất cả, sắp xếp theo tên
 
-
     return categoryMapper.toCategoryResponseList(categories); // Sử dụng MapStruct mapper
   }
 
@@ -175,7 +174,6 @@ public class CategoryServiceImpl implements CategoryService {
         fileStorageService.delete(oldBlobPath);
       } catch (Exception e) {
         log.error("Failed to delete old category image file from storage: {}", oldBlobPath, e);
-
       }
     }
 
@@ -207,7 +205,6 @@ public class CategoryServiceImpl implements CategoryService {
     if (!category.getChildren().isEmpty()) {
       throw new BadRequestException(
           "Cannot delete category with id " + id + " because it has subcategories.");
-
     }
 
     String blobPathToDelete = category.getBlobPath(); // Lấy blobPath trước khi xóa entity

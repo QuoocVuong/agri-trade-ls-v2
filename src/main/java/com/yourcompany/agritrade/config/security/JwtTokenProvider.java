@@ -105,8 +105,6 @@ public class JwtTokenProvider {
     }
   }
 
-
-
   // Xác thực JWT
   public boolean validateToken(String authToken) {
     try {

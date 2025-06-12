@@ -6,6 +6,7 @@ import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -45,7 +46,6 @@ public class SecurityConfig {
     return new RestTemplate();
   }
 
-
   @Bean
   public AuthenticationManager authenticationManager(
       AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -56,8 +56,11 @@ public class SecurityConfig {
   @Bean
   CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    // Cho phép origin của Angular dev server
-    configuration.setAllowedOrigins(Arrays.asList("http://localhost:4200"));
+    // Cho phép cả localhost và tất cả các subdomain của vercel.app
+    configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:4200",
+            "https://*.vercel.app" // << DÙNG WILDCARD CHO SUBDOMAIN
+    ));
     // Cho phép các method HTTP phổ biến
     configuration.setAllowedMethods(
         Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
@@ -91,7 +94,9 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(
+                auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(
                         "/api/auth/**", // Auth endpoints
                         "/api/public/**", // Public APIs
                         "/api/files/download/**", // Public file downloads

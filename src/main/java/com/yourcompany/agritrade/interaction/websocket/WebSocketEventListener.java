@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -26,16 +25,13 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 @Slf4j
 public class WebSocketEventListener {
 
-
   private final SimpMessageSendingOperations messagingTemplate; // Để gửi thông báo online/offline
 
   // Lưu trạng thái online đơn giản (UserId -> Set<SessionId>)
   // Dùng ConcurrentHashMap để an toàn trong môi trường đa luồng
   private final Map<Long, Set<String>> onlineUsers = new ConcurrentHashMap<>();
 
-
   private final UserRepository userRepository;
-
 
   // Map lưu trạng thái online (UserId -> isOnline) - Đơn giản hóa
   private final Map<Long, Boolean> onlineUsersStatus = new ConcurrentHashMap<>();
@@ -161,7 +157,6 @@ public class WebSocketEventListener {
       log.debug("Anonymous user unsubscribed from destination: {}", destination);
     }
   }
-
 
   // Hàm helper để gửi thông báo trạng thái
   private void broadcastPresenceStatus(Long userId, String username, boolean isOnline) {

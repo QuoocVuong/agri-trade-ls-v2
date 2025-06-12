@@ -88,8 +88,6 @@ public class PermissionServiceImpl implements PermissionService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Permission", "id", id));
 
-
-
     //  Lấy tất cả Role và kiểm tra
     boolean isInUse =
         roleRepository.findAll().stream()

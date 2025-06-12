@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-
 @Mapper(
     componentModel = "spring",
     uses = {UserMapper.class, ChatMessageMapper.class})
@@ -23,10 +22,7 @@ public abstract class ChatRoomMapper {
   @Autowired protected UserMapper userMapper; // Để map user1, user2
   @Autowired protected ChatMessageMapper chatMessageMapper; // Để map lastMessage
 
-
   @Autowired protected UserRepository userRepository;
-
-
 
   // Map các trường cơ bản
   @Mapping(target = "user1", source = "user1") // Dùng UserMapper -> UserInfoSimpleResponse

@@ -37,9 +37,7 @@ public class FirebaseStorageService implements FileStorageService {
   @Value("${firebase.storage.service-account-key-path}")
   private String serviceAccountKeyPath;
 
-
   private Storage storage; // Client của Google Cloud Storage
-
 
   @PostConstruct // Khởi tạo Firebase Admin SDK khi service được tạo
   @Override
@@ -102,11 +100,7 @@ public class FirebaseStorageService implements FileStorageService {
 
     try {
       BlobId blobId = BlobId.of(bucketName, blobPath);
-      BlobInfo blobInfo =
-          BlobInfo.newBuilder(blobId)
-              .setContentType(file.getContentType())
-
-              .build();
+      BlobInfo blobInfo = BlobInfo.newBuilder(blobId).setContentType(file.getContentType()).build();
 
       // Upload file lên Firebase Storage
       storage.create(blobInfo, file.getBytes());
@@ -128,7 +122,6 @@ public class FirebaseStorageService implements FileStorageService {
     log.warn(
         "loadAll operation is not efficiently supported by FirebaseStorageService. Returning empty stream.");
     return Stream.empty();
-
   }
 
   @Override
@@ -153,7 +146,6 @@ public class FirebaseStorageService implements FileStorageService {
     }
   }
 
-
   @Override // Đảm bảo @Override khớp với interface mới
   public void delete(String blobPath) { // Nhận vào đường dẫn đầy đủ
     try {
@@ -169,7 +161,6 @@ public class FirebaseStorageService implements FileStorageService {
       throw new StorageException("Could not delete file: " + blobPath, e);
     }
   }
-
 
   @Override
   public String getFileUrl(String blobPath) { // Nhận blobPath
@@ -187,8 +178,6 @@ public class FirebaseStorageService implements FileStorageService {
       return "error-generating-url/" + blobPath;
     }
   }
-
-
 
   @Override
   public void deleteAll(String subFolderPrefix) {

@@ -16,20 +16,18 @@ import com.yourcompany.agritrade.ordering.repository.InvoiceRepository;
 import com.yourcompany.agritrade.ordering.repository.OrderRepository;
 import com.yourcompany.agritrade.ordering.repository.specification.InvoiceSpecifications;
 import com.yourcompany.agritrade.ordering.service.InvoiceService;
+import com.yourcompany.agritrade.usermanagement.domain.User;
 import java.awt.*;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-
-import com.yourcompany.agritrade.usermanagement.domain.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,8 +73,12 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setStatus(InvoiceStatus.ISSUED); // Hoặc DRAFT
       }
     }
-    log.info("Creating new invoice {} for order {}. Due date: {}, Status: {}",
-            invoice.getInvoiceNumber(), order.getId(), invoice.getDueDate(), invoice.getStatus());
+    log.info(
+        "Creating new invoice {} for order {}. Due date: {}, Status: {}",
+        invoice.getInvoiceNumber(),
+        order.getId(),
+        invoice.getDueDate(),
+        invoice.getStatus());
     return invoiceRepository.save(invoice);
   }
 
@@ -101,7 +103,6 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     Document document = new Document(PageSize.A4); // Tạo document iText/OpenPDF
-
 
     try {
       PdfWriter writer = PdfWriter.getInstance(document, out);
@@ -287,28 +288,33 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(InvoiceStatus status,  PaymentStatus paymentStatus, String keyword, Pageable pageable) {
-    log.debug("Admin fetching invoices with status: {}, keyword: {}, pageable: {}", status, keyword, pageable);
+  public Page<InvoiceSummaryResponse> getAllInvoicesForAdmin(
+      InvoiceStatus status, PaymentStatus paymentStatus, String keyword, Pageable pageable) {
+    log.debug(
+        "Admin fetching invoices with status: {}, keyword: {}, pageable: {}",
+        status,
+        keyword,
+        pageable);
 
     Specification<Invoice> spec = Specification.where(null); // Bắt đầu với một spec trống
 
     if (status != null) {
       spec = spec.and(InvoiceSpecifications.hasStatus(status));
     }
-    if (paymentStatus != null) spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
+    if (paymentStatus != null)
+      spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
 
     if (StringUtils.hasText(keyword)) {
       // Tìm kiếm theo invoiceNumber, orderCode, hoặc buyerFullName
-      Specification<Invoice> keywordSpec = Specification.anyOf(
+      Specification<Invoice> keywordSpec =
+          Specification.anyOf(
               InvoiceSpecifications.hasInvoiceNumber(keyword),
               InvoiceSpecifications.hasOrderCode(keyword),
-              InvoiceSpecifications.hasBuyerFullName(keyword)
-      );
+              InvoiceSpecifications.hasBuyerFullName(keyword));
       spec = spec.and(keywordSpec);
     }
 
     spec = spec.and(InvoiceSpecifications.fetchOrderAndBuyer());
-
 
     Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
     return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
@@ -316,51 +322,66 @@ public class InvoiceServiceImpl implements InvoiceService {
 
   @Override
   @Transactional(readOnly = true)
-  public Page<InvoiceSummaryResponse> getInvoicesForFarmer(Authentication authentication, InvoiceStatus status, PaymentStatus paymentStatus, String keyword, Pageable pageable) {
+  public Page<InvoiceSummaryResponse> getInvoicesForFarmer(
+      Authentication authentication,
+      InvoiceStatus status,
+      PaymentStatus paymentStatus,
+      String keyword,
+      Pageable pageable) {
     User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // Hàm helper của bạn
-    Specification<Invoice> spec = Specification.where(InvoiceSpecifications.fetchOrderAndBuyer())
+    Specification<Invoice> spec =
+        Specification.where(InvoiceSpecifications.fetchOrderAndBuyer())
             .and(InvoiceSpecifications.isFarmerInvoice(farmer.getId())); // Spec mới
 
     if (status != null) spec = spec.and(InvoiceSpecifications.hasStatus(status));
-    if (paymentStatus != null) spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
+    if (paymentStatus != null)
+      spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
     if (StringUtils.hasText(keyword)) {
       // Farmer có thể tìm theo mã HĐ, mã ĐH, tên người mua của hóa đơn họ
-      spec = spec.and(Specification.anyOf(
-              InvoiceSpecifications.hasInvoiceNumber(keyword),
-              InvoiceSpecifications.hasOrderCode(keyword),
-              InvoiceSpecifications.hasBuyerFullName(keyword) // Vẫn giữ vì farmer cần biết của buyer nào
-      ));
+      spec =
+          spec.and(
+              Specification.anyOf(
+                  InvoiceSpecifications.hasInvoiceNumber(keyword),
+                  InvoiceSpecifications.hasOrderCode(keyword),
+                  InvoiceSpecifications.hasBuyerFullName(
+                      keyword) // Vẫn giữ vì farmer cần biết của buyer nào
+                  ));
     }
     Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
     return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
   }
 
   @Transactional(readOnly = true)
-  public Page<InvoiceSummaryResponse> getInvoicesForBuyer(Authentication authentication, InvoiceStatus status,  PaymentStatus paymentStatus, String keyword, Pageable pageable) {
+  public Page<InvoiceSummaryResponse> getInvoicesForBuyer(
+      Authentication authentication,
+      InvoiceStatus status,
+      PaymentStatus paymentStatus,
+      String keyword,
+      Pageable pageable) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser();
 
-    Specification<Invoice> spec = Specification.where(InvoiceSpecifications.fetchOrderAndBuyer()) // Fetch thông tin cần thiết
+    Specification<Invoice> spec =
+        Specification.where(InvoiceSpecifications.fetchOrderAndBuyer()) // Fetch thông tin cần thiết
             .and(InvoiceSpecifications.isBuyerInvoice(buyer.getId())); // Spec mới
 
     if (status != null) {
       spec = spec.and(InvoiceSpecifications.hasStatus(status));
     }
-    if (paymentStatus != null) spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
+    if (paymentStatus != null)
+      spec = spec.and(InvoiceSpecifications.hasOrderPaymentStatus(paymentStatus));
     if (StringUtils.hasText(keyword)) {
       // Buyer có thể tìm theo mã HĐ hoặc mã ĐH
-      spec = spec.and(Specification.anyOf(
-              InvoiceSpecifications.hasInvoiceNumber(keyword),
-              InvoiceSpecifications.hasOrderCode(keyword)
-      ));
+      spec =
+          spec.and(
+              Specification.anyOf(
+                  InvoiceSpecifications.hasInvoiceNumber(keyword),
+                  InvoiceSpecifications.hasOrderCode(keyword)));
     }
 
     // Chỉ lấy các hóa đơn có phương thức thanh toán là INVOICE
     spec = spec.and(InvoiceSpecifications.hasPaymentMethod(PaymentMethod.INVOICE));
 
-
     Page<Invoice> invoicePage = invoiceRepository.findAll(spec, pageable);
     return invoiceMapper.toInvoiceSummaryResponsePage(invoicePage);
   }
-
-
 }

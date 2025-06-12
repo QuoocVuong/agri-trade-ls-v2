@@ -68,7 +68,6 @@ public class FavoriteServiceImpl implements FavoriteService {
 
     favoriteProductRepository.deleteByUserIdAndProductId(user.getId(), productId);
 
-
     updateFavoriteCount(productId, false); // Gọi hàm cập nhật count
 
     log.info("User {} removed product {} from favorites", user.getId(), productId);

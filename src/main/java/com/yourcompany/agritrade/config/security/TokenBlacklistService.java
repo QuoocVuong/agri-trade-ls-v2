@@ -40,7 +40,6 @@ public class TokenBlacklistService {
         log.info("JTI {} added to blacklist with TTL: {} ms", jti, ttlMillis);
       } catch (Exception e) {
         log.error("Error adding JTI {} to Redis blacklist: {}", jti, e.getMessage(), e);
-
       }
     } else {
       log.warn(

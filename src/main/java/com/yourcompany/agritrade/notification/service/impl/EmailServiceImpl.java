@@ -6,6 +6,8 @@ import com.yourcompany.agritrade.ordering.domain.*;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,9 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
-
-import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +36,7 @@ public class EmailServiceImpl implements EmailService {
   @Value("${app.mail.sender-name}")
   private String appMailSenderName;
 
-  @Value("${app.frontend.url:http://localhost:4200}")
+  @Value("${app.frontend.url}")
   private String frontendUrl;
 
   @Value("${app.name:AgriTrade}")
@@ -77,8 +76,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("username", user.getFullName());
     context.setVariable("appName", appName);
     context.setVariable("loginUrl", frontendUrl + "/auth/login"); // Ví dụ link đăng nhập
-    String htmlBody =
-        thymeleafTemplateEngine.process("mail/welcome", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/welcome", context);
     sendHtmlEmail(subject, user.getEmail(), htmlBody);
   }
 
@@ -89,8 +87,7 @@ public class EmailServiceImpl implements EmailService {
     Context context = new Context();
     context.setVariable("username", user.getFullName());
     context.setVariable("appName", appName);
-    String htmlBody =
-        thymeleafTemplateEngine.process("mail/password-changed", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/password-changed", context);
     sendHtmlEmail(subject, user.getEmail(), htmlBody);
   }
 
@@ -106,9 +103,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable(
         "orderUrl", frontendUrl + "/orders/" + order.getId()); // Link chi tiết đơn hàng
     context.setVariable("appName", appName);
-    String htmlBody =
-        thymeleafTemplateEngine.process(
-            "mail/order-confirmation-buyer", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/order-confirmation-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -123,8 +118,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable(
         "orderUrl", frontendUrl + "/farmer/orders/" + order.getId()); // Link quản lý đơn hàng
     context.setVariable("appName", appName);
-    String htmlBody =
-        thymeleafTemplateEngine.process("mail/new-order-farmer", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/new-order-farmer", context);
     sendHtmlEmail(subject, order.getFarmer().getEmail(), htmlBody);
   }
 
@@ -143,9 +137,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("previousStatus", previousStatus.name());
     context.setVariable("orderUrl", frontendUrl + "/orders/" + order.getId());
     context.setVariable("appName", appName);
-    String htmlBody =
-        thymeleafTemplateEngine.process(
-            "mail/order-status-update-buyer", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/order-status-update-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -159,9 +151,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("buyerName", order.getBuyer().getFullName());
     context.setVariable("orderUrl", frontendUrl + "/orders/" + order.getId());
     context.setVariable("appName", appName);
-    String htmlBody =
-        thymeleafTemplateEngine.process(
-            "mail/order-cancellation-buyer", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/order-cancellation-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -176,9 +166,7 @@ public class EmailServiceImpl implements EmailService {
         "buyerName", order.getBuyer().getFullName()); // Thông báo cho farmer biết ai hủy
     context.setVariable("orderUrl", frontendUrl + "/farmer/orders/" + order.getId());
     context.setVariable("appName", appName);
-    String htmlBody =
-        thymeleafTemplateEngine.process(
-            "mail/order-cancellation-farmer", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/order-cancellation-farmer", context);
     sendHtmlEmail(subject, order.getFarmer().getEmail(), htmlBody);
   }
 
@@ -194,9 +182,7 @@ public class EmailServiceImpl implements EmailService {
     context.setVariable("buyerName", order.getBuyer().getFullName());
     context.setVariable("orderUrl", frontendUrl + "/orders/" + order.getId());
     context.setVariable("appName", appName);
-    String htmlBody =
-        thymeleafTemplateEngine.process(
-            "mail/payment-success-buyer", context);
+    String htmlBody = thymeleafTemplateEngine.process("mail/payment-success-buyer", context);
     sendHtmlEmail(subject, order.getBuyer().getEmail(), htmlBody);
   }
 
@@ -254,8 +240,7 @@ public class EmailServiceImpl implements EmailService {
 
   @Override
   @Async("taskExecutor")
-  public void sendProductRejectedEmailToFarmer(
-      Product product, String reason, User farmer) {
+  public void sendProductRejectedEmailToFarmer(Product product, String reason, User farmer) {
     if (farmer == null || farmer.getEmail() == null) {
       log.error(
           "Cannot send product rejected email. Farmer or farmer email is null for product ID: {}",
@@ -291,19 +276,26 @@ public class EmailServiceImpl implements EmailService {
       return;
     }
     User buyer = invoice.getOrder().getBuyer();
-    String subject = String.format("[%s] Nhắc nhở: Hóa đơn #%s đã quá hạn thanh toán", appName, invoice.getInvoiceNumber());
+    String subject =
+        String.format(
+            "[%s] Nhắc nhở: Hóa đơn #%s đã quá hạn thanh toán",
+            appName, invoice.getInvoiceNumber());
     Context context = new Context();
     context.setVariable("buyerName", buyer.getFullName());
     context.setVariable("invoiceNumber", invoice.getInvoiceNumber());
     context.setVariable("orderCode", invoice.getOrder().getOrderCode());
-    context.setVariable("dueDate", invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+    context.setVariable(
+        "dueDate", invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
     context.setVariable("totalAmount", invoice.getTotalAmount());
     context.setVariable("orderUrl", frontendUrl + "/user/orders/" + invoice.getOrder().getId());
     context.setVariable("appName", appName);
 
     String htmlBody = thymeleafTemplateEngine.process("mail/invoice-overdue-reminder", context);
     sendHtmlEmail(subject, buyer.getEmail(), htmlBody);
-    log.info("Sent overdue invoice reminder email for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+    log.info(
+        "Sent overdue invoice reminder email for invoice {} to buyer {}",
+        invoice.getInvoiceNumber(),
+        buyer.getEmail());
   }
 
   @Override
@@ -314,36 +306,58 @@ public class EmailServiceImpl implements EmailService {
       return;
     }
     User buyer = invoice.getOrder().getBuyer();
-    String subject = String.format("[%s] Nhắc nhở: Hóa đơn #%s sắp đến hạn thanh toán", appName, invoice.getInvoiceNumber());
+    String subject =
+        String.format(
+            "[%s] Nhắc nhở: Hóa đơn #%s sắp đến hạn thanh toán",
+            appName, invoice.getInvoiceNumber());
     Context context = new Context();
     context.setVariable("buyerName", buyer.getFullName());
     context.setVariable("invoiceNumber", invoice.getInvoiceNumber());
     context.setVariable("orderCode", invoice.getOrder().getOrderCode());
-    context.setVariable("dueDate", invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+    context.setVariable(
+        "dueDate", invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
     context.setVariable("totalAmount", invoice.getTotalAmount());
     context.setVariable("orderUrl", frontendUrl + "/user/orders/" + invoice.getOrder().getId());
     context.setVariable("appName", appName);
 
     String htmlBody = thymeleafTemplateEngine.process("mail/invoice-due-soon-reminder", context);
     sendHtmlEmail(subject, buyer.getEmail(), htmlBody);
-    log.info("Sent due soon invoice reminder email for invoice {} to buyer {}", invoice.getInvoiceNumber(), buyer.getEmail());
+    log.info(
+        "Sent due soon invoice reminder email for invoice {} to buyer {}",
+        invoice.getInvoiceNumber(),
+        buyer.getEmail());
   }
 
   @Override
   @Async("taskExecutor")
   public void sendOverdueInvoiceAdminEmail(Invoice invoice, List<User> adminUsers) {
     if (invoice == null || adminUsers == null || adminUsers.isEmpty()) {
-      log.warn("Cannot send overdue invoice admin email: invoice or adminUsers list is null/empty.");
+      log.warn(
+          "Cannot send overdue invoice admin email: invoice or adminUsers list is null/empty.");
       return;
     }
-    String subject = String.format("[%s] Cảnh báo: Hóa đơn #%s đã quá hạn", appName, invoice.getInvoiceNumber());
+    String subject =
+        String.format("[%s] Cảnh báo: Hóa đơn #%s đã quá hạn", appName, invoice.getInvoiceNumber());
     Context context = new Context();
     context.setVariable("invoiceNumber", invoice.getInvoiceNumber());
-    context.setVariable("orderCode", invoice.getOrder() != null ? invoice.getOrder().getOrderCode() : "N/A");
-    context.setVariable("buyerName", invoice.getOrder() != null && invoice.getOrder().getBuyer() != null ? invoice.getOrder().getBuyer().getFullName() : "N/A");
-    context.setVariable("dueDate", invoice.getDueDate() != null ? invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A");
+    context.setVariable(
+        "orderCode", invoice.getOrder() != null ? invoice.getOrder().getOrderCode() : "N/A");
+    context.setVariable(
+        "buyerName",
+        invoice.getOrder() != null && invoice.getOrder().getBuyer() != null
+            ? invoice.getOrder().getBuyer().getFullName()
+            : "N/A");
+    context.setVariable(
+        "dueDate",
+        invoice.getDueDate() != null
+            ? invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+            : "N/A");
     context.setVariable("totalAmount", invoice.getTotalAmount());
-    context.setVariable("adminOrderUrl", frontendUrl + "/admin/orders/" + (invoice.getOrder() != null ? invoice.getOrder().getId() : ""));
+    context.setVariable(
+        "adminOrderUrl",
+        frontendUrl
+            + "/admin/orders/"
+            + (invoice.getOrder() != null ? invoice.getOrder().getId() : ""));
     context.setVariable("appName", appName);
 
     String htmlBody = thymeleafTemplateEngine.process("mail/invoice-overdue-admin-alert", context);
@@ -351,12 +365,13 @@ public class EmailServiceImpl implements EmailService {
     for (User admin : adminUsers) {
       if (admin != null && StringUtils.hasText(admin.getEmail())) {
         sendHtmlEmail(subject, admin.getEmail(), htmlBody);
-        log.info("Sent overdue invoice admin alert for invoice {} to admin {}", invoice.getInvoiceNumber(), admin.getEmail());
+        log.info(
+            "Sent overdue invoice admin alert for invoice {} to admin {}",
+            invoice.getInvoiceNumber(),
+            admin.getEmail());
       }
     }
   }
-
-
 
   // --- Private Helper Method ---
   private void sendHtmlEmail(String subject, String recipientEmail, String htmlContent) {
@@ -367,9 +382,7 @@ public class EmailServiceImpl implements EmailService {
     MimeMessage message = mailSender.createMimeMessage();
     try {
       MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-      helper.setFrom(
-          appMailFrom,
-          appMailSenderName);
+      helper.setFrom(appMailFrom, appMailSenderName);
       helper.setTo(recipientEmail);
       helper.setSubject(subject);
       helper.setText(htmlContent, true); // true = HTML content

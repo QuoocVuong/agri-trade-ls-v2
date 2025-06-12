@@ -19,8 +19,6 @@ public interface ChatService {
   /** Lấy danh sách các phòng chat của user hiện tại (phân trang hoặc không) */
   List<ChatRoomResponse> getMyChatRooms(Authentication authentication);
 
-
-
   /** Lấy lịch sử tin nhắn của một phòng chat (phân trang) */
   Page<ChatMessageResponse> getChatMessages(
       Authentication authentication, Long roomId, Pageable pageable);

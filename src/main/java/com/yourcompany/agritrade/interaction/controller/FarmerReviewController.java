@@ -26,7 +26,6 @@ public class FarmerReviewController {
   @GetMapping
   public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getMyProductReviews(
       Authentication authentication,
-
       @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
 
@@ -37,6 +36,4 @@ public class FarmerReviewController {
 
     return ResponseEntity.ok(ApiResponse.success(reviews));
   }
-
-
 }

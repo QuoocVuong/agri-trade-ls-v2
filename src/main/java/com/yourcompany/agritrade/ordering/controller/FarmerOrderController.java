@@ -17,7 +17,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -31,17 +30,17 @@ public class FarmerOrderController {
   // Lấy danh sách đơn hàng MÀ MÌNH LÀ NGƯỜI BÁN
   @GetMapping("/my")
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsFarmer(
-          Authentication authentication,
-          @RequestParam(required = false) String keyword,
-          @RequestParam(required = false) OrderStatus status,
-          @RequestParam(required = false) PaymentMethod paymentMethod,
-          @RequestParam(required = false) PaymentStatus paymentStatus,
-          @RequestParam(required = false) OrderType orderType,
-          @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
-
+      Authentication authentication,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) OrderStatus status,
+      @RequestParam(required = false) PaymentMethod paymentMethod,
+      @RequestParam(required = false) PaymentStatus paymentStatus,
+      @RequestParam(required = false) OrderType orderType,
+      @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
     Page<OrderSummaryResponse> orders =
-        orderService.getMyOrdersAsFarmer(authentication, keyword, status, paymentMethod, paymentStatus, orderType, pageable);
+        orderService.getMyOrdersAsFarmer(
+            authentication, keyword, status, paymentMethod, paymentStatus, orderType, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 
@@ -60,9 +59,7 @@ public class FarmerOrderController {
       Authentication authentication,
       @PathVariable Long orderId,
       @Valid @RequestBody OrderStatusUpdateRequest request) {
-    OrderResponse updatedOrder =
-        orderService.updateOrderStatus(
-            authentication, orderId, request);
+    OrderResponse updatedOrder = orderService.updateOrderStatus(authentication, orderId, request);
     return ResponseEntity.ok(
         ApiResponse.success(updatedOrder, "Order status updated successfully"));
   }

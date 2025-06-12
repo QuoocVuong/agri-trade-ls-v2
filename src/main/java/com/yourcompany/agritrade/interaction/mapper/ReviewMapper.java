@@ -44,6 +44,4 @@ public interface ReviewMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   Review requestToReview(ReviewRequest request);
-
-
 }

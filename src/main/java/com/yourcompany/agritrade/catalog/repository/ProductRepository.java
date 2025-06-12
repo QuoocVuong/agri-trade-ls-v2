@@ -40,9 +40,6 @@ public interface ProductRepository
   // Đếm sản phẩm theo category (hữu ích khi xóa category)
   long countByCategoryId(Integer categoryId);
 
-
-
-
   /**
    * Tìm các sản phẩm khác trong cùng danh mục (đã published, không bao gồm sản phẩm hiện tại). Giới
    * hạn số lượng trả về.
@@ -97,8 +94,9 @@ public interface ProductRepository
 
   // Đếm sản phẩm sắp hết hàng của Farmer (ví dụ: < 5)
   Long countByFarmerIdAndStockQuantityLessThan(Long farmerId, int threshold);
-  Long countByFarmerIdAndB2bEnabledAndStockQuantityLessThan(Long farmerId, boolean b2bEnabled, int threshold);
 
+  Long countByFarmerIdAndB2bEnabledAndStockQuantityLessThan(
+      Long farmerId, boolean b2bEnabled, int threshold);
 
   @Query(
       "SELECT new com.yourcompany.agritrade.catalog.dto.response.TopProductResponse("
@@ -116,7 +114,6 @@ public interface ProductRepository
   // Đếm sản phẩm theo trạng thái (cho Admin)
   Long countByStatus(ProductStatus status);
 
-
   Page<Product> findByFarmerIdAndStatus(Long farmerId, ProductStatus status, Pageable pageable);
 
   @Query(
@@ -130,7 +127,4 @@ public interface ProductRepository
 
   @Query("SELECT p FROM Product p LEFT JOIN FETCH p.images WHERE p.id IN :ids")
   List<Product> findByIdInWithImages(@Param("ids") List<Long> ids);
-
-
-
 }

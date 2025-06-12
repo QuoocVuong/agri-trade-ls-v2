@@ -83,7 +83,7 @@ public class UserServiceImpl implements UserService {
 
   private static final String MSG_USER_NOT_FOUND_WITH_EMAIL = "User not found with email: ";
 
-  @Value("${app.frontend.url:http://localhost:4200}") // Lấy URL frontend
+  @Value("${app.frontend.url}") // Lấy URL frontend
   private String frontendUrl;
 
   @Value("${google.auth.client-id}")
@@ -436,7 +436,6 @@ public class UserServiceImpl implements UserService {
     // Có thể gửi email thông báo đổi mật khẩu thành công (tùy chọn)
   }
 
-
   @Override
   @Transactional(readOnly = true)
   public List<FarmerSummaryResponse> getFeaturedFarmers(int limit) {
@@ -473,9 +472,6 @@ public class UserServiceImpl implements UserService {
     return responseList;
   }
 
-
-
-
   @Override
   @Transactional(readOnly = true)
   public Page<FarmerSummaryResponse> searchPublicFarmers(
@@ -486,12 +482,10 @@ public class UserServiceImpl implements UserService {
         provinceCode,
         pageable);
 
-
     Specification<FarmerProfile> spec =
         Specification.where(isVerified()) // Lọc profile đã VERIFIED
             .and(hasKeywordInProfileOrUser(keyword)) // Lọc theo keyword
             .and(hasProvince(provinceCode)); // Lọc theo tỉnh
-
 
     Page<FarmerProfile> farmerProfilePage = farmerProfileRepository.findAll(spec, pageable);
 
@@ -508,7 +502,7 @@ public class UserServiceImpl implements UserService {
             // để tránh lỗi filter sau này và giữ đúng cấu trúc Page
             return new FarmerSummaryResponse(
                 profile.getUserId(),
-                    profile.getUserId(),
+                profile.getUserId(),
                 profile.getFarmName(),
                 "[User not found]",
                 null,
@@ -519,8 +513,6 @@ public class UserServiceImpl implements UserService {
           return farmerSummaryMapper.toFarmerSummaryResponse(user, profile);
         }); // <-- Bỏ .filter(Objects::nonNull) ở đây
   }
-
-
 
   // --- Specification Helper Methods ---
   private Specification<FarmerProfile> isVerified() {
@@ -559,7 +551,6 @@ public class UserServiceImpl implements UserService {
       // Tạo các điều kiện LIKE
       Predicate nameLike = cb.like(cb.lower(root.get("fullName")), pattern);
       Predicate farmNameLike = cb.like(cb.lower(profileJoin.get("farmName")), pattern);
-
 
       // Kết hợp bằng OR
       return cb.or(nameLike, farmNameLike /*, descriptionLike */);
@@ -624,7 +615,6 @@ public class UserServiceImpl implements UserService {
     String name = (String) payload.get("name");
     String pictureUrl = (String) payload.get("picture");
 
-
     if (!emailVerified) {
       throw new BadRequestException("Google account email is not verified.");
     }
@@ -638,8 +628,7 @@ public class UserServiceImpl implements UserService {
     // 4. Tạo JWT cho user của bạn
     // Cần tạo đối tượng Authentication thủ công để generateToken
     // Lấy authorities từ user đã tìm/tạo
-    Collection<? extends GrantedAuthority> authorities =
-        mapRolesToAuthorities(user.getRoles());
+    Collection<? extends GrantedAuthority> authorities = mapRolesToAuthorities(user.getRoles());
     UsernamePasswordAuthenticationToken authentication =
         new UsernamePasswordAuthenticationToken(
             user.getEmail(), null, mapRolesToAuthorities(user.getRoles()));
@@ -658,7 +647,12 @@ public class UserServiceImpl implements UserService {
   }
 
   // Hàm helper tìm hoặc tạo user
-  private User findOrCreateUserForOAuth2(String email, String fullName, String avatarUrl, String googleProviderName, String googleProviderId) {
+  private User findOrCreateUserForOAuth2(
+      String email,
+      String fullName,
+      String avatarUrl,
+      String googleProviderName,
+      String googleProviderId) {
     // Luôn chuẩn hóa email về chữ thường để đảm bảo tính nhất quán khi truy vấn
     String normalizedEmail = email.toLowerCase();
 
@@ -670,12 +664,19 @@ public class UserServiceImpl implements UserService {
       User existingUser = userOptional.get();
       String currentProvider = existingUser.getProvider(); // Lấy provider hiện tại của user
 
-      // Kiểm tra xem user hiện tại có phải là user GOOGLE, LOCAL hoặc chưa có provider (null) không.
+      // Kiểm tra xem user hiện tại có phải là user GOOGLE, LOCAL hoặc chưa có provider (null)
+      // không.
       // Điều này cho phép liên kết tài khoản Google với tài khoản LOCAL đã có,
       // hoặc đăng nhập lại nếu đã từng đăng nhập bằng Google.
-      if (googleProviderName.equals(currentProvider) || currentProvider == null || "LOCAL".equalsIgnoreCase(currentProvider)) {
+      if (googleProviderName.equals(currentProvider)
+          || currentProvider == null
+          || "LOCAL".equalsIgnoreCase(currentProvider)) {
 
-        log.info("User {} found. Current provider: {}. Attempting to login/link with provider: {}", normalizedEmail, currentProvider, googleProviderName);
+        log.info(
+            "User {} found. Current provider: {}. Attempting to login/link with provider: {}",
+            normalizedEmail,
+            currentProvider,
+            googleProviderName);
 
         boolean needsUpdate = false; // Cờ để theo dõi xem có cần lưu lại user không
 
@@ -684,12 +685,18 @@ public class UserServiceImpl implements UserService {
           existingUser.setProvider(googleProviderName);
           existingUser.setProviderId(googleProviderId);
           needsUpdate = true;
-          log.debug("Linking Google account to existing LOCAL/null provider user: {}", normalizedEmail);
-        } else if (googleProviderId != null && !googleProviderId.equals(existingUser.getProviderId())) {
+          log.debug(
+              "Linking Google account to existing LOCAL/null provider user: {}", normalizedEmail);
+        } else if (googleProviderId != null
+            && !googleProviderId.equals(existingUser.getProviderId())) {
           // Trường hợp hiếm: providerId từ Google thay đổi cho cùng một email. Cập nhật nếu cần.
           existingUser.setProviderId(googleProviderId);
           needsUpdate = true;
-          log.warn("Google providerId for user {} changed from {} to {}. Updating.", normalizedEmail, existingUser.getProviderId(), googleProviderId);
+          log.warn(
+              "Google providerId for user {} changed from {} to {}. Updating.",
+              normalizedEmail,
+              existingUser.getProviderId(),
+              googleProviderId);
         }
 
         // Cập nhật thông tin cá nhân (tên, avatar) nếu có từ Google và khác với thông tin hiện tại
@@ -709,7 +716,9 @@ public class UserServiceImpl implements UserService {
           existingUser.setVerificationToken(null);
           existingUser.setVerificationTokenExpiry(null);
           needsUpdate = true;
-          log.debug("Activating user {} and clearing verification token due to Google Sign-In.", normalizedEmail);
+          log.debug(
+              "Activating user {} and clearing verification token due to Google Sign-In.",
+              normalizedEmail);
         }
 
         // Nếu có bất kỳ thay đổi nào, lưu lại user vào DB
@@ -719,14 +728,26 @@ public class UserServiceImpl implements UserService {
             return userRepository.save(existingUser);
           } catch (DataIntegrityViolationException dive) {
             // Xử lý lỗi nếu có vi phạm ràng buộc dữ liệu khi cập nhật
-            log.error("Data integrity violation while updating existing OAuth2 user {}: {}. Root cause: {}",
-                    normalizedEmail, dive.getMessage(), dive.getRootCause() != null ? dive.getRootCause().getMessage() : "N/A", dive);
-            throw new BadRequestException("Error updating user data. Possible data conflict: " +
-                    (dive.getRootCause() != null ? dive.getRootCause().getMessage() : dive.getMessage()));
+            log.error(
+                "Data integrity violation while updating existing OAuth2 user {}: {}. Root cause: {}",
+                normalizedEmail,
+                dive.getMessage(),
+                dive.getRootCause() != null ? dive.getRootCause().getMessage() : "N/A",
+                dive);
+            throw new BadRequestException(
+                "Error updating user data. Possible data conflict: "
+                    + (dive.getRootCause() != null
+                        ? dive.getRootCause().getMessage()
+                        : dive.getMessage()));
           } catch (Exception e) {
             // Xử lý các lỗi không mong muốn khác
-            log.error("Unexpected error updating existing OAuth2 user {}: {}", normalizedEmail, e.getMessage(), e);
-            throw new RuntimeException("Failed to update user during OAuth2 process: " + e.getMessage(), e);
+            log.error(
+                "Unexpected error updating existing OAuth2 user {}: {}",
+                normalizedEmail,
+                e.getMessage(),
+                e);
+            throw new RuntimeException(
+                "Failed to update user during OAuth2 process: " + e.getMessage(), e);
           }
         }
         // Nếu không có gì cần cập nhật, trả về user hiện tại
@@ -735,19 +756,28 @@ public class UserServiceImpl implements UserService {
       } else {
         // User đã tồn tại nhưng với một provider OAuth2 khác (ví dụ: Facebook)
         // và không phải là LOCAL hoặc null. Không cho phép liên kết tự động.
-        log.warn("User with email {} already exists with provider {} (expected {} or LOCAL/null). Cannot link Google account.",
-                normalizedEmail, currentProvider, googleProviderName);
+        log.warn(
+            "User with email {} already exists with provider {} (expected {} or LOCAL/null). Cannot link Google account.",
+            normalizedEmail,
+            currentProvider,
+            googleProviderName);
         throw new BadRequestException(
-                "Tài khoản với email này đã được đăng ký bằng một phương thức khác (" + currentProvider
-                        + ") không thể tự động liên kết với Google."
-        );
+            "Tài khoản với email này đã được đăng ký bằng một phương thức khác ("
+                + currentProvider
+                + ") không thể tự động liên kết với Google.");
       }
     } else {
       // Kịch bản: User chưa tồn tại trong DB, tạo user mới
-      log.info("User with email {} not found. Creating new user from OAuth2 provider {}.", normalizedEmail, googleProviderName);
+      log.info(
+          "User with email {} not found. Creating new user from OAuth2 provider {}.",
+          normalizedEmail,
+          googleProviderName);
       User newUser = new User();
       newUser.setEmail(normalizedEmail);
-      newUser.setFullName(fullName != null ? fullName : "Người dùng " + googleProviderName); // Tên mặc định nếu không có
+      newUser.setFullName(
+          fullName != null
+              ? fullName
+              : "Người dùng " + googleProviderName); // Tên mặc định nếu không có
       newUser.setAvatarUrl(avatarUrl);
       // Tạo mật khẩu ngẫu nhiên vì user OAuth2 không dùng mật khẩu của ứng dụng
       newUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
@@ -759,17 +789,22 @@ public class UserServiceImpl implements UserService {
       newUser.setVerificationToken(null);
       newUser.setVerificationTokenExpiry(null);
 
-
-
       try {
         // Gán vai trò mặc định cho user mới (ví dụ: ROLE_CONSUMER)
-        Role defaultRole = roleRepository.findByName(RoleType.ROLE_CONSUMER)
-                .orElseThrow(() -> {
-                  // Lỗi nghiêm trọng nếu role mặc định không được cấu hình trong DB
-                  log.error("Default role {} not found in database. Cannot create new OAuth2 user.", RoleType.ROLE_CONSUMER.name());
-                  // Ném ResourceNotFoundException để controller có thể bắt và trả về lỗi 500 hoặc 400 phù hợp
-                  return new ResourceNotFoundException("Role", "name", RoleType.ROLE_CONSUMER.name());
-                });
+        Role defaultRole =
+            roleRepository
+                .findByName(RoleType.ROLE_CONSUMER)
+                .orElseThrow(
+                    () -> {
+                      // Lỗi nghiêm trọng nếu role mặc định không được cấu hình trong DB
+                      log.error(
+                          "Default role {} not found in database. Cannot create new OAuth2 user.",
+                          RoleType.ROLE_CONSUMER.name());
+                      // Ném ResourceNotFoundException để controller có thể bắt và trả về lỗi 500
+                      // hoặc 400 phù hợp
+                      return new ResourceNotFoundException(
+                          "Role", "name", RoleType.ROLE_CONSUMER.name());
+                    });
 
         // Sử dụng một Set có thể thay đổi (mutable) như HashSet
         // để tránh UnsupportedOperationException khi Hibernate quản lý collection
@@ -777,24 +812,41 @@ public class UserServiceImpl implements UserService {
         roles.add(defaultRole);
         newUser.setRoles(roles);
 
-        log.info("Attempting to save new user from OAuth2 provider {}: {}", googleProviderName, normalizedEmail);
+        log.info(
+            "Attempting to save new user from OAuth2 provider {}: {}",
+            googleProviderName,
+            normalizedEmail);
         return userRepository.save(newUser);
       } catch (ResourceNotFoundException rnfe) {
         // Xử lý lỗi nếu không tìm thấy role mặc định
-        log.error("Failed to create new OAuth2 user {} due to missing default role: {}", normalizedEmail, rnfe.getMessage(), rnfe);
+        log.error(
+            "Failed to create new OAuth2 user {} due to missing default role: {}",
+            normalizedEmail,
+            rnfe.getMessage(),
+            rnfe);
         // Ném lại RuntimeException để báo hiệu lỗi cấu hình server
         throw new RuntimeException("Server configuration error: " + rnfe.getMessage(), rnfe);
       } catch (DataIntegrityViolationException dive) {
         // Xử lý lỗi nếu có vi phạm ràng buộc dữ liệu khi tạo user mới
-        // (ví dụ: một trường unique khác ngoài email bị trùng, dù ít khả năng xảy ra ở đây nếu logic đúng)
-        log.error("Data integrity violation while creating new OAuth2 user {}: {}. Root cause: {}",
-                normalizedEmail, dive.getMessage(), dive.getRootCause() != null ? dive.getRootCause().getMessage() : "N/A", dive);
-        throw new BadRequestException("Error creating user. Possible duplicate entry or data conflict: " +
-                (dive.getRootCause() != null ? dive.getRootCause().getMessage() : dive.getMessage()));
+        // (ví dụ: một trường unique khác ngoài email bị trùng, dù ít khả năng xảy ra ở đây nếu
+        // logic đúng)
+        log.error(
+            "Data integrity violation while creating new OAuth2 user {}: {}. Root cause: {}",
+            normalizedEmail,
+            dive.getMessage(),
+            dive.getRootCause() != null ? dive.getRootCause().getMessage() : "N/A",
+            dive);
+        throw new BadRequestException(
+            "Error creating user. Possible duplicate entry or data conflict: "
+                + (dive.getRootCause() != null
+                    ? dive.getRootCause().getMessage()
+                    : dive.getMessage()));
       } catch (Exception e) {
         // Xử lý các lỗi không mong muốn khác
-        log.error("Unexpected error creating new OAuth2 user {}: {}", normalizedEmail, e.getMessage(), e);
-        throw new RuntimeException("Failed to create user during OAuth2 process: " + e.getMessage(), e);
+        log.error(
+            "Unexpected error creating new OAuth2 user {}: {}", normalizedEmail, e.getMessage(), e);
+        throw new RuntimeException(
+            "Failed to create user during OAuth2 process: " + e.getMessage(), e);
       }
     }
   }
@@ -841,9 +893,9 @@ public class UserServiceImpl implements UserService {
           "Refresh token for user {} is invalid, not matching DB, or expired in DB. Forcing re-login.",
           email);
       // (Tùy chọn) Thu hồi tất cả refresh token của user này nếu phát hiện lạm dụng hoặc token cũ
-       user.setRefreshToken(null);
-       user.setRefreshTokenExpiryDate(null);
-       userRepository.save(user);
+      user.setRefreshToken(null);
+      user.setRefreshTokenExpiryDate(null);
+      userRepository.save(user);
       throw new BadRequestException("Refresh token is invalid or expired. Please login again.");
     }
 
@@ -886,8 +938,10 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional(readOnly = true)
   public Page<UserResponse> searchBuyers(String keyword, Pageable pageable) {
-    Specification<User> spec = Specification.where(UserSpecification.isActive(true))
-            .and(Specification.where(UserSpecification.hasRole(RoleType.ROLE_CONSUMER))
+    Specification<User> spec =
+        Specification.where(UserSpecification.isActive(true))
+            .and(
+                Specification.where(UserSpecification.hasRole(RoleType.ROLE_CONSUMER))
                     .or(UserSpecification.hasRole(RoleType.ROLE_BUSINESS_BUYER))
                     .or(UserSpecification.hasRole(RoleType.ROLE_FARMER)));
 

@@ -5,7 +5,6 @@ import com.yourcompany.agritrade.ordering.domain.Invoice;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.usermanagement.domain.User;
-
 import java.util.List;
 
 public interface EmailService {
@@ -35,13 +34,14 @@ public interface EmailService {
 
   void sendPaymentFailureEmailToBuyer(Order order);
 
-
   void sendProductApprovedEmailToFarmer(Product product, User farmer);
 
   void sendProductRejectedEmailToFarmer(Product product, String reason, User farmer);
 
   // --- Invoice Related ---
   void sendOverdueInvoiceReminderEmail(Invoice invoice);
+
   void sendDueSoonInvoiceReminderEmail(Invoice invoice);
+
   void sendOverdueInvoiceAdminEmail(Invoice invoice, List<User> adminUsers);
 }

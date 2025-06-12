@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
-
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
@@ -86,21 +85,15 @@ public class Product {
       fetch = FetchType.LAZY)
   private Set<ProductImage> images = new HashSet<>();
 
-
   @Lob // @Lob nếu lý do dài
   private String rejectReason;
 
-  @Column
-  private Integer weightInGrams;
+  @Column private Integer weightInGrams;
   // bằng gram
 
+  @Column private LocalDate harvestDate; // Ngày thu hoạch/dự kiến
 
-
-  @Column
-  private LocalDate harvestDate; // Ngày thu hoạch/dự kiến
-
-  @Column
-  private LocalDateTime lastStockUpdate; // Tự động cập nhật khi stockQuantity thay đổi
+  @Column private LocalDateTime lastStockUpdate; // Tự động cập nhật khi stockQuantity thay đổi
 
   @Column(nullable = false)
   private boolean negotiablePrice = true; // Mặc định là true
@@ -121,7 +114,4 @@ public class Product {
 
   @Column(nullable = false)
   private boolean isDeleted = false;
-
-
-
 }

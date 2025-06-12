@@ -26,16 +26,14 @@ public class AdminFarmerController {
   @GetMapping("/pending")
   public ResponseEntity<ApiResponse<Page<UserProfileResponse>>> getPendingFarmers(
       @PageableDefault(size = 10, sort = "createdAt,asc") Pageable pageable) {
-    Page<UserProfileResponse> pendingFarmers =
-        adminUserService.getPendingFarmers(pageable);
+    Page<UserProfileResponse> pendingFarmers = adminUserService.getPendingFarmers(pageable);
     return ResponseEntity.ok(ApiResponse.success(pendingFarmers));
   }
 
   // API lấy danh sách tất cả Farmer (có thể thêm filter)
   @GetMapping
   public ResponseEntity<ApiResponse<Page<UserProfileResponse>>> getAllFarmers(
-      @RequestParam(required = false)
-          VerificationStatus verificationStatus,
+      @RequestParam(required = false) VerificationStatus verificationStatus,
       @RequestParam(required = false) String keyword,
       @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
     // Cần thêm phương thức getAllFarmers vào AdminUserService
@@ -59,10 +57,7 @@ public class AdminFarmerController {
       @RequestBody(required = false) FarmerRejectRequest request,
       Authentication authentication) {
     String reason = (request != null) ? request.getReason() : null;
-    adminUserService.rejectFarmer(
-        userId, reason, authentication);
+    adminUserService.rejectFarmer(userId, reason, authentication);
     return ResponseEntity.ok(ApiResponse.success("Farmer rejected successfully."));
   }
-
-
 }

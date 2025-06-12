@@ -33,11 +33,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     // Cho phép các origin từ Angular dev server (hoặc *)
     registry
         .addEndpoint("/ws") // Đường dẫn kết nối WebSocket
-        .setAllowedOrigins("http://localhost:4200") // URL của Angular dev server
+        .setAllowedOrigins("http://localhost:4200",
+                "https://agri-trade-ls.vercel.app", // << THÊM TÊN MIỀN CỤ THỂ
+                "https://*.vercel.app") // URL của Angular dev server
         .withSockJS(); // Bật hỗ trợ SockJS fallback
     // Có thể thêm endpoint khác nếu cần
     // registry.addEndpoint("/ws-native").setAllowedOrigins("*"); // Endpoint không dùng SockJS
-    registry.addEndpoint("/ws").setAllowedOrigins("http://localhost:4200");
+    registry.addEndpoint("/ws").setAllowedOrigins("http://localhost:4200",
+            "https://agri-trade-ls.vercel.app", // << THÊM TÊN MIỀN CỤ THỂ
+            "https://*.vercel.app");
   }
 
   @Override

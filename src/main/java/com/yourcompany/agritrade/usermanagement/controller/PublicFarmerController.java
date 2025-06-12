@@ -36,7 +36,6 @@ public class PublicFarmerController {
     return ResponseEntity.ok(ApiResponse.success(featuredFarmers));
   }
 
-
   // ===== ENDPOINT MỚI CHO TÌM KIẾM/LỌC =====
   @GetMapping
   public ResponseEntity<ApiResponse<Page<FarmerSummaryResponse>>> searchPublicFarmers(

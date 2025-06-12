@@ -61,5 +61,4 @@ public class AdminPermissionController {
     permissionService.deletePermission(id);
     return ResponseEntity.ok(ApiResponse.success("Permission deleted successfully."));
   }
-
 }

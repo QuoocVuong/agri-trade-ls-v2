@@ -24,7 +24,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final JwtTokenProvider tokenProvider;
 
-
   private final TokenBlacklistService tokenBlacklistService;
 
   private static final String HEADER_AUTHORIZATION = "Authorization";
@@ -53,7 +52,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
           // lệ
           String email = tokenProvider.getEmailFromToken(jwt);
 
-
           // Lấy authorities trực tiếp từ token
           List<String> authoritiesStrings = tokenProvider.getAuthoritiesFromToken(jwt);
           List<SimpleGrantedAuthority> authorities =
@@ -63,8 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
           // Tạo đối tượng Authentication với email và authorities từ token
           UsernamePasswordAuthenticationToken authentication =
-              new UsernamePasswordAuthenticationToken(
-                  email, null, authorities);
+              new UsernamePasswordAuthenticationToken(email, null, authorities);
           authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
           SecurityContextHolder.getContext().setAuthentication(authentication);

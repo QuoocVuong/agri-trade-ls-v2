@@ -19,7 +19,6 @@ public interface FarmerInfoMapper {
   // Hoặc map chỉ từ User nếu không cần profile ngay lập tức
   @Mapping(target = "farmerId", source = "id")
   @Mapping(target = "farmerAvatarUrl", source = "avatarUrl")
-
   @Mapping(target = "farmName", ignore = true)
   @Mapping(target = "provinceCode", ignore = true)
   FarmerInfoResponse userToFarmerInfoResponse(User user);

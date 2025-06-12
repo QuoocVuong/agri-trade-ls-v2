@@ -135,7 +135,7 @@ public class AddressServiceImpl implements AddressService {
         addressRepository.save(newDefault);
       } else {
         // Nếu đây là địa chỉ cuối cùng, không nên xóa? Hoặc cho phép xóa.
-         throw new BadRequestException("Cannot delete the last address.");
+        throw new BadRequestException("Cannot delete the last address.");
       }
     }
 
@@ -168,9 +168,10 @@ public class AddressServiceImpl implements AddressService {
       throw new ResourceNotFoundException("User", "id", userId);
     }
     // @Where trên Address entity sẽ tự lọc is_deleted = false
-    return addressRepository.findByUserIdAndIsDefaultTrue(userId)
-            .map(addressMapper::toAddressResponse)
-            .orElse(null); // Trả về null nếu không có địa chỉ mặc định
+    return addressRepository
+        .findByUserIdAndIsDefaultTrue(userId)
+        .map(addressMapper::toAddressResponse)
+        .orElse(null); // Trả về null nếu không có địa chỉ mặc định
   }
 
   // --- Helper Methods ---
@@ -201,8 +202,4 @@ public class AddressServiceImpl implements AddressService {
       addressRepository.saveAll(currentDefaults);
     }
   }
-
-
-
-
 }

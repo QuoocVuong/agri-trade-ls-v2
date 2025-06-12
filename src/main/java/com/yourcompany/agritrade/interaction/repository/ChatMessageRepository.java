@@ -50,5 +50,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
    */
   long countByRoomIdAndRecipientIdAndIsReadFalse(Long roomId, Long recipientId);
 
-  Page<ChatMessage> findByRoomIdAndSenderIdOrderBySentAtDesc(Long roomId, Long senderId, Pageable pageable);
+  Page<ChatMessage> findByRoomIdAndSenderIdOrderBySentAtDesc(
+      Long roomId, Long senderId, Pageable pageable);
 }

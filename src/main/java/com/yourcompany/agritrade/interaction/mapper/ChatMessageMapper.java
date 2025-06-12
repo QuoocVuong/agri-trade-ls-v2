@@ -7,13 +7,10 @@ import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-
 @Mapper(
     componentModel = "spring",
     uses = {UserMapper.class})
 public interface ChatMessageMapper {
-
-
 
   @Mapping(target = "roomId", source = "room.id")
   // MapStruct sẽ dùng UserMapper trong 'uses' để gọi hàm map User -> UserInfoSimpleResponse
@@ -24,6 +21,4 @@ public interface ChatMessageMapper {
 
   List<ChatMessageResponse> toChatMessageResponseList(
       List<ChatMessage> messages); // Đổi về non-abstract
-
-
 }

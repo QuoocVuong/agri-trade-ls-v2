@@ -5,7 +5,6 @@ import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import com.yourcompany.agritrade.ordering.dto.response.PaymentUrlResponse;
 import com.yourcompany.agritrade.ordering.service.PaymentGatewayService;
-
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,13 +37,16 @@ public class MoMoServiceImpl implements PaymentGatewayService {
   @Value("${payment.momo.refundUrl}") // THÊM URL API HOÀN TIỀN CỦA MOMO
   private String momoRefundUrl;
 
+  @Value("${app.backend.url}")
+  private String backendAppUrl;
+
   // app.frontend.momoReturnUrl và app.backend.momoIpnUrl sẽ được truyền vào hàm
 
   private final RestTemplate restTemplate; // Inject RestTemplate (cần tạo Bean cho nó)
 
   @Override
   public PaymentUrlResponse createMoMoPaymentUrl(
-      Order order, String clientReturnUrl, String backendIpnUrl) {
+      Order order, String clientReturnUrl, String backendIpnUrl_unused) {
     String requestId = MoMoUtils.generateRequestId();
     String momoOrderId = MoMoUtils.generateOrderId("AGRITRADE_MOMO_"); // MoMo có orderId riêng
     String amount = String.valueOf(order.getTotalAmount().longValue()); // MoMo dùng số nguyên
@@ -52,6 +54,9 @@ public class MoMoServiceImpl implements PaymentGatewayService {
     String requestType =
         "captureWallet"; // Hoặc "payWithATM", "payWithCC" tùy theo loại bạn muốn tích hợp
     String extraData = ""; // Dữ liệu bổ sung, có thể base64 encode nếu cần
+
+    // XÂY DỰNG URL IPN ĐỘNG
+    String backendIpnUrl = backendAppUrl + "/api/payments/callback/momo/ipn";
 
     // Tạo rawHashData theo đúng định dạng MoMo yêu cầu
     String rawHashData =
@@ -124,9 +129,13 @@ public class MoMoServiceImpl implements PaymentGatewayService {
   }
 
   @Override
-  public boolean requestRefund(String originalTransactionCode, BigDecimal refundAmount, String reason) {
-    log.info("Requesting MoMo refund for transaction: {}, amount: {}, reason: {}",
-            originalTransactionCode, refundAmount, reason);
+  public boolean requestRefund(
+      String originalTransactionCode, BigDecimal refundAmount, String reason) {
+    log.info(
+        "Requesting MoMo refund for transaction: {}, amount: {}, reason: {}",
+        originalTransactionCode,
+        refundAmount,
+        reason);
 
     String requestId = MoMoUtils.generateRequestId();
     String momoOrderId = reason; // MoMo API hoàn tiền thường dùng orderId của giao dịch gốc
@@ -137,13 +146,23 @@ public class MoMoServiceImpl implements PaymentGatewayService {
     // Các tham số cho API hoàn tiền của MoMo có thể khác với API tạo thanh toán.
     // Dưới đây là ví dụ, CẦN THAM KHẢO TÀI LIỆU API HOÀN TIỀN CỦA MOMO.
     // Ví dụ: MoMo có thể yêu cầu `transId` của giao dịch gốc.
-    String rawHashData = "accessKey=" + accessKey +
-            "&amount=" + amountToRefund +
-            "&description=" + ("Hoan tien cho " + reason) + // Mô tả cho giao dịch hoàn tiền
-            "&orderId=" + momoOrderId + // Có thể là orderId của yêu cầu hoàn tiền, hoặc orderId gốc
-            "&partnerCode=" + partnerCode +
-            "&requestId=" + requestId +
-            "&transId=" + originalTransactionCode; // Mã giao dịch gốc của MoMo
+    String rawHashData =
+        "accessKey="
+            + accessKey
+            + "&amount="
+            + amountToRefund
+            + "&description="
+            + ("Hoan tien cho " + reason)
+            + // Mô tả cho giao dịch hoàn tiền
+            "&orderId="
+            + momoOrderId
+            + // Có thể là orderId của yêu cầu hoàn tiền, hoặc orderId gốc
+            "&partnerCode="
+            + partnerCode
+            + "&requestId="
+            + requestId
+            + "&transId="
+            + originalTransactionCode; // Mã giao dịch gốc của MoMo
 
     log.debug("MoMo Raw Hmac Data for refund: {}", rawHashData);
 
@@ -168,20 +187,31 @@ public class MoMoServiceImpl implements PaymentGatewayService {
 
       // Gọi API hoàn tiền của MoMo
       Map<String, Object> momoRefundResponse =
-              restTemplate.postForObject(momoRefundUrl, entity, Map.class); // Sử dụng momoRefundUrl
+          restTemplate.postForObject(momoRefundUrl, entity, Map.class); // Sử dụng momoRefundUrl
       log.info("MoMo Refund Response: {}", momoRefundResponse);
 
-      if (momoRefundResponse != null && "0".equals(String.valueOf(momoRefundResponse.get("resultCode")))) {
+      if (momoRefundResponse != null
+          && "0".equals(String.valueOf(momoRefundResponse.get("resultCode")))) {
         // resultCode = 0 thường là thành công hoặc yêu cầu đã được chấp nhận
-        log.info("MoMo refund request for transaction {} submitted successfully.", originalTransactionCode);
+        log.info(
+            "MoMo refund request for transaction {} submitted successfully.",
+            originalTransactionCode);
         return true;
       } else {
-        String message = momoRefundResponse != null ? (String) momoRefundResponse.get("message") : "Unknown MoMo refund error";
-        log.error("MoMo refund request for transaction {} failed: {}", originalTransactionCode, message);
+        String message =
+            momoRefundResponse != null
+                ? (String) momoRefundResponse.get("message")
+                : "Unknown MoMo refund error";
+        log.error(
+            "MoMo refund request for transaction {} failed: {}", originalTransactionCode, message);
         return false;
       }
     } catch (Exception e) {
-      log.error("Exception during MoMo refund request for transaction {}: {}", originalTransactionCode, e.getMessage(), e);
+      log.error(
+          "Exception during MoMo refund request for transaction {}: {}",
+          originalTransactionCode,
+          e.getMessage(),
+          e);
       return false;
     }
   }

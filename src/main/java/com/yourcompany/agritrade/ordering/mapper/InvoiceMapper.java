@@ -10,13 +10,13 @@ import org.springframework.data.domain.Page;
 @Mapper(componentModel = "spring")
 public interface InvoiceMapper {
 
-    @Mapping(target = "invoiceId", source = "id")
-    @Mapping(target = "orderId", source = "order.id")
-    @Mapping(target = "orderCode", source = "order.orderCode")
-    @Mapping(target = "buyerFullName", source = "order.buyer.fullName")
-    InvoiceSummaryResponse toInvoiceSummaryResponse(Invoice invoice);
+  @Mapping(target = "invoiceId", source = "id")
+  @Mapping(target = "orderId", source = "order.id")
+  @Mapping(target = "orderCode", source = "order.orderCode")
+  @Mapping(target = "buyerFullName", source = "order.buyer.fullName")
+  InvoiceSummaryResponse toInvoiceSummaryResponse(Invoice invoice);
 
-    default Page<InvoiceSummaryResponse> toInvoiceSummaryResponsePage(Page<Invoice> invoicePage) {
-        return invoicePage.map(this::toInvoiceSummaryResponse);
-    }
+  default Page<InvoiceSummaryResponse> toInvoiceSummaryResponsePage(Page<Invoice> invoicePage) {
+    return invoicePage.map(this::toInvoiceSummaryResponse);
+  }
 }

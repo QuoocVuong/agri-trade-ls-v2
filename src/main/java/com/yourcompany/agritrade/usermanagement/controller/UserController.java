@@ -64,7 +64,7 @@ public class UserController {
   // Lấy danh sách tất cả user (phân trang) - Chỉ Admin
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
-  //@PreAuthorize("hasAuthority('USER_READ_ALL')") // Cách mới dùng permission
+  // @PreAuthorize("hasAuthority('USER_READ_ALL')") // Cách mới dùng permission
   public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsersForAdmin(
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String role, // Nhận role là String
@@ -77,7 +77,7 @@ public class UserController {
       try {
         roleEnum = RoleType.valueOf(role.toUpperCase());
       } catch (IllegalArgumentException e) {
-         log.warn("Invalid role value received: {}", role);
+        log.warn("Invalid role value received: {}", role);
       }
     }
     Page<UserResponse> users = adminUserService.getAllUsers(pageable, roleEnum, keyword, isActive);
@@ -96,7 +96,7 @@ public class UserController {
   // Cập nhật trạng thái active/inactive của user - Chỉ Admin
   @PutMapping("/{id}/status")
   @PreAuthorize("hasRole('ADMIN')")
-  //@PreAuthorize("hasAuthority('USER_UPDATE_STATUS')")
+  // @PreAuthorize("hasAuthority('USER_UPDATE_STATUS')")
   public ResponseEntity<ApiResponse<UserResponse>> updateUserStatus(
       @PathVariable Long id, @RequestParam boolean isActive) {
     UserResponse updatedUser = userService.updateUserStatus(id, isActive);
@@ -117,11 +117,9 @@ public class UserController {
   @GetMapping("/search-buyers")
   @PreAuthorize("hasRole('FARMER')")
   public ResponseEntity<ApiResponse<Page<UserResponse>>> searchBuyers(
-          @RequestParam(required = false) String keyword,
-          @PageableDefault(size = 10) Pageable pageable) {
+      @RequestParam(required = false) String keyword,
+      @PageableDefault(size = 10) Pageable pageable) {
     Page<UserResponse> buyers = userService.searchBuyers(keyword, pageable);
     return ResponseEntity.ok(ApiResponse.success(buyers));
   }
-
-
 }

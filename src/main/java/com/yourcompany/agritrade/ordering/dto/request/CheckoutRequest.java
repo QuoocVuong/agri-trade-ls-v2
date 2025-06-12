@@ -10,7 +10,6 @@ public class CheckoutRequest {
   @NotNull(message = "Shipping address ID is required")
   private Long shippingAddressId; // ID của địa chỉ đã lưu
 
-
   @NotNull(message = "Payment method is required")
   private PaymentMethod paymentMethod;
 

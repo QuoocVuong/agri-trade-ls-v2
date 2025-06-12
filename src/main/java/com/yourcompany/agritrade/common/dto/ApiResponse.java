@@ -59,9 +59,9 @@ public class ApiResponse<T> {
   }
 
   // Response lỗi chung
-//      public static <T> ApiResponse<T> error(String message, HttpStatus status) {
-//          return new ApiResponse<>(false, message, null, status);
-//      }
+  //      public static <T> ApiResponse<T> error(String message, HttpStatus status) {
+  //          return new ApiResponse<>(false, message, null, status);
+  //      }
 
   // Response lỗi cụ thể hơn (ví dụ: Bad Request)
   public static <T> ApiResponse<T> badRequest(String message) {

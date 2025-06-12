@@ -67,6 +67,4 @@ public class ChatController {
     int count = chatService.getTotalUnreadMessages(authentication);
     return ResponseEntity.ok(ApiResponse.success(count));
   }
-
-
 }

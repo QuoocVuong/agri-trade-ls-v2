@@ -17,6 +17,6 @@ public interface CategoryService {
 
   void deleteCategory(Integer id); // Admin only (cần kiểm tra có sản phẩm không)
 
-  /** Lấy danh sách phẳng tất cả các danh mục  */
+  /** Lấy danh sách phẳng tất cả các danh mục */
   List<CategoryResponse> getAllCategoriesForDropdown();
 }

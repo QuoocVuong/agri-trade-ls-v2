@@ -56,7 +56,6 @@ public class User {
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   private Set<Role> roles = new HashSet<>();
 
-
   @OneToOne(
       mappedBy =
           "user", // Quan trọng: Chỉ định rằng mối quan hệ được quản lý bởi trường 'user' trong
@@ -72,7 +71,6 @@ public class User {
 
   @Column(length = 255) // Lưu ID từ nhà cung cấp OAuth2
   private String providerId;
-
 
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
@@ -98,6 +96,4 @@ public class User {
   private String refreshToken;
 
   private LocalDateTime refreshTokenExpiryDate;
-
-
 }

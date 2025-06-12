@@ -1,0 +1,41 @@
+spring:
+  # Cấu hình DB cho production (sẽ lấy từ biến môi trường trong docker-compose)
+  datasource:
+    url: ${SPRING_DATASOURCE_URL} # jdbc:mysql://mysql-db:3306/...
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  # Cấu hình Redis cho production
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST} # redis-cache
+      port: ${SPRING_REDIS_PORT}
+      password: ${SPRING_REDIS_PASSWORD:}
+  # Trong production, không để Hibernate tự thay đổi schema
+  jpa:
+    hibernate:
+      ddl-auto: update # Chỉ kiểm tra schema có khớp với entity không
+  # Bật Flyway để tự động migrate DB khi khởi động
+  flyway:
+    enabled: false
+
+app:
+  # URL cho môi trường production
+  frontend:
+    url: "https://agri-trade-ls.vercel.app"
+  backend:
+    url: "https://agritrade-backend.duckdns.org"
+  # Các URL callback sẽ được xây dựng từ 2 URL trên
+  bank:
+    # Giữ nguyên thông tin tài khoản ngân hàng
+    accountName: CONG TY TNHH AGRI TRADE
+    accountNumber: "666366668888"
+    nameDisplay: Ngân hàng Kỹ thương Việt Nam (Techcombank)
+    bin: "970407"
+    qr:
+      template: compact2
+      serviceUrlBase: https://img.vietqr.io/image
+  admin:
+    # Thông tin admin nên được lấy từ biến môi trường để bảo mật hơn
+    email: ${ADMIN_EMAIL:admin@gmail.com}
+    password: ${ADMIN_PASSWORD:1}
+    fullname: ${ADMIN_FULLNAME:Quản Trị Viên}

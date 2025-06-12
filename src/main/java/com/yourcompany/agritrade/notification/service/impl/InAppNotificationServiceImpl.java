@@ -56,7 +56,6 @@ public class InAppNotificationServiceImpl implements InAppNotificationService {
           recipient.getId(),
           e.getMessage(),
           e);
-
     }
   }
 }

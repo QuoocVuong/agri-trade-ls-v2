@@ -18,5 +18,4 @@ public class BankTransferInfoResponse {
   private String orderCode; // Mã đơn hàng
   private String transferContent; // Nội dung chuyển khoản gợi ý (thường là orderCode)
   private String qrCodeDataString; // Chuỗi dữ liệu để frontend tự render QR code
-
 }

@@ -76,7 +76,5 @@ public interface ReviewRepository
   Page<Review> findReviewsForFarmerProductsByStatus(
       @Param("farmerId") Long farmerId, @Param("status") ReviewStatus status, Pageable pageable);
 
-
   long countByProductIdAndStatus(Long productId, ReviewStatus status);
-
 }

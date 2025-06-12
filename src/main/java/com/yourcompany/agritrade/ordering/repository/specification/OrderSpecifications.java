@@ -76,12 +76,11 @@ public class OrderSpecifications {
     String namePattern = "%" + buyerName.toLowerCase() + "%";
     return (root, query, criteriaBuilder) -> {
       Join<Order, User> buyerJoin =
-          root.join(
-              "buyer",
-              JoinType.LEFT); // LEFT JOIN để không loại bỏ đơn nếu buyer bị null
+          root.join("buyer", JoinType.LEFT); // LEFT JOIN để không loại bỏ đơn nếu buyer bị null
       return criteriaBuilder.like(criteriaBuilder.lower(buyerJoin.get("fullName")), namePattern);
     };
   }
+
   public static Specification<Order> hasFarmerNameOrFarmName(String farmerKeyword) {
     return (root, query, criteriaBuilder) -> {
       if (!StringUtils.hasText(farmerKeyword)) {
@@ -90,10 +89,14 @@ public class OrderSpecifications {
       String pattern = "%" + farmerKeyword.toLowerCase() + "%";
       Join<Order, User> farmerUserJoin = root.join("farmer", JoinType.INNER);
       // Join với FarmerProfile để tìm theo farmName
-      Join<User, FarmerProfile> farmerProfileJoin = farmerUserJoin.join("farmerProfile", JoinType.LEFT); // LEFT JOIN phòng trường hợp chưa có profile
+      Join<User, FarmerProfile> farmerProfileJoin =
+          farmerUserJoin.join(
+              "farmerProfile", JoinType.LEFT); // LEFT JOIN phòng trường hợp chưa có profile
 
-      Predicate farmerFullNameLike = criteriaBuilder.like(criteriaBuilder.lower(farmerUserJoin.get("fullName")), pattern);
-      Predicate farmNameLike = criteriaBuilder.like(criteriaBuilder.lower(farmerProfileJoin.get("farmName")), pattern);
+      Predicate farmerFullNameLike =
+          criteriaBuilder.like(criteriaBuilder.lower(farmerUserJoin.get("fullName")), pattern);
+      Predicate farmNameLike =
+          criteriaBuilder.like(criteriaBuilder.lower(farmerProfileJoin.get("farmName")), pattern);
 
       return criteriaBuilder.or(farmerFullNameLike, farmNameLike);
     };
@@ -105,21 +108,16 @@ public class OrderSpecifications {
       return Specification.where(null); // Hoặc cb.conjunction()
     }
     // Buyer có thể tìm theo mã đơn hàng hoặc tên người bán/tên trang trại
-    return Specification.anyOf(
-            hasOrderCode(keyword),
-            hasFarmerNameOrFarmName(keyword)
-    );
+    return Specification.anyOf(hasOrderCode(keyword), hasFarmerNameOrFarmName(keyword));
   }
+
   // Specification tổng hợp cho tìm kiếm của Farmer
   public static Specification<Order> farmerSearch(String keyword) {
     if (!StringUtils.hasText(keyword)) {
       return Specification.where(null);
     }
     // Farmer có thể tìm theo mã đơn hàng hoặc tên người mua
-    return Specification.anyOf(
-            hasOrderCode(keyword),
-            hasBuyerName(keyword)
-    );
+    return Specification.anyOf(hasOrderCode(keyword), hasBuyerName(keyword));
   }
 
   // (Tùy chọn) Specification để fetch thông tin cho Summary
@@ -180,6 +178,4 @@ public class OrderSpecifications {
       return criteriaBuilder.equal(root.get("orderType"), orderType);
     };
   }
-
-
 }

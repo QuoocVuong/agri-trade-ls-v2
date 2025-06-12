@@ -34,7 +34,7 @@ public class AdminCatalogController {
       @Valid @RequestBody CategoryRequest request) {
     CategoryResponse createdCategory = categoryService.createCategory(request);
     return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.created(createdCategory, "Category created successfully"));
+        .body(ApiResponse.created(createdCategory, "Category created successfully"));
   }
 
   @PutMapping("/categories/{id}")
@@ -77,14 +77,13 @@ public class AdminCatalogController {
 
     ProductDetailResponse product = productService.approveProduct(id);
     return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_JSON) // Thêm Content-Type
-            .body(ApiResponse.success(product, "Product approved successfully"));
+        .contentType(MediaType.APPLICATION_JSON) // Thêm Content-Type
+        .body(ApiResponse.success(product, "Product approved successfully"));
   }
 
   @PostMapping("/products/{id}/reject")
   public ResponseEntity<ApiResponse<ProductDetailResponse>> rejectProduct(
-      @PathVariable Long id,
-      @RequestBody(required = false) ProductRejectRequest request) {
+      @PathVariable Long id, @RequestBody(required = false) ProductRejectRequest request) {
     String reason = (request != null) ? request.getReason() : null;
 
     ProductDetailResponse product = productService.rejectProduct(id, reason);

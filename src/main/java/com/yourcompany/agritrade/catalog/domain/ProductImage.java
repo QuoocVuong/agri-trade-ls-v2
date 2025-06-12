@@ -2,7 +2,6 @@ package com.yourcompany.agritrade.catalog.domain;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,8 +23,7 @@ public class ProductImage {
   @JoinColumn(name = "product_id", nullable = false)
   private Product product;
 
-  @Transient
-  private String imageUrl;
+  @Transient private String imageUrl;
 
   @Column(nullable = false)
   private boolean isDefault = false;
@@ -39,6 +37,4 @@ public class ProductImage {
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
-
-
 }

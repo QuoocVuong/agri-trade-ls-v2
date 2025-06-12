@@ -10,5 +10,4 @@ public interface FarmerProfileService {
 
   FarmerProfileResponse getFarmerProfile(
       Long userId); // Lấy profile của farmer bất kỳ (cho public view)
-
 }
