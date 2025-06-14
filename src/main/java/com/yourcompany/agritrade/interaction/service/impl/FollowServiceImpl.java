@@ -2,6 +2,7 @@ package com.yourcompany.agritrade.interaction.service.impl;
 
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.UserFollow;
 import com.yourcompany.agritrade.interaction.dto.response.FollowUserResponse;
 import com.yourcompany.agritrade.interaction.mapper.FollowUserMapper;
@@ -35,7 +36,7 @@ public class FollowServiceImpl implements FollowService {
   @Override
   @Transactional
   public void followUser(Authentication authentication, Long followingId) {
-    User follower = getUserFromAuthentication(authentication);
+    User follower = SecurityUtils.getCurrentAuthenticatedUser();
     User following =
         userRepository
             .findById(followingId)
@@ -67,7 +68,7 @@ public class FollowServiceImpl implements FollowService {
   @Override
   @Transactional
   public void unfollowUser(Authentication authentication, Long followingId) {
-    User follower = getUserFromAuthentication(authentication);
+    User follower = SecurityUtils.getCurrentAuthenticatedUser();
 
     if (!userFollowRepository.existsByFollowerIdAndFollowingId(follower.getId(), followingId)) {
       log.warn("User {} is not following user {}", follower.getId(), followingId);
@@ -86,7 +87,7 @@ public class FollowServiceImpl implements FollowService {
   @Override
   @Transactional(readOnly = true)
   public Page<FollowUserResponse> getFollowing(Authentication authentication, Pageable pageable) {
-    User follower = getUserFromAuthentication(authentication);
+    User follower = SecurityUtils.getCurrentAuthenticatedUser();
     // Cần tạo phương thức trả về Page<User> trong repository hoặc xử lý phân trang ở đây
     // Ví dụ tạm: Lấy List rồi tạo Page thủ công (không hiệu quả với dữ liệu lớn)
     List<User> followingUsers = userFollowRepository.findFollowingByFollowerId(follower.getId());
@@ -100,7 +101,7 @@ public class FollowServiceImpl implements FollowService {
   @Override
   @Transactional(readOnly = true)
   public Page<FollowUserResponse> getFollowers(Authentication authentication, Pageable pageable) {
-    User following = getUserFromAuthentication(authentication);
+    User following = SecurityUtils.getCurrentAuthenticatedUser();
     // Tương tự getFollowing, cần xử lý phân trang
     List<User> followerUsers = userFollowRepository.findFollowersByFollowingId(following.getId());
     List<FollowUserResponse> responseList =
@@ -127,22 +128,11 @@ public class FollowServiceImpl implements FollowService {
   @Override
   @Transactional(readOnly = true)
   public boolean isFollowing(Authentication authentication, Long followingId) {
-    User follower = getUserFromAuthentication(authentication);
+    User follower = SecurityUtils.getCurrentAuthenticatedUser();
     return userFollowRepository.existsByFollowerIdAndFollowingId(follower.getId(), followingId);
   }
 
-  // Helper method (copy từ UserServiceImpl hoặc tách ra Util)
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-  }
+
 
   private void updateFollowCounts(Long followerId, Long followingId, boolean isFollowing) {
     User follower = userRepository.findById(followerId).orElse(null);

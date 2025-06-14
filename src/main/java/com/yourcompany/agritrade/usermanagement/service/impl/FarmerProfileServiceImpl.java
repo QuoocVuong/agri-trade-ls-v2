@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.usermanagement.service.impl;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.Role;
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -34,7 +35,7 @@ public class FarmerProfileServiceImpl implements FarmerProfileService {
   @Transactional
   public FarmerProfileResponse createOrUpdateFarmerProfile(
       Authentication authentication, FarmerProfileRequest request) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
 
     boolean isNewProfile =
         !farmerProfileRepository.existsById(user.getId()); // Kiểm tra xem có phải tạo mới không
@@ -85,14 +86,5 @@ public class FarmerProfileServiceImpl implements FarmerProfileService {
     return farmerProfileMapper.toFarmerProfileResponse(profile);
   }
 
-  // Helper lấy User từ Authentication
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null || !authentication.isAuthenticated()) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-  }
+
 }

@@ -5,6 +5,7 @@ import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
 import com.yourcompany.agritrade.catalog.mapper.ProductMapper;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.FavoriteProduct;
 import com.yourcompany.agritrade.interaction.repository.FavoriteProductRepository;
 import com.yourcompany.agritrade.interaction.service.FavoriteService;
@@ -33,7 +34,7 @@ public class FavoriteServiceImpl implements FavoriteService {
   @Override
   @Transactional
   public void addFavorite(Authentication authentication, Long productId) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     Product product =
         productRepository
             .findById(productId) // Chỉ cho yêu thích sp chưa bị xóa
@@ -58,7 +59,7 @@ public class FavoriteServiceImpl implements FavoriteService {
   @Override
   @Transactional
   public void removeFavorite(Authentication authentication, Long productId) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
 
     if (!favoriteProductRepository.existsByUserIdAndProductId(user.getId(), productId)) {
       log.warn("User {} has not favorited product {}", user.getId(), productId);
@@ -77,7 +78,7 @@ public class FavoriteServiceImpl implements FavoriteService {
   @Transactional(readOnly = true)
   public Page<ProductSummaryResponse> getMyFavorites(
       Authentication authentication, Pageable pageable) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     // Dùng phương thức repo để lấy Page<Product>
     Page<Product> favoriteProductsPage =
         favoriteProductRepository.findFavoriteProductsByUserId(user.getId(), pageable);
@@ -88,27 +89,11 @@ public class FavoriteServiceImpl implements FavoriteService {
   @Override
   @Transactional(readOnly = true)
   public boolean isFavorite(Authentication authentication, Long productId) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     return favoriteProductRepository.existsByUserIdAndProductId(user.getId(), productId);
   }
 
-  // Helper method (copy từ UserServiceImpl hoặc tách ra Util)
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      // Ném lỗi nếu không xác thực, vì các API favorite yêu cầu đăng nhập
-      throw new AccessDeniedException("User is not authenticated for this operation.");
-    }
-    String email = authentication.getName(); // Lấy email/username từ Principal
-    return userRepository
-        .findByEmail(email) // Tìm trong DB
-        .orElseThrow(
-            () ->
-                new UsernameNotFoundException(
-                    "Authenticated user not found with email: "
-                        + email)); // Ném lỗi nếu không thấy user trong DB
-  }
+
 
   private void updateFavoriteCount(Long productId, boolean increment) {
     // Dùng cách đếm lại cho an toàn

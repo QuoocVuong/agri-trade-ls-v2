@@ -5,6 +5,7 @@ import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.ReviewStatus;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.interaction.dto.request.ReviewRequest;
 import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
@@ -45,7 +46,7 @@ public class ReviewServiceImpl implements ReviewService {
   @Override
   @Transactional
   public ReviewResponse createReview(Authentication authentication, ReviewRequest request) {
-    User consumer = getUserFromAuthentication(authentication);
+    User consumer = SecurityUtils.getCurrentAuthenticatedUser();
     Product product =
         productRepository
             .findById(request.getProductId())
@@ -120,7 +121,7 @@ public class ReviewServiceImpl implements ReviewService {
   @Override
   @Transactional(readOnly = true)
   public Page<ReviewResponse> getMyReviews(Authentication authentication, Pageable pageable) {
-    User consumer = getUserFromAuthentication(authentication);
+    User consumer = SecurityUtils.getCurrentAuthenticatedUser();
     Page<Review> reviewPage = reviewRepository.findByConsumerId(consumer.getId(), pageable);
     return reviewMapper.toReviewResponsePage(reviewPage);
   }
@@ -130,7 +131,7 @@ public class ReviewServiceImpl implements ReviewService {
   @Transactional(readOnly = true)
   public Page<ReviewResponse> getReviewsForFarmerProducts(
       Authentication authentication, Pageable pageable) {
-    User farmer = getUserFromAuthentication(authentication); // Lấy user farmer đang đăng nhập
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // Lấy user farmer đang đăng nhập
     Page<Review> reviewPage =
         reviewRepository.findReviewsForFarmerProducts(farmer.getId(), pageable);
 
@@ -142,7 +143,7 @@ public class ReviewServiceImpl implements ReviewService {
   @Transactional(readOnly = true)
   public Page<ReviewResponse> getReviewsForFarmerProductsByStatus(
       Authentication authentication, ReviewStatus status, Pageable pageable) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Page<Review> reviewPage =
         reviewRepository.findReviewsForFarmerProductsByStatus(farmer.getId(), status, pageable);
 
@@ -222,23 +223,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
   }
 
-  //  HELPER METHOD
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      // Ném lỗi nếu không xác thực, vì API tạo review yêu cầu đăng nhập
-      throw new AccessDeniedException("User is not authenticated to create a review.");
-    }
-    String email = authentication.getName(); // Lấy email/username từ Principal
-    return userRepository
-        .findByEmail(email) // Tìm trong DB
-        .orElseThrow(
-            () ->
-                new UsernameNotFoundException(
-                    "Authenticated user not found with email: "
-                        + email)); // Ném lỗi nếu không thấy user trong DB
-  }
+
 
   private Review findReviewById(Long reviewId) {
     return reviewRepository

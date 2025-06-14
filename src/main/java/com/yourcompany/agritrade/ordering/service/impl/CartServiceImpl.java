@@ -6,6 +6,7 @@ import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.ordering.domain.CartItem;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemUpdateRequest;
@@ -42,7 +43,7 @@ public class CartServiceImpl implements CartService {
   @Override
   @Transactional
   public CartResponse getCart(Authentication authentication) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     List<CartItem> cartItemsFromDb = cartItemRepository.findByUserId(user.getId());
     List<CartItemResponse> validItemResponses = new ArrayList<>();
     List<Long> itemsToRemoveFromDb = new ArrayList<>(); // Lưu ID của CartItem cần xóa
@@ -190,7 +191,7 @@ public class CartServiceImpl implements CartService {
   @Override
   @Transactional
   public CartItemResponse addItem(Authentication authentication, CartItemRequest request) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     Product product;
     try {
       // Gọi findAvailableProduct để kiểm tra tồn tại, status và is_deleted (nhờ @Where)
@@ -257,7 +258,7 @@ public class CartServiceImpl implements CartService {
   @Transactional
   public CartItemResponse updateItemQuantity(
       Authentication authentication, Long cartItemId, CartItemUpdateRequest request) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     CartItem cartItem =
         cartItemRepository
             .findById(cartItemId)
@@ -307,7 +308,7 @@ public class CartServiceImpl implements CartService {
   @Override
   @Transactional
   public void removeItem(Authentication authentication, Long cartItemId) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     CartItem cartItem =
         cartItemRepository
             .findById(cartItemId)
@@ -325,23 +326,12 @@ public class CartServiceImpl implements CartService {
   @Override
   @Transactional
   public void clearCart(Authentication authentication) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     cartItemRepository.deleteByUserId(user.getId());
     log.info("Cleared cart for user {}", user.getId());
   }
 
-  // --- Helper Methods ---
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email) // findByEmail đã lọc is_deleted=false
-        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-  }
+
 
   private Product findAvailableProduct(Long productId) {
     Product product =
@@ -362,7 +352,7 @@ public class CartServiceImpl implements CartService {
   @Override
   @Transactional
   public CartValidationResponse validateCartForCheckout(Authentication authentication) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     List<CartItem> cartItemsFromDb = cartItemRepository.findByUserId(user.getId());
 
     if (cartItemsFromDb.isEmpty()) {

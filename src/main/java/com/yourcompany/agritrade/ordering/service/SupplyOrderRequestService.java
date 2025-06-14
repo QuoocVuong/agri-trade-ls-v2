@@ -25,5 +25,14 @@ public interface SupplyOrderRequestService {
   SupplyOrderRequestResponse rejectSupplyOrderRequest(
       Authentication authentication, Long requestId, String reason);
 
-  void cancelSupplyOrderRequestByBuyer(Authentication authentication, Long requestId); // Tùy chọn
+  void cancelSupplyOrderRequestByBuyer(Authentication authentication, Long requestId);
+
+  /**
+   * Kiểm tra quyền tạo yêu cầu cung ứng của người dùng.
+   * Ném ra exception nếu không đủ quyền.
+   *
+   * @param authentication Đối tượng xác thực.
+
+   */
+  void checkCreatePermission(Authentication authentication);
 }

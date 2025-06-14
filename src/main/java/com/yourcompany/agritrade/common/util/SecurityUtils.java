@@ -16,8 +16,7 @@ public class SecurityUtils {
 
   private static UserRepository staticUserRepository;
 
-  // Constructor injection cho UserRepository
-  // Spring sẽ tự động inject UserRepository vào đây khi SecurityUtils được tạo
+
   public SecurityUtils(UserRepository userRepository) {
     SecurityUtils.staticUserRepository = userRepository;
   }

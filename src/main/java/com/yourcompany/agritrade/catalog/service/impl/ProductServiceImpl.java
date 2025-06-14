@@ -17,6 +17,7 @@ import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
 import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
 import com.yourcompany.agritrade.interaction.service.ReviewService;
 import com.yourcompany.agritrade.notification.service.EmailService;
@@ -76,7 +77,7 @@ public class ProductServiceImpl implements ProductService {
   @Transactional(readOnly = true)
   public Page<ProductSummaryResponse> getMyProducts(
       Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
 
     //  Specification để lọc
     Specification<Product> spec =
@@ -105,7 +106,7 @@ public class ProductServiceImpl implements ProductService {
   @Transactional(readOnly = true)
   public Page<ProductSummaryResponse> getMyB2CProducts(
       Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
-    User farmer = getUserFromAuthentication(authentication); // Hàm helper của bạn
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // Hàm helper của bạn
     Specification<Product> spec =
         Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
             .and(ProductSpecifications.isB2cProduct()); // Lọc b2bEnabled = false
@@ -126,7 +127,7 @@ public class ProductServiceImpl implements ProductService {
   @Transactional(readOnly = true)
   public Page<ProductSummaryResponse> getMySupplyProducts(
       Authentication authentication, String keyword, ProductStatus status, Pageable pageable) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Specification<Product> spec =
         Specification.where(ProductSpecifications.byFarmer(farmer.getId()))
             .and(ProductSpecifications.isB2bSupply()); // Lọc b2bEnabled = true
@@ -157,7 +158,7 @@ public class ProductServiceImpl implements ProductService {
   @Override
   @Transactional(readOnly = true)
   public ProductDetailResponse getMyProductById(Authentication authentication, Long productId) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Product product = findMyProductById(productId, farmer.getId());
     ProductDetailResponse response = productMapper.toProductDetailResponse(product);
     return response;
@@ -167,7 +168,7 @@ public class ProductServiceImpl implements ProductService {
   @Transactional
   public ProductDetailResponse createMyProduct(
       Authentication authentication, ProductRequest request) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     validateFarmer(farmer); // Kiểm tra vai trò và profile
 
     FarmerProfile farmerProfile =
@@ -237,7 +238,7 @@ public class ProductServiceImpl implements ProductService {
   @Transactional // Đảm bảo tất cả thao tác trong một transaction
   public ProductDetailResponse updateMyProduct(
       Authentication authentication, Long productId, ProductRequest request) {
-    User farmer = getUserFromAuthentication(authentication); // 1. Lấy thông tin Farmer
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // 1. Lấy thông tin Farmer
     Product existingProduct =
         findMyProductById(productId, farmer.getId()); // 2. Tìm sản phẩm và kiểm tra ownership
 
@@ -448,7 +449,7 @@ public class ProductServiceImpl implements ProductService {
   @Override
   @Transactional
   public void deleteMyProduct(Authentication authentication, Long productId) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Product product = findMyProductById(productId, farmer.getId()); // Kiểm tra ownership
 
     // Thực hiện soft delete
@@ -704,18 +705,7 @@ public class ProductServiceImpl implements ProductService {
     }
   }
 
-  // --- Helper Methods ---
 
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null || !authentication.isAuthenticated()) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    // findByEmail đã tự lọc is_deleted=false
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-  }
 
   private Product findMyProductById(Long productId, Long farmerId) {
     // findByIdAndFarmerId đã tự lọc is_deleted=false

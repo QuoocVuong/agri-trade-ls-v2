@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.NotificationType;
 import com.yourcompany.agritrade.common.model.RoleType;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.notification.domain.Notification;
 import com.yourcompany.agritrade.notification.dto.response.NotificationResponse;
@@ -45,7 +46,7 @@ public class NotificationServiceImpl implements NotificationService {
   private final InAppNotificationService inAppNotificationService;
   private final UserRepository userRepository;
 
-  @Value("${app.frontend.url:http}")
+  @Value("${app.frontend.url}")
   private String frontendUrl;
 
   // --- Gửi thông báo ---
@@ -188,7 +189,7 @@ public class NotificationServiceImpl implements NotificationService {
   @Transactional(readOnly = true)
   public Page<NotificationResponse> getMyNotifications(
       Authentication authentication, Pageable pageable) {
-    User recipient = getUserFromAuthentication(authentication);
+    User recipient = SecurityUtils.getCurrentAuthenticatedUser();
     Page<Notification> notificationPage =
         notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipient.getId(), pageable);
     return notificationMapper.toNotificationResponsePage(notificationPage);
@@ -197,14 +198,14 @@ public class NotificationServiceImpl implements NotificationService {
   @Override
   @Transactional(readOnly = true)
   public long getMyUnreadNotificationCount(Authentication authentication) {
-    User recipient = getUserFromAuthentication(authentication);
+    User recipient = SecurityUtils.getCurrentAuthenticatedUser();
     return notificationRepository.countByRecipientIdAndIsReadFalse(recipient.getId());
   }
 
   @Override
   @Transactional
   public void markNotificationAsRead(Authentication authentication, Long notificationId) {
-    User recipient = getUserFromAuthentication(authentication);
+    User recipient = SecurityUtils.getCurrentAuthenticatedUser();
     int updated =
         notificationRepository.markAsRead(notificationId, recipient.getId(), LocalDateTime.now());
     if (updated == 0) {
@@ -220,7 +221,7 @@ public class NotificationServiceImpl implements NotificationService {
   @Override
   @Transactional
   public void markAllMyNotificationsAsRead(Authentication authentication) {
-    User recipient = getUserFromAuthentication(authentication);
+    User recipient = SecurityUtils.getCurrentAuthenticatedUser();
     int updatedCount =
         notificationRepository.markAllAsReadForRecipient(recipient.getId(), LocalDateTime.now());
     log.info("Marked {} notifications as read for user {}", updatedCount, recipient.getId());
@@ -229,7 +230,7 @@ public class NotificationServiceImpl implements NotificationService {
   @Override
   @Transactional
   public void deleteNotification(Authentication authentication, Long notificationId) {
-    User recipient = getUserFromAuthentication(authentication);
+    User recipient = SecurityUtils.getCurrentAuthenticatedUser();
     Notification notification =
         notificationRepository
             .findById(notificationId)
@@ -242,18 +243,7 @@ public class NotificationServiceImpl implements NotificationService {
     log.info("Deleted notification {} for user {}", notificationId, recipient.getId());
   }
 
-  // Helper method
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-  }
+
 
   @Override
   public void sendWelcomeNotification(User user) {

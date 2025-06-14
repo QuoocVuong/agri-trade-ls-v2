@@ -4,6 +4,7 @@ import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.Role;
@@ -193,7 +194,7 @@ public class AdminUserServiceImpl implements AdminUserService {
   @Override
   @Transactional
   public void approveFarmer(Long userId, Authentication adminAuth) {
-    User admin = getUserFromAuthentication(adminAuth); // Lấy thông tin Admin
+    User admin =SecurityUtils.getCurrentAuthenticatedUser();// Lấy thông tin Admin
     FarmerProfile profile =
         farmerProfileRepository
             .findById(userId)
@@ -223,7 +224,7 @@ public class AdminUserServiceImpl implements AdminUserService {
   @Override
   @Transactional
   public void rejectFarmer(Long userId, String reason, Authentication adminAuth) {
-    User admin = getUserFromAuthentication(adminAuth);
+    User admin = SecurityUtils.getCurrentAuthenticatedUser();
     FarmerProfile profile =
         farmerProfileRepository
             .findById(userId)
@@ -246,19 +247,5 @@ public class AdminUserServiceImpl implements AdminUserService {
     notificationService.sendFarmerProfileRejectedNotification(profile, reason); // Cần tạo hàm này
   }
 
-  // Helper method (copy từ UserServiceImpl hoặc tách ra Util)
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(
-            () ->
-                new UsernameNotFoundException(
-                    "Admin User not found with email: " + email)); // Sửa thông báo lỗi
-  }
+
 }

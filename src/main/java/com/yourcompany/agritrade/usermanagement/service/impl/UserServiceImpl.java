@@ -8,6 +8,7 @@ import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.config.properties.JwtProperties;
 import com.yourcompany.agritrade.config.security.JwtTokenProvider;
 import com.yourcompany.agritrade.notification.service.EmailService;
@@ -99,11 +100,11 @@ public class UserServiceImpl implements UserService {
 
     // 1. Kiểm tra trùng lặp
     if (userRepository.existsByEmailIgnoringSoftDelete(email)) {
-      throw new BadRequestException("Error: Email is already taken!");
+      throw new BadRequestException("Error: Email Đã tồn tại!");
     }
     if (registrationRequest.getPhoneNumber() != null
         && userRepository.existsByPhoneNumber(registrationRequest.getPhoneNumber())) {
-      throw new BadRequestException("Error: Phone number is already taken!");
+      throw new BadRequestException("Error: Số điện thoại đã được sử dụng!");
     }
 
     // 2. Tạo User mới
@@ -152,39 +153,8 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional(readOnly = true)
   public UserProfileResponse getCurrentUserProfile(Authentication authentication) {
-    if (authentication == null || !authentication.isAuthenticated()) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName(); // Lấy email từ principal
-    User user =
-        userRepository
-            .findByEmail(email)
-            .orElseThrow(
-                () -> new UsernameNotFoundException(MSG_USER_NOT_FOUND_WITH_EMAIL + email));
-
-    // Lấy thêm thông tin profile nếu có
-    UserProfileResponse response = userMapper.toUserProfileResponse(user); // Mapper cơ bản
-
-    // Kiểm tra và lấy profile tương ứng
-    if (user.getRoles().stream().anyMatch(role -> role.getName() == RoleType.ROLE_FARMER)) {
-      farmerProfileRepository
-          .findById(user.getId())
-          .ifPresent(
-              profile ->
-                  // Sử dụng farmerProfileMapper đã inject
-                  response.setFarmerProfile(farmerProfileMapper.toFarmerProfileResponse(profile)));
-    } else if (user.getRoles().stream()
-        .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER)) {
-      businessProfileRepository
-          .findById(user.getId())
-          .ifPresent(
-              profile ->
-                  // Sử dụng businessProfileMapper đã inject
-                  response.setBusinessProfile(
-                      businessProfileMapper.toBusinessProfileResponse(profile)));
-    }
-
-    return response;
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
+    return buildUserProfileResponse(user);
   }
 
   @Override
@@ -221,7 +191,7 @@ public class UserServiceImpl implements UserService {
   @Transactional
   public UserResponse updateCurrentUserProfile(
       Authentication authentication, UserUpdateRequest updateRequest) {
-    User user = getUserFromAuthentication(authentication); // Dùng lại helper method
+    User user = SecurityUtils.getCurrentAuthenticatedUser(); // Dùng lại helper method
 
     // Cập nhật các trường nếu được cung cấp trong request
     if (updateRequest.getFullName() != null && !updateRequest.getFullName().isBlank()) {
@@ -260,23 +230,28 @@ public class UserServiceImpl implements UserService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
-    // Lấy profile tương tự như getCurrentUserProfile
+    return buildUserProfileResponse(user);
+  }
+
+  private UserProfileResponse buildUserProfileResponse(User user) {
     UserProfileResponse response = userMapper.toUserProfileResponse(user);
+
+
+
+    // Luôn kiểm tra FarmerProfile một cách độc lập
     if (user.getRoles().stream().anyMatch(role -> role.getName() == RoleType.ROLE_FARMER)) {
-      farmerProfileRepository
-          .findById(user.getId())
-          .ifPresent(
-              profile ->
-                  response.setFarmerProfile(farmerProfileMapper.toFarmerProfileResponse(profile)));
-    } else if (user.getRoles().stream()
-        .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER)) {
-      businessProfileRepository
-          .findById(user.getId())
-          .ifPresent(
-              profile ->
-                  response.setBusinessProfile(
-                      businessProfileMapper.toBusinessProfileResponse(profile)));
+      farmerProfileRepository.findById(user.getId()).ifPresent(profile ->
+              response.setFarmerProfile(farmerProfileMapper.toFarmerProfileResponse(profile))
+      );
     }
+
+    // Luôn kiểm tra BusinessProfile một cách độc lập
+    if (user.getRoles().stream().anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER)) {
+      businessProfileRepository.findById(user.getId()).ifPresent(profile ->
+              response.setBusinessProfile(businessProfileMapper.toBusinessProfileResponse(profile))
+      );
+    }
+
     return response;
   }
 
@@ -323,16 +298,7 @@ public class UserServiceImpl implements UserService {
     return userMapper.toUserResponse(updatedUser);
   }
 
-  // Helper method (đã có ở Business/Farmer Service Impl)
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null || !authentication.isAuthenticated()) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(() -> new UsernameNotFoundException(MSG_USER_NOT_FOUND_WITH_EMAIL + email));
-  }
+
 
   // (Optional) Thêm phương thức xóa mềm
   // @Override

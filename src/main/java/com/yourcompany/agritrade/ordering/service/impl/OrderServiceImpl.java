@@ -120,6 +120,21 @@ public class OrderServiceImpl implements OrderService {
   // Thử lại nếu có xung đột optimistic lock
   public List<OrderResponse> checkout(Authentication authentication, CheckoutRequest request) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser();
+
+
+    // Nếu người dùng chọn thanh toán bằng INVOICE (công nợ)
+    if (request.getPaymentMethod() == PaymentMethod.INVOICE) {
+      // Kiểm tra xem họ có vai trò BUSINESS_BUYER không
+      boolean isBusinessBuyer = buyer.getRoles().stream()
+              .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
+
+      if (!isBusinessBuyer) {
+        throw new BadRequestException("Phương thức thanh toán bằng Công nợ (Invoice) chỉ dành cho khách hàng doanh nghiệp.");
+      }
+    }
+
+
+
     Address shippingAddress =
         addressRepository
             .findByIdAndUserId(request.getShippingAddressId(), buyer.getId())

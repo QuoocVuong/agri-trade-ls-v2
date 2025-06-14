@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import lombok.Getter;
-import lombok.Setter;
+
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 @Setter
 @JsonInclude(JsonInclude.Include.NON_NULL) // Không trả về các field null trong JSON
 @Slf4j
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class ApiResponse<T> {
 
   private boolean success;

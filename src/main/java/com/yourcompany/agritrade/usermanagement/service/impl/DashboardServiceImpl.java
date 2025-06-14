@@ -10,6 +10,7 @@ import com.yourcompany.agritrade.common.model.ReviewStatus;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
 import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.repository.ReviewRepository;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
@@ -73,7 +74,7 @@ public class DashboardServiceImpl implements DashboardService {
 
   @Override
   public DashboardStatsResponse getFarmerDashboardStats(Authentication authentication) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Long farmerId = farmer.getId();
     LocalDateTime todayStart = LocalDate.now().atStartOfDay();
     LocalDateTime todayEnd = LocalDate.now().atTime(LocalTime.MAX);
@@ -124,7 +125,7 @@ public class DashboardServiceImpl implements DashboardService {
   @Override
   public List<OrderSummaryResponse> getRecentFarmerOrders(
       Authentication authentication, int limit) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
     // Dùng lại hàm repo đã có JOIN FETCH nếu có, hoặc tạo query mới chỉ lấy field cần cho summary
     Page<Order> orderPage = orderRepository.findByFarmerIdWithDetails(farmer.getId(), pageable);
@@ -135,7 +136,7 @@ public class DashboardServiceImpl implements DashboardService {
   @Override
   public List<TopProductResponse> getTopSellingFarmerProducts(
       Authentication authentication, int limit) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Pageable pageable = PageRequest.of(0, limit);
     // 1. Lấy dữ liệu tổng hợp (ID, tên, số lượng, doanh thu) từ repository
     List<TopProductResponse> topProductsStats =
@@ -190,7 +191,7 @@ public class DashboardServiceImpl implements DashboardService {
   @Override
   public List<FarmerChartDataResponse> getFarmerOrderCountChartData(
       Authentication authentication, LocalDate startDate, LocalDate endDate) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Long farmerId = farmer.getId();
 
     LocalDateTime startDateTime = startDate.atStartOfDay();
@@ -249,7 +250,7 @@ public class DashboardServiceImpl implements DashboardService {
   @Override
   public List<FarmerChartDataResponse> getFarmerRevenueChartData(
       Authentication authentication, LocalDate startDate, LocalDate endDate) {
-    User farmer = getUserFromAuthentication(authentication);
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser();
     Long farmerId = farmer.getId();
 
     LocalDateTime startDateTime = startDate.atStartOfDay();
@@ -512,18 +513,7 @@ public class DashboardServiceImpl implements DashboardService {
     return counts;
   }
 
-  // Helper method
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-  }
+
 
   // Helper function để parse Date từ Object trả về của query (tránh lặp code)
   private LocalDate parseDateFromResult(Object dateObject) {

@@ -4,8 +4,7 @@ package com.yourcompany.agritrade.ordering.service.impl;
 // ... (imports cho các class đã tạo ở trên, OrderService, NotificationService, etc.) ...
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
-import com.yourcompany.agritrade.common.exception.BadRequestException;
-import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.exception.*;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.notification.service.NotificationService;
@@ -18,7 +17,10 @@ import com.yourcompany.agritrade.ordering.repository.SupplyOrderRequestRepositor
 import com.yourcompany.agritrade.ordering.repository.specification.SupplyOrderRequestSpecifications;
 import com.yourcompany.agritrade.ordering.service.OrderService;
 import com.yourcompany.agritrade.ordering.service.SupplyOrderRequestService;
+import com.yourcompany.agritrade.usermanagement.domain.Role;
 import com.yourcompany.agritrade.usermanagement.domain.User;
+import com.yourcompany.agritrade.usermanagement.repository.BusinessProfileRepository;
+import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -41,12 +45,18 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
   private final SupplyOrderRequestMapper requestMapper;
   private final OrderService orderService; // Để tạo AgreedOrder khi Farmer chấp nhận
   private final NotificationService notificationService; // Để gửi thông báo
+  private final BusinessProfileRepository businessProfileRepository;
+  private final FarmerProfileRepository farmerProfileRepository;
 
   @Override
   @Transactional
   public SupplyOrderRequestResponse createSupplyOrderRequest(
       Authentication authentication, SupplyOrderPlacementRequest requestDto) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser(); // Hoặc getUserFromAuthentication
+
+    // Gọi lại hàm kiểm tra quyền ở đầu để tái sử dụng logic
+    checkCreatePermission(authentication);
+
     User farmer =
         userRepository
             .findById(requestDto.getFarmerId())
@@ -172,74 +182,7 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
           "Request cannot be accepted from its current status: " + supplyRequest.getStatus());
     }
 
-    //        // Tạo AgreedOrderRequest từ SupplyOrderRequest
-    //        AgreedOrderRequest agreedOrderDto = new AgreedOrderRequest();
-    //        agreedOrderDto.setBuyerId(supplyRequest.getBuyer().getId());
-    //        // farmerId sẽ được lấy từ Authentication trong orderService.createAgreedOrder
-    //
-    //        AgreedOrderItemRequest agreedItem = new AgreedOrderItemRequest();
-    //        agreedItem.setProductId(supplyRequest.getProduct().getId());
-    //        agreedItem.setProductName(supplyRequest.getProduct().getName()); // Lấy tên gốc,
-    // Farmer có thể sửa khi tạo đơn
-    //        agreedItem.setUnit(supplyRequest.getRequestedUnit());
-    //        agreedItem.setQuantity(supplyRequest.getRequestedQuantity());
-    //        // Giá: Ưu tiên giá đề xuất của buyer, nếu không có thì Farmer tự nhập khi tạo đơn
-    //        // Hoặc Farmer có thể sửa giá này trong form tạo AgreedOrder
-    //        agreedItem.setPricePerUnit(
-    //                supplyRequest.getProposedPricePerUnit() != null ?
-    //                        supplyRequest.getProposedPricePerUnit() :
-    //                        (supplyRequest.getProduct().getReferenceWholesalePrice() != null ?
-    //                                supplyRequest.getProduct().getReferenceWholesalePrice() :
-    //                                BigDecimal.ZERO)
-    //        );
-    //
-    //
-    //
-    //        agreedOrderDto.setItems(List.of(agreedItem));
-    //
-    //        // Tổng tiền: Farmer sẽ nhập/xác nhận lại khi tạo AgreedOrder.
-    //        // Ở đây có thể tính tạm dựa trên proposedPrice hoặc referenceWholesalePrice
-    //        BigDecimal tempTotal = BigDecimal.ZERO;
-    //        if (supplyRequest.getProposedPricePerUnit() != null) {
-    //            tempTotal =
-    // supplyRequest.getProposedPricePerUnit().multiply(BigDecimal.valueOf(supplyRequest.getRequestedQuantity()));
-    //        } else if (supplyRequest.getProduct().getReferenceWholesalePrice() != null) {
-    //            tempTotal =
-    // supplyRequest.getProduct().getReferenceWholesalePrice().multiply(BigDecimal.valueOf(supplyRequest.getRequestedQuantity()));
-    //        }
-    //        agreedOrderDto.setAgreedTotalAmount(tempTotal); // Farmer sẽ xác nhận lại
-    //
-    //        // Phương thức thanh toán: Farmer sẽ chọn khi tạo AgreedOrder. Mặc định là INVOICE.
-    //        agreedOrderDto.setAgreedPaymentMethod(PaymentMethod.INVOICE);
-    //
-    //        // Copy thông tin giao hàng từ request
-    //        agreedOrderDto.setShippingFullName(supplyRequest.getShippingFullName());
-    //        agreedOrderDto.setShippingPhoneNumber(supplyRequest.getShippingPhoneNumber());
-    //        agreedOrderDto.setShippingAddressDetail(supplyRequest.getShippingAddressDetail());
-    //        agreedOrderDto.setShippingProvinceCode(supplyRequest.getShippingProvinceCode());
-    //        agreedOrderDto.setShippingDistrictCode(supplyRequest.getShippingDistrictCode());
-    //        agreedOrderDto.setShippingWardCode(supplyRequest.getShippingWardCode());
-    //        agreedOrderDto.setExpectedDeliveryDate(supplyRequest.getExpectedDeliveryDate());
-    //        agreedOrderDto.setNotes("Đơn hàng được tạo từ yêu cầu #" + supplyRequest.getId() + ".
-    // " + (supplyRequest.getBuyerNotes() != null ? supplyRequest.getBuyerNotes() : ""));
-    //
-    //        // Gọi OrderService để tạo "Đơn hàng thỏa thuận"
-    //        // Authentication ở đây là của Farmer
-    //        OrderResponse createdOrder = orderService.createAgreedOrder(authentication,
-    // agreedOrderDto);
-    //
-    //        supplyRequest.setStatus(SupplyOrderRequestStatus.FARMER_ACCEPTED);
-    //        requestRepository.save(supplyRequest);
-    //
-    //        log.info("Farmer {} accepted SupplyOrderRequest {} and created Order {}",
-    //                farmer.getId(), requestId, createdOrder.getOrderCode());
-    //
-    //        // Gửi thông báo cho Buyer
-    //        // notificationService.sendSupplyOrderRequestAcceptedNotification(supplyRequest,
-    // createdOrder);
-    //
-    //        return createdOrder;
-    // *** LOGIC CHÍNH ĐƯỢC THAY ĐỔI ***
+
     // Chỉ cập nhật trạng thái. Việc tạo Order sẽ do một API khác xử lý.
     supplyRequest.setStatus(SupplyOrderRequestStatus.FARMER_ACCEPTED); // Trạng thái mới
     SupplyOrderRequest savedRequest = requestRepository.save(supplyRequest);
@@ -317,8 +260,49 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
     requestRepository.save(request);
     log.info("Buyer {} cancelled SupplyOrderRequest {}", buyer.getId(), requestId);
 
-    // TODO: Gửi thông báo cho Farmer rằng Buyer đã hủy yêu cầu
+
     // notificationService.sendSupplyRequestCancelledByBuyerNotification(request.getFarmer(),
     // request);
+  }
+
+  @Override
+  public void checkCreatePermission(Authentication authentication) {
+    User buyer = SecurityUtils.getCurrentAuthenticatedUser();
+
+
+    // 1. Lấy danh sách các vai trò của người dùng
+    Set<Role> userRoles = buyer.getRoles();
+
+    // 2. Kiểm tra xem người dùng có vai trò FARMER hoặc BUSINESS_BUYER không
+    boolean isFarmer = userRoles.stream()
+            .anyMatch(role -> role.getName() == RoleType.ROLE_FARMER);
+
+    boolean isBusinessBuyer = userRoles.stream()
+            .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
+
+    // 3. Nếu người dùng KHÔNG phải là Farmer VÀ cũng KHÔNG phải là Business Buyer
+    if (!isFarmer && !isBusinessBuyer) {
+      // Ném ra exception yêu cầu nâng cấp tài khoản.
+      // Thông báo này vẫn hợp lý vì người dùng có thể chọn nâng cấp lên Business Buyer.
+      throw new BusinessAccountRequiredException(
+              "Chức năng này chỉ dành cho tài khoản Nông dân hoặc Doanh nghiệp. Vui lòng đăng ký hồ sơ phù hợp để tiếp tục.");
+    }
+
+    // 4. Nếu người dùng là BUSINESS_BUYER, yêu cầu phải có hồ sơ doanh nghiệp
+    if (isBusinessBuyer) {
+      businessProfileRepository.findById(buyer.getId())
+              .orElseThrow(() -> new BusinessProfileRequiredException(
+                      "Bạn cần hoàn thiện hồ sơ doanh nghiệp trước khi gửi yêu cầu cung ứng."));
+    }
+
+    // 5. Nếu người dùng là FARMER (nhưng không phải Business Buyer), yêu cầu phải có hồ sơ nông dân
+    // Điều này đảm bảo chỉ những nông dân đã đăng ký hồ sơ mới có thể mua hàng B2B.
+    if (isFarmer && !isBusinessBuyer) {
+      farmerProfileRepository.findById(buyer.getId())
+              .orElseThrow(() -> new FarmerProfileRequiredException( // <<< TẠO EXCEPTION MỚI
+                      "Bạn cần hoàn thiện hồ sơ nông dân trước khi gửi yêu cầu cung ứng."));
+    }
+
+    // Nếu người dùng có cả 2 vai trò, chỉ cần 1 trong 2 hồ sơ tồn tại là được
   }
 }

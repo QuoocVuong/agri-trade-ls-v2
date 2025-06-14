@@ -2,6 +2,7 @@ package com.yourcompany.agritrade.usermanagement.service.impl;
 
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.usermanagement.domain.Address;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.dto.request.AddressRequest;
@@ -31,7 +32,7 @@ public class AddressServiceImpl implements AddressService {
   @Override
   @Transactional(readOnly = true)
   public List<AddressResponse> getMyAddresses(Authentication authentication) {
-    User currentUser = getUserFromAuthentication(authentication);
+    User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
     log.debug("Fetching addresses for user ID: {}", currentUser.getId());
     // Repo đã có @Where(clause = "is_deleted = false") nên tự lọc
     List<Address> addresses = addressRepository.findByUserId(currentUser.getId());
@@ -41,7 +42,7 @@ public class AddressServiceImpl implements AddressService {
   @Override
   @Transactional(readOnly = true)
   public AddressResponse getMyAddressById(Authentication authentication, Long addressId) {
-    User currentUser = getUserFromAuthentication(authentication);
+    User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
     Address address =
         addressRepository
             .findByIdAndUserId(addressId, currentUser.getId())
@@ -52,7 +53,7 @@ public class AddressServiceImpl implements AddressService {
   @Override
   @Transactional
   public AddressResponse addMyAddress(Authentication authentication, AddressRequest request) {
-    User currentUser = getUserFromAuthentication(authentication);
+    User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
 
     Address newAddress = addressMapper.requestToAddress(request);
     newAddress.setUser(currentUser);
@@ -80,7 +81,7 @@ public class AddressServiceImpl implements AddressService {
   @Transactional
   public AddressResponse updateMyAddress(
       Authentication authentication, Long addressId, AddressRequest request) {
-    User currentUser = getUserFromAuthentication(authentication);
+    User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
     Address existingAddress =
         addressRepository
             .findByIdAndUserId(addressId, currentUser.getId())
@@ -113,7 +114,7 @@ public class AddressServiceImpl implements AddressService {
   @Override
   @Transactional
   public void deleteMyAddress(Authentication authentication, Long addressId) {
-    User currentUser = getUserFromAuthentication(authentication);
+    User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
     Address address =
         addressRepository
             .findByIdAndUserId(addressId, currentUser.getId())
@@ -146,7 +147,7 @@ public class AddressServiceImpl implements AddressService {
   @Override
   @Transactional
   public void setMyDefaultAddress(Authentication authentication, Long addressId) {
-    User currentUser = getUserFromAuthentication(authentication);
+    User currentUser = SecurityUtils.getCurrentAuthenticatedUser();
     Address newDefaultAddress =
         addressRepository
             .findByIdAndUserId(addressId, currentUser.getId())
@@ -174,18 +175,7 @@ public class AddressServiceImpl implements AddressService {
         .orElse(null); // Trả về null nếu không có địa chỉ mặc định
   }
 
-  // --- Helper Methods ---
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      throw new AccessDeniedException("User is not authenticated");
-    }
-    String email = authentication.getName();
-    return userRepository
-        .findByEmail(email)
-        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-  }
+
 
   private void unsetDefaultForOtherAddresses(Long userId, Long excludeAddressId) {
     List<Address> currentDefaults =

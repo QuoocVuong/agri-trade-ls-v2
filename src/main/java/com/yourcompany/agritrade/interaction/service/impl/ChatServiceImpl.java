@@ -3,6 +3,7 @@ package com.yourcompany.agritrade.interaction.service.impl;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.ChatMessage;
 import com.yourcompany.agritrade.interaction.domain.ChatRoom;
 import com.yourcompany.agritrade.interaction.domain.MessageType;
@@ -54,7 +55,7 @@ public class ChatServiceImpl implements ChatService {
   @Override
   @Transactional
   public ChatRoomResponse getOrCreateChatRoom(Authentication authentication, Long recipientId) {
-    User sender = getUserFromAuthentication(authentication);
+    User sender = SecurityUtils.getCurrentAuthenticatedUser();
     User recipient =
         userRepository
             .findById(recipientId)
@@ -80,7 +81,7 @@ public class ChatServiceImpl implements ChatService {
   @Transactional
   public ChatMessageResponse sendMessage(
       Authentication authentication, ChatMessageRequest request) {
-    User sender = getUserFromAuthentication(authentication);
+    User sender = SecurityUtils.getCurrentAuthenticatedUser();
     User recipient =
         userRepository
             .findById(request.getRecipientId())
@@ -248,7 +249,7 @@ public class ChatServiceImpl implements ChatService {
   @Override
   @Transactional(readOnly = true)
   public List<ChatRoomResponse> getMyChatRooms(Authentication authentication) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     List<ChatRoom> rooms = chatRoomRepository.findRoomsByUser(user.getId());
     return chatRoomMapper.toChatRoomResponseList(
         rooms); // Mapper sẽ tính myUnreadCount và otherUser
@@ -258,7 +259,7 @@ public class ChatServiceImpl implements ChatService {
   @Transactional(readOnly = true)
   public Page<ChatMessageResponse> getChatMessages(
       Authentication authentication, Long roomId, Pageable pageable) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     ChatRoom room =
         chatRoomRepository
             .findById(roomId)
@@ -278,7 +279,7 @@ public class ChatServiceImpl implements ChatService {
   @Override
   @Transactional
   public void markMessagesAsRead(Authentication authentication, Long roomId) {
-    User user = getUserFromAuthentication(authentication); // Người đọc
+    User user = SecurityUtils.getCurrentAuthenticatedUser(); // Người đọc
     ChatRoom room =
         chatRoomRepository
             .findById(roomId)
@@ -328,25 +329,9 @@ public class ChatServiceImpl implements ChatService {
   @Override
   @Transactional(readOnly = true)
   public int getTotalUnreadMessages(Authentication authentication) {
-    User user = getUserFromAuthentication(authentication);
+    User user = SecurityUtils.getCurrentAuthenticatedUser();
     return chatRoomRepository.getTotalUnreadCountForUser(user.getId()).orElse(0);
   }
 
-  // Helper method
-  private User getUserFromAuthentication(Authentication authentication) {
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
-      // Ném lỗi vì các API chat yêu cầu đăng nhập
-      throw new AccessDeniedException("User is not authenticated for chat operations.");
-    }
-    String email = authentication.getName(); // Lấy email/username từ Principal
-    return userRepository
-        .findByEmail(email) // Tìm trong DB
-        .orElseThrow(
-            () ->
-                new UsernameNotFoundException(
-                    "Authenticated user not found with email: "
-                        + email)); // Ném lỗi nếu không thấy user trong DB
-  }
+
 }
