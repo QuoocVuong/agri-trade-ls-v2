@@ -61,9 +61,9 @@ public class PaymentController {
           if (hashData.length() > 0) {
             hashData.append('&');
           }
-          hashData.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII));
+          hashData.append(fieldName);
           hashData.append('=');
-          hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
+          hashData.append(fieldValue);
         }
       }
 

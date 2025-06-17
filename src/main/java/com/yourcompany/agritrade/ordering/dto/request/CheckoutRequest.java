@@ -2,8 +2,11 @@ package com.yourcompany.agritrade.ordering.dto.request;
 
 import com.yourcompany.agritrade.ordering.domain.PaymentMethod;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+
+import java.math.BigDecimal;
 
 @Data
 public class CheckoutRequest {
@@ -12,6 +15,10 @@ public class CheckoutRequest {
 
   @NotNull(message = "Payment method is required")
   private PaymentMethod paymentMethod;
+
+  @NotNull(message = "Confirmed total amount is required.")
+  @Positive(message = "Confirmed total must be positive.")
+  private BigDecimal confirmedTotalAmount;
 
   private String notes; // Ghi chú tùy chọn
 

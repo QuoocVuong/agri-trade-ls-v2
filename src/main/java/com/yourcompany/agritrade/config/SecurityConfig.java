@@ -104,7 +104,8 @@ public class SecurityConfig {
                         "/api-docs/**", // OpenAPI docs
                         "/api/auth/refresh-token",
                         "/swagger-ui.html",
-                        "/ws/**" // <-- Cho phép kết nối WebSocket ban đầu
+                        "/ws/**", // <-- Cho phép kết nối WebSocket ban đầu
+                        "/api/payments/callback/**"
                         )
                     .permitAll()
                     .anyRequest()

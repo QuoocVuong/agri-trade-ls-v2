@@ -22,8 +22,10 @@ app:
   # URL cho môi trường production
   frontend:
     url: "https://agri-trade-ls.vercel.app"
+    vnpayReturnUrl: "${app.frontend.url}/payment/vnpay/result"
   backend:
     url: "https://agritrade-backend.duckdns.org"
+    vnpayIpnUrl: "${app.backend.url}/api/payments/callback/vnpay/ipn"
   # Các URL callback sẽ được xây dựng từ 2 URL trên
   bank:
     # Giữ nguyên thông tin tài khoản ngân hàng

@@ -109,255 +109,173 @@ public class OrderServiceImpl implements OrderService {
   private String backendAppUrl;
 
   @Override
-  @Transactional(isolation = Isolation.READ_COMMITTED) // Đảm bảo đọc dữ liệu đã commit
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   @Retryable(
-      retryFor = {
-        OptimisticLockingFailureException.class,
-        ObjectOptimisticLockingFailureException.class
-      },
-      maxAttempts = 3,
-      backoff = @Backoff(delay = 100))
-  // Thử lại nếu có xung đột optimistic lock
+          retryFor = {OptimisticLockingFailureException.class, ObjectOptimisticLockingFailureException.class},
+          maxAttempts = 3,
+          backoff = @Backoff(delay = 100)
+  )
   public List<OrderResponse> checkout(Authentication authentication, CheckoutRequest request) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser();
-
-
-    // Nếu người dùng chọn thanh toán bằng INVOICE (công nợ)
-    if (request.getPaymentMethod() == PaymentMethod.INVOICE) {
-      // Kiểm tra xem họ có vai trò BUSINESS_BUYER không
-      boolean isBusinessBuyer = buyer.getRoles().stream()
-              .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
-
-      if (!isBusinessBuyer) {
-        throw new BadRequestException("Phương thức thanh toán bằng Công nợ (Invoice) chỉ dành cho khách hàng doanh nghiệp.");
-      }
-    }
-
-
-
-    Address shippingAddress =
-        addressRepository
-            .findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
-            .orElseThrow(
-                () ->
-                    new ResourceNotFoundException(
-                        "Shipping Address", "id", request.getShippingAddressId()));
+    Address shippingAddress = addressRepository.findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("Shipping Address", "id", request.getShippingAddressId()));
 
     List<CartItem> cartItems = cartItemRepository.findByUserId(buyer.getId());
     if (cartItems.isEmpty()) {
-      throw new BadRequestException("Cart is empty.");
+      throw new BadRequestException("Giỏ hàng của bạn đang trống.");
     }
 
-    // Phân nhóm item theo Farmer ID
-    Map<Long, List<CartItem>> itemsByFarmer =
-        cartItems.stream()
-            .collect(
-                Collectors.groupingBy(
-                    item -> {
-                      // Thêm kiểm tra null cho product ở đây để an toàn hơn
-                      Product p = item.getProduct();
-                      if (p == null || p.getFarmer() == null) {
-                        log.error(
-                            "CartItem ID {} has null product or farmer. Skipping.", item.getId());
-                        // Có thể ném lỗi hoặc xử lý khác
-                        throw new IllegalStateException(
-                            "Invalid cart item found with missing product or farmer data.");
-                      }
-                      return p.getFarmer().getId();
-                    }));
+    // --- BƯỚC 1: XÁC THỰC TOÀN BỘ GIỎ HÀNG VÀ TÍNH TOÁN LẠI TỔNG TIỀN ---
+    List<String> validationErrors = new ArrayList<>();
+    Map<Long, Product> validatedProducts = new HashMap<>(); // Lưu các sản phẩm đã được kiểm tra
+    BigDecimal currentActualSubTotal = BigDecimal.ZERO;
+
+    for (CartItem cartItem : cartItems) {
+      Product productInCart = cartItem.getProduct();
+      if (productInCart == null) {
+        validationErrors.add("Một sản phẩm trong giỏ hàng không hợp lệ.");
+        cartItemRepository.delete(cartItem);
+        continue;
+      }
+
+      Long productId = productInCart.getId();
+      int requestedQuantity = cartItem.getQuantity();
+
+      Product productFromDb = productRepository.findById(productId).orElse(null);
+
+      // Kiểm tra các điều kiện và thu thập lỗi
+      if (productFromDb == null || productFromDb.isDeleted()) {
+        validationErrors.add("Sản phẩm '" + productInCart.getName() + "' không còn tồn tại.");
+        cartItemRepository.delete(cartItem);
+        continue;
+      }
+      if (productFromDb.getStatus() != ProductStatus.PUBLISHED) {
+        validationErrors.add("Sản phẩm '" + productFromDb.getName() + "' hiện không còn được bán.");
+        cartItemRepository.delete(cartItem);
+        continue;
+      }
+      if (productFromDb.getStockQuantity() < requestedQuantity) {
+        validationErrors.add("Sản phẩm '" + productFromDb.getName() + "' không đủ số lượng tồn kho (chỉ còn " + productFromDb.getStockQuantity() + ").");
+        continue; // Không xóa, chỉ báo lỗi để người dùng sửa
+      }
+
+      // Nếu sản phẩm hợp lệ, thêm vào map để xử lý sau và tính tổng phụ
+      validatedProducts.put(productId, productFromDb);
+      currentActualSubTotal = currentActualSubTotal.add(productFromDb.getPrice().multiply(BigDecimal.valueOf(requestedQuantity)));
+    }
+
+    // Nếu có bất kỳ lỗi nào về tồn kho hoặc trạng thái, dừng lại ngay
+    if (!validationErrors.isEmpty()) {
+      String combinedErrorMessage = String.join("\n", validationErrors);
+      throw new BadRequestException("Không thể đặt hàng. Vui lòng kiểm tra lại giỏ hàng:\n" + combinedErrorMessage);
+    }
+
+    // --- BƯỚC 2: KIỂM TRA TỔNG TIỀN CUỐI CÙNG ---
+    BigDecimal totalShippingFee = calculateTotalShippingFee(cartItems, buyer, shippingAddress);
+    BigDecimal totalDiscount = calculateDiscount(buyer, currentActualSubTotal);
+    BigDecimal currentActualTotal = currentActualSubTotal.add(totalShippingFee).subtract(totalDiscount).setScale(2, RoundingMode.HALF_UP);
+
+    if (request.getConfirmedTotalAmount().compareTo(currentActualTotal) != 0) {
+      log.warn("Price/Total mismatch during checkout for user {}. Confirmed: {}, Actual: {}",
+              buyer.getEmail(), request.getConfirmedTotalAmount(), currentActualTotal);
+      throw new BadRequestException(
+              "Tổng giá trị đơn hàng đã thay đổi do cập nhật giá hoặc phí vận chuyển. Vui lòng quay lại giỏ hàng để xác nhận lại."
+      );
+    }
+
+    // --- BƯỚC 3: TẠO ĐƠN HÀNG (KHI MỌI THỨ ĐỀU HỢP LỆ) ---
+    Map<Long, List<CartItem>> itemsByFarmer = cartItems.stream()
+            .collect(Collectors.groupingBy(item -> item.getProduct().getFarmer().getId()));
 
     List<Order> createdOrders = new ArrayList<>();
-    List<Long> processedCartItemIds = new ArrayList<>();
-    List<String> unavailableProductMessages = new ArrayList<>(); // Lưu thông báo lỗi
 
     for (Map.Entry<Long, List<CartItem>> entry : itemsByFarmer.entrySet()) {
       Long farmerId = entry.getKey();
       List<CartItem> farmerCartItems = entry.getValue();
-
-      User farmer =
-          userRepository
-              .findById(farmerId)
-              .orElseThrow(() -> new ResourceNotFoundException("Farmer", "id", farmerId));
-
-      if (farmer == null) { // Kiểm tra farmer tồn tại
-        log.error(
-            "Farmer with ID {} not found for items in cart. Skipping this farmer's items.",
-            farmerId);
-        // Thêm các cart item ID này vào danh sách để xóa sau
-        farmerCartItems.forEach(ci -> processedCartItemIds.add(ci.getId()));
-        unavailableProductMessages.add(
-            "Một số sản phẩm từ người bán không xác định đã bị xóa khỏi giỏ hàng.");
-        continue; // Bỏ qua các sản phẩm của farmer này
-      }
-
-      // *** Lấy Farmer Profile để biết tỉnh của Farmer ***
-      FarmerProfile farmerProfile =
-          farmerProfileRepository
-              .findById(farmerId)
-              .orElseThrow(
-                  () -> new ResourceNotFoundException("Farmer Profile", "userId", farmerId));
+      User farmer = userRepository.findById(farmerId).orElseThrow(() -> new IllegalStateException("Farmer not found during order creation"));
+      FarmerProfile farmerProfile = farmerProfileRepository.findById(farmerId).orElseThrow(() -> new IllegalStateException("Farmer profile not found"));
 
       Order order = new Order();
       order.setBuyer(buyer);
       order.setFarmer(farmer);
-      order.setOrderType(determineOrderType(buyer, farmerCartItems)); // Xác định B2B/B2C
+      order.setOrderType(determineOrderType(buyer, farmerCartItems));
       order.setOrderCode(generateOrderCode());
       order.setPaymentMethod(request.getPaymentMethod());
       order.setPaymentStatus(PaymentStatus.PENDING);
       order.setStatus(OrderStatus.PENDING);
       order.setNotes(request.getNotes());
-
-      if (order.getOrderType() == OrderType.B2B) {
-        order.setPurchaseOrderNumber(request.getPurchaseOrderNumber());
-      }
-
       copyShippingAddress(order, shippingAddress);
 
-      BigDecimal subTotal = BigDecimal.ZERO;
-      boolean farmerOrderHasValidItems = false; // Cờ kiểm tra xem farmer này có item hợp lệ không
+      BigDecimal farmerSubTotal = BigDecimal.ZERO;
 
       for (CartItem cartItem : farmerCartItems) {
-        // *** Xử lý Tồn kho với Optimistic Lock ***
-        // Lấy product ID và số lượng yêu cầu
-        Long productId = cartItem.getProduct() != null ? cartItem.getProduct().getId() : null;
-        if (productId == null) {
-          log.warn("CartItem ID {} has null product. Skipping.", cartItem.getId());
-          processedCartItemIds.add(cartItem.getId()); // Đánh dấu để xóa
-          continue;
-        }
+        Product product = validatedProducts.get(cartItem.getProduct().getId());
         int requestedQuantity = cartItem.getQuantity();
 
-        // Tải lại Product trong transaction để lấy version mới nhất (nếu dùng @Version)
-        // Hoặc dùng SELECT FOR UPDATE nếu dùng Pessimistic Lock
-        Product product;
-        try {
-          // Tải lại Product để kiểm tra tồn kho và trạng thái
-          product =
-              productRepository
-                  .findById(productId)
-                  .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
+        // Trừ tồn kho trên đối tượng đã được xác thực
+        product.setStockQuantity(product.getStockQuantity() - requestedQuantity);
 
-          if (product.getStatus() != ProductStatus.PUBLISHED
-              || product.isDeleted()) { // Kiểm tra cả isDeleted ở đây
-            throw new BadRequestException(
-                "Product '" + product.getName() + "' is not available for purchase.");
-          }
+        // Tạo OrderItem với giá hiện tại
+        OrderItem orderItem = new OrderItem();
+        orderItem.setProduct(product);
+        orderItem.setProductName(product.getName());
+        orderItem.setUnit(determineUnit(product, order.getOrderType()));
+        orderItem.setPricePerUnit(product.getPrice());
+        orderItem.setQuantity(requestedQuantity);
+        BigDecimal itemTotalPrice = product.getPrice().multiply(BigDecimal.valueOf(requestedQuantity));
+        orderItem.setTotalPrice(itemTotalPrice);
 
-          int currentStock = product.getStockQuantity();
-          if (currentStock < requestedQuantity) {
-            throw new OutOfStockException(
-                "Not enough stock for product: "
-                    + product.getName()
-                    + ". Available: "
-                    + currentStock,
-                currentStock // Truyền số lượng tồn thực tế
-                );
-          }
-
-          // Trừ kho
-          product.setStockQuantity(currentStock - requestedQuantity);
-
-          // Tạo OrderItem
-          OrderItem orderItem = new OrderItem();
-          orderItem.setProduct(product); // Giữ liên kết
-          orderItem.setProductName(product.getName());
-          BigDecimal pricePerUnit =
-              determinePrice(product, requestedQuantity, order.getOrderType());
-          String unit = determineUnit(product, order.getOrderType());
-          orderItem.setUnit(unit);
-          orderItem.setPricePerUnit(pricePerUnit);
-          orderItem.setQuantity(requestedQuantity);
-          BigDecimal itemTotalPrice = pricePerUnit.multiply(BigDecimal.valueOf(requestedQuantity));
-          orderItem.setTotalPrice(itemTotalPrice);
-
-          order.addOrderItem(orderItem);
-          subTotal = subTotal.add(itemTotalPrice);
-          processedCartItemIds.add(cartItem.getId()); // Đánh dấu cart item đã xử lý
-          farmerOrderHasValidItems = true; // Đánh dấu farmer này có item hợp lệ
-
-        } catch (ResourceNotFoundException | BadRequestException | OutOfStockException e) {
-          // Nếu sản phẩm không tìm thấy, không hợp lệ, hoặc hết hàng
-          log.warn(
-              "Cannot process cart item ID {} for product ID {}: {}",
-              cartItem.getId(),
-              productId,
-              e.getMessage());
-          processedCartItemIds.add(cartItem.getId()); // Đánh dấu để xóa khỏi giỏ hàng
-          unavailableProductMessages.add(
-              "Sản phẩm '"
-                  + (cartItem.getProduct() != null
-                      ? cartItem.getProduct().getName()
-                      : "ID " + productId)
-                  + "' không còn khả dụng và đã bị xóa khỏi giỏ hàng.");
-          // Không ném lỗi ra ngoài ngay, tiếp tục xử lý các item khác
-        } catch (OptimisticLockingFailureException e) {
-          log.warn(
-              "Optimistic lock failed during checkout for product ID {}. Retrying...", productId);
-          throw e; // Ném lại để @Retryable xử lý
-        }
-      } // Kết thúc vòng lặp qua cart items của farmer
-
-      // Chỉ tạo order cho farmer nếu có ít nhất 1 item hợp lệ
-      if (farmerOrderHasValidItems) {
-
-        order.setSubTotal(subTotal);
-
-        BigDecimal shippingFee =
-            calculateShippingFee(
-                shippingAddress,
-                farmerProfile,
-                farmerCartItems,
-                order.getOrderType()); // Truyền thêm OrderType
-        order.setShippingFee(shippingFee);
-        BigDecimal discount = calculateDiscount(buyer, subTotal); // Truyền subTotal
-        order.setDiscountAmount(discount);
-        order.setTotalAmount(subTotal.add(shippingFee).subtract(discount));
-
-        // Lưu Order (bao gồm OrderItems nhờ CascadeType.ALL)
-        Order savedOrder = orderRepository.save(order);
-
-        // *** Gửi thông báo đặt hàng thành công ***
-        notificationService.sendOrderPlacementNotification(savedOrder);
-
-        createInitialPaymentRecord(savedOrder); // Helper tạo paymentcalculateShippingFee
-
-        if (savedOrder.getPaymentMethod() == PaymentMethod.INVOICE) {
-          invoiceService.getOrCreateInvoiceForOrder(savedOrder); // Gọi InvoiceService
-          // InvoiceService sẽ tạo Invoice với status là ISSUED và tính dueDate nếu cần
-        }
-
-        createdOrders.add(savedOrder);
-        // Cuối vòng lặp for trong checkout, sau khi save order và payment
-        notificationService.sendOrderPlacementNotification(savedOrder);
-        log.info(
-            "Order {} created successfully for farmer {}", savedOrder.getOrderCode(), farmerId);
-
-      } else {
-        log.info(
-            "No valid items found for farmer {}. Skipping order creation for this farmer.",
-            farmerId);
+        order.addOrderItem(orderItem);
+        farmerSubTotal = farmerSubTotal.add(itemTotalPrice);
       }
-    } // Kết thúc vòng lặp qua các farmer
 
-    // Xóa các cart item đã checkout
-    if (!processedCartItemIds.isEmpty()) {
-      cartItemRepository.deleteAllById(processedCartItemIds);
-    }
-    // Nếu có lỗi về sản phẩm không khả dụng, ném lỗi tổng hợp
-    if (!unavailableProductMessages.isEmpty()) {
-      throw new BadRequestException(String.join("\n", unavailableProductMessages));
-    }
-    // Nếu không có đơn hàng nào được tạo (do tất cả sản phẩm đều lỗi)
-    if (createdOrders.isEmpty()) {
-      throw new BadRequestException(
-          "Không thể tạo đơn hàng do tất cả sản phẩm trong giỏ không hợp lệ.");
+      // Tính toán các loại phí cho từng đơn hàng của từng farmer
+      BigDecimal farmerShippingFee = calculateShippingFee(shippingAddress, farmerProfile, farmerCartItems, order.getOrderType());
+      BigDecimal farmerDiscount = calculateDiscount(buyer, farmerSubTotal); // Discount có thể tính trên từng đơn hoặc tổng
+
+      order.setSubTotal(farmerSubTotal);
+      order.setShippingFee(farmerShippingFee);
+      order.setDiscountAmount(farmerDiscount);
+      order.setTotalAmount(farmerSubTotal.add(farmerShippingFee).subtract(farmerDiscount));
+
+      Order savedOrder = orderRepository.save(order);
+      createdOrders.add(savedOrder);
+
+      notificationService.sendOrderPlacementNotification(savedOrder);
+      createInitialPaymentRecord(savedOrder);
+      if (savedOrder.getPaymentMethod() == PaymentMethod.INVOICE) {
+        invoiceService.getOrCreateInvoiceForOrder(savedOrder);
+      }
+      log.info("Order {} created successfully for farmer {}", savedOrder.getOrderCode(), farmerId);
     }
 
-    // Load lại đầy đủ thông tin để trả về (do save ban đầu có thể chưa flush hết)
+    // Xóa toàn bộ giỏ hàng sau khi đã xử lý thành công
+    cartItemRepository.deleteAllInBatch(cartItems);
+
     return createdOrders.stream()
-        .map(o -> orderRepository.findById(o.getId()).orElse(o)) // Load lại
-        .map(orderMapper::toOrderResponse)
-        .collect(Collectors.toList());
+            .map(o -> orderRepository.findById(o.getId()).orElse(o))
+            .map(orderMapper::toOrderResponse)
+            .collect(Collectors.toList());
+  }
+
+  private BigDecimal calculateTotalShippingFee(List<CartItem> cartItems, User buyer, Address shippingAddress) {
+    Map<Long, List<CartItem>> itemsByFarmer = cartItems.stream()
+            .collect(Collectors.groupingBy(item -> item.getProduct().getFarmer().getId()));
+
+    BigDecimal totalShippingFee = BigDecimal.ZERO;
+
+    for (Map.Entry<Long, List<CartItem>> entry : itemsByFarmer.entrySet()) {
+      Long farmerId = entry.getKey();
+      List<CartItem> farmerCartItems = entry.getValue();
+      // Lấy profile để tính phí ship
+      FarmerProfile farmerProfile = farmerProfileRepository.findById(farmerId).orElse(null);
+      OrderType orderType = determineOrderType(buyer, farmerCartItems);
+
+      if (farmerProfile != null) {
+        totalShippingFee = totalShippingFee.add(calculateShippingFee(shippingAddress, farmerProfile, farmerCartItems, orderType));
+      }
+    }
+    return totalShippingFee;
   }
 
   @Override
@@ -830,11 +748,36 @@ public class OrderServiceImpl implements OrderService {
   }
 
   private OrderType determineOrderType(User buyer, List<CartItem> items) {
-    // Logic xác định B2B/B2C, ví dụ dựa trên vai trò người mua
-    boolean isBusiness =
-        buyer.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_BUSINESS_BUYER);
-    // Hoặc dựa trên số lượng/loại sản phẩm trong giỏ hàng
-    return isBusiness ? OrderType.B2B : OrderType.B2C;
+    // 1. Kiểm tra xem người mua có vai trò BUSINESS_BUYER không.
+    boolean isBusinessBuyer = buyer.getRoles().stream()
+            .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
+
+    // 2. Nếu người mua không phải là Business Buyer, đơn hàng luôn là B2C.
+    if (!isBusinessBuyer) {
+      return OrderType.B2C;
+    }
+
+    // 3. Nếu là Business Buyer, kiểm tra các sản phẩm trong giỏ hàng.
+    //    Đơn hàng chỉ là B2B nếu TẤT CẢ các sản phẩm đều được bật B2B.
+    if (items == null || items.isEmpty()) {
+      // Nếu giỏ hàng trống (trường hợp hiếm), mặc định là B2C.
+      return OrderType.B2C;
+    }
+
+    // allMatch sẽ trả về true nếu tất cả các item thỏa mãn điều kiện,
+    // hoặc trả về true nếu danh sách item rỗng (đã kiểm tra ở trên).
+    boolean allItemsAreB2BEnabled = items.stream()
+            .allMatch(item -> item.getProduct() != null && item.getProduct().isB2bEnabled());
+
+    if (allItemsAreB2BEnabled) {
+      // Nếu tất cả sản phẩm đều hỗ trợ B2B, đây là đơn hàng B2B.
+      log.info("Determined order type as B2B for buyer ID {}", buyer.getId());
+      return OrderType.B2B;
+    } else {
+      // Nếu có ít nhất một sản phẩm không hỗ trợ B2B, toàn bộ đơn hàng được coi là B2C.
+      log.info("Determined order type as B2C for buyer ID {} because at least one item is not B2B enabled.", buyer.getId());
+      return OrderType.B2C;
+    }
   }
 
   private BigDecimal determinePrice(Product product, int quantity, OrderType type) {
