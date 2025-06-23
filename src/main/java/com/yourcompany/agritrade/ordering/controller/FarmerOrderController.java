@@ -17,6 +17,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -32,15 +33,24 @@ public class FarmerOrderController {
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getMyOrdersAsFarmer(
       Authentication authentication,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) OrderStatus status,
+      @RequestParam(required = false) String status,
       @RequestParam(required = false) PaymentMethod paymentMethod,
       @RequestParam(required = false) PaymentStatus paymentStatus,
       @RequestParam(required = false) OrderType orderType,
       @PageableDefault(size = 15, sort = "createdAt,desc") Pageable pageable) {
 
+    OrderStatus statusEnum = null;
+    if (StringUtils.hasText(status)) {
+      try {
+        statusEnum = OrderStatus.valueOf(status.toUpperCase());
+      } catch (IllegalArgumentException e) {
+
+      }
+    }
+
     Page<OrderSummaryResponse> orders =
         orderService.getMyOrdersAsFarmer(
-            authentication, keyword, status, paymentMethod, paymentStatus, orderType, pageable);
+            authentication, keyword, statusEnum, paymentMethod, paymentStatus, orderType, pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 

@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.common.util; // Hoặc package utils phù hợp
+package com.yourcompany.agritrade.common.util;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;

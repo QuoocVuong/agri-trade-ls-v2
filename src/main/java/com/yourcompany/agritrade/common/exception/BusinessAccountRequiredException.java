@@ -5,8 +5,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 @ResponseStatus(HttpStatus.FORBIDDEN)
 public class BusinessAccountRequiredException extends RuntimeException {
-    public BusinessAccountRequiredException(String message) {
+  public BusinessAccountRequiredException(String message) {
 
-        super(message);
-    }
+    super(message);
+  }
 }

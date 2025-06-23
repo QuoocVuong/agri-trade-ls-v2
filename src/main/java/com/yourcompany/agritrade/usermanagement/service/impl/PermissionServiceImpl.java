@@ -1,4 +1,3 @@
-// src/main/java/com/yourcompany/agritrade/usermanagement/service/impl/PermissionServiceImpl.java
 package com.yourcompany.agritrade.usermanagement.service.impl;
 
 import com.yourcompany.agritrade.common.exception.BadRequestException;

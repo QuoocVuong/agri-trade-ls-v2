@@ -58,8 +58,7 @@ public abstract class OrderMapper {
     }
 
     // Tìm Invoice liên quan đến Order này
-    // Giả sử Invoice được tạo khi đơn hàng INVOICE được tạo
-    // Nếu bạn dùng invoiceService.getOrCreateInvoiceForOrder() khi checkout,
+    //  Invoice được tạo khi đơn hàng INVOICE được tạo
     // thì ở đây invoiceRepository.findByOrderId() sẽ luôn tìm thấy.
     return invoiceRepository
         .findByOrderId(order.getId())
@@ -71,7 +70,7 @@ public abstract class OrderMapper {
                     invoice.getDueDate(),
                     invoice.getStatus(),
                     invoice.getId()))
-        .orElse(null); // Trả về null nếu không tìm thấy Invoice (dù không nên xảy ra)
+        .orElse(null); // Trả về null nếu không tìm thấy Invoice
   }
 
   // Map sang OrderSummaryResponse (tóm tắt)
@@ -94,7 +93,7 @@ public abstract class OrderMapper {
   @Named("mapUserAndProfileToFarmerInfo") // Đổi tên cho rõ ràng
   protected FarmerInfoResponse mapUserAndProfileToFarmerInfo(User farmer) {
     if (farmer == null) return null;
-    // Quan trọng: Dòng này yêu cầu FarmerProfile phải được load sẵn (do JOIN FETCH trong
+    // Dòng này yêu cầu FarmerProfile phải được load sẵn (do JOIN FETCH trong
     // Service/Repo)
     FarmerProfile profile = farmer.getFarmerProfile();
     // Gọi phương thức của FarmerInfoMapper nhận cả User và Profile
@@ -107,8 +106,7 @@ public abstract class OrderMapper {
       info.setFarmName(
           farmer.getFullName()); // Dùng fullName của User làm dự phòng nếu farmName trống
     }
-    // Đảm bảo fullName luôn được map vào FarmerInfoResponse (nếu chưa có trong
-    // toFarmerInfoResponse)
+    // Đảm bảo fullName luôn được map vào FarmerInfoResponse
     if (info != null && info.getFullName() == null && farmer.getFullName() != null) {
       info.setFullName(farmer.getFullName());
     }
@@ -120,7 +118,7 @@ public abstract class OrderMapper {
   @Named("mapUserToBestFarmerName")
   protected String mapUserToBestFarmerName(User farmer) {
     if (farmer == null) return null;
-    // Quan trọng: Dòng này yêu cầu FarmerProfile phải được load sẵn
+    //  Dòng này yêu cầu FarmerProfile phải được load sẵn
     FarmerProfile profile = farmer.getFarmerProfile();
     if (profile != null && profile.getFarmName() != null && !profile.getFarmName().isEmpty()) {
       return profile.getFarmName(); // Ưu tiên farmName

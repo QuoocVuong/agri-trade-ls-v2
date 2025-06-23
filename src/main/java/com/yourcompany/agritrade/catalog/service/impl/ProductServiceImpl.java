@@ -39,7 +39,6 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -468,15 +467,7 @@ public class ProductServiceImpl implements ProductService {
       Double maxPrice,
       Integer minRating,
       Pageable pageable) {
-    log.debug(
-        "Searching public products with keyword: '{}', categoryId: {}, provinceCode: {}, minPrice: {}, maxPrice: {}, minRating: {}, pageable: {}",
-        keyword,
-        categoryId,
-        provinceCode,
-        minPrice,
-        maxPrice,
-        minRating,
-        pageable);
+
     Specification<Product> spec =
         Specification.where(ProductSpecifications.isPublished())
             .and(ProductSpecifications.hasKeyword(keyword))
@@ -704,8 +695,6 @@ public class ProductServiceImpl implements ProductService {
       throw new ResourceNotFoundException("Product", "id", productId);
     }
   }
-
-
 
   private Product findMyProductById(Long productId, Long farmerId) {
     // findByIdAndFarmerId đã tự lọc is_deleted=false
@@ -952,13 +941,6 @@ public class ProductServiceImpl implements ProductService {
       String wardCode,
       Integer minQuantityNeeded,
       Pageable pageable) {
-    log.debug(
-        "Finding supply sources with productKeyword: {}, categoryId: {}, provinceCode: {}, districtCode: {}, minQuantity: {}",
-        productKeyword,
-        categoryId,
-        provinceCode,
-        districtCode,
-        minQuantityNeeded);
 
     // 1. Tạo Specification để tìm Product phù hợp
     Specification<Product> productSpec =

@@ -1,6 +1,4 @@
-package com.yourcompany.agritrade.usermanagement.dto.response; // Đặt trong usermanagement hoặc
-
-// common
+package com.yourcompany.agritrade.usermanagement.dto.response;
 
 import java.math.BigDecimal;
 import java.util.Map;

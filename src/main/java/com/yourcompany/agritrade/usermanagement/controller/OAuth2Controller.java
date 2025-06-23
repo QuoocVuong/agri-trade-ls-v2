@@ -1,4 +1,3 @@
-// OAuth2Controller.java
 package com.yourcompany.agritrade.usermanagement.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;

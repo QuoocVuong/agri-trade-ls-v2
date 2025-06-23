@@ -180,8 +180,12 @@ public class UserServiceImpl implements UserService {
     // Mã hóa và cập nhật mật khẩu mới
     user.setPasswordHash(passwordEncoder.encode(passwordChangeRequest.getNewPassword()));
 
-    invalidateRefreshTokenForUser(user.getEmail());
+    // Vô hiệu hóa refresh token ngay tại đây
+    user.setRefreshToken(null);
+    user.setRefreshTokenExpiryDate(null);
+    log.info("Invalidated refresh token for user: {} due to password change.", email);
 
+    // Lưu tất cả thay đổi (mật khẩu mới và refresh token đã xóa) trong một lần duy nhất
     userRepository.save(user);
   }
 
@@ -236,20 +240,23 @@ public class UserServiceImpl implements UserService {
   private UserProfileResponse buildUserProfileResponse(User user) {
     UserProfileResponse response = userMapper.toUserProfileResponse(user);
 
-
-
     // Luôn kiểm tra FarmerProfile một cách độc lập
     if (user.getRoles().stream().anyMatch(role -> role.getName() == RoleType.ROLE_FARMER)) {
-      farmerProfileRepository.findById(user.getId()).ifPresent(profile ->
-              response.setFarmerProfile(farmerProfileMapper.toFarmerProfileResponse(profile))
-      );
+      farmerProfileRepository
+          .findById(user.getId())
+          .ifPresent(
+              profile ->
+                  response.setFarmerProfile(farmerProfileMapper.toFarmerProfileResponse(profile)));
     }
 
     // Luôn kiểm tra BusinessProfile một cách độc lập
     if (user.getRoles().stream().anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER)) {
-      businessProfileRepository.findById(user.getId()).ifPresent(profile ->
-              response.setBusinessProfile(businessProfileMapper.toBusinessProfileResponse(profile))
-      );
+      businessProfileRepository
+          .findById(user.getId())
+          .ifPresent(
+              profile ->
+                  response.setBusinessProfile(
+                      businessProfileMapper.toBusinessProfileResponse(profile)));
     }
 
     return response;
@@ -298,10 +305,8 @@ public class UserServiceImpl implements UserService {
     return userMapper.toUserResponse(updatedUser);
   }
 
+  //  Thêm phương thức xóa mềm
 
-
-  // (Optional) Thêm phương thức xóa mềm
-  // @Override
   @Transactional
   public void softDeleteUser(Long id) {
     User user =
@@ -311,7 +316,7 @@ public class UserServiceImpl implements UserService {
     userRepository.delete(user); // Hibernate sẽ chạy câu lệnh trong @SQLDelete
   }
 
-  // (Optional) Thêm phương thức khôi phục user
+  //  Thêm phương thức khôi phục user
   @Transactional
   public UserResponse restoreUser(Long id) {
     User user =
@@ -563,9 +568,6 @@ public class UserServiceImpl implements UserService {
     GoogleIdTokenVerifier verifier =
         new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
             .setAudience(Collections.singletonList(googleClientId))
-            // Hoặc nếu bạn có nhiều client ID: .setAudience(Arrays.asList(CLIENT_ID_1, CLIENT_ID_2,
-            // ...))
-            // .setIssuer("https://accounts.google.com") // Có thể chỉ định issuer
             .build();
 
     GoogleIdToken idToken = verifier.verify(googleIdTokenString);

@@ -74,15 +74,15 @@ public class Order {
   // Thanh toán & Trạng thái
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private PaymentMethod paymentMethod = PaymentMethod.COD; // Tạo Enum này
+  private PaymentMethod paymentMethod = PaymentMethod.COD;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private PaymentStatus paymentStatus = PaymentStatus.PENDING; // Tạo Enum này
+  private PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  private OrderStatus status = OrderStatus.PENDING; // Tạo Enum này
+  private OrderStatus status = OrderStatus.PENDING;
 
   @Lob private String notes;
 
@@ -102,8 +102,6 @@ public class Order {
       orphanRemoval = true,
       fetch = FetchType.LAZY)
   private Set<Payment> payments = new HashSet<>(); // Lịch sử thanh toán
-
-  // Thêm vào trong lớp Order.java
 
   @OneToOne(fetch = FetchType.LAZY) // Một Order chỉ có thể đến từ một Request
   @JoinColumn(name = "source_request_id", referencedColumnName = "id")

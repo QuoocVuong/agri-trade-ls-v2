@@ -1,4 +1,3 @@
-// ordering/scheduler/InvoiceScheduler.java
 package com.yourcompany.agritrade.ordering.scheduler;
 
 import com.yourcompany.agritrade.common.model.RoleType;
@@ -34,7 +33,7 @@ public class InvoiceScheduler {
   @Value("${app.scheduler.invoice.due_soon_days_before:3}")
   private int dueSoonDaysBefore;
 
-  @Value("${app.scheduler.invoice.overdue_admin_notify_after_days:7}") // Thêm cấu hình này
+  @Value("${app.scheduler.invoice.overdue_admin_notify_after_days:7}")
   private int overdueAdminNotifyAfterDays;
 
   @Scheduled(cron = "${app.scheduler.invoice.cron}")
@@ -68,16 +67,7 @@ public class InvoiceScheduler {
 
     // 2. Gửi thông báo cho Admin về các hóa đơn OVERDUE (có thể có ngưỡng ngày quá hạn)
     LocalDate adminNotifyThresholdDate = today.minusDays(overdueAdminNotifyAfterDays);
-    // Lấy tất cả hóa đơn OVERDUE hoặc những hóa đơn mới chuyển sang OVERDUE và quá 1 ngưỡng nhất
-    // định
-    // Để đơn giản, ta có thể lấy tất cả OVERDUE và service thông báo sẽ quyết định có gửi lại hay
-    // không
-    // Hoặc, chỉ gửi cho những hóa đơn vừa chuyển trạng thái ở bước trên.
-    // Ở đây, ta sẽ gửi cho tất cả các hóa đơn đang là OVERDUE và có dueDate <=
-    // adminNotifyThresholdDate
-    // để tránh spam admin mỗi ngày cho cùng 1 hóa đơn.
-    // Cần một query mới hoặc lọc sau khi lấy.
-    // Ví dụ đơn giản: gửi cho những hóa đơn vừa chuyển thành OVERDUE ở trên.
+
     if (!newlyOverdueInvoices.isEmpty()) {
       List<User> admins = userRepository.findByRoles_Name(RoleType.ROLE_ADMIN);
       if (!admins.isEmpty()) {

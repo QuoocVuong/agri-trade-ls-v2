@@ -3,7 +3,6 @@ package com.yourcompany.agritrade.usermanagement.dto.request;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-// DTO cho phép user tự cập nhật thông tin cơ bản
 @Data
 public class UserUpdateRequest {
   @Size(max = 100, message = "Full name must be less than 100 characters")

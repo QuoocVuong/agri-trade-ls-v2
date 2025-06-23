@@ -40,9 +40,7 @@ public class MoMoServiceImpl implements PaymentGatewayService {
   @Value("${app.backend.url}")
   private String backendAppUrl;
 
-  // app.frontend.momoReturnUrl và app.backend.momoIpnUrl sẽ được truyền vào hàm
-
-  private final RestTemplate restTemplate; // Inject RestTemplate (cần tạo Bean cho nó)
+  private final RestTemplate restTemplate; // Inject RestTemplate
 
   @Override
   public PaymentUrlResponse createMoMoPaymentUrl(
@@ -52,7 +50,7 @@ public class MoMoServiceImpl implements PaymentGatewayService {
     String amount = String.valueOf(order.getTotalAmount().longValue()); // MoMo dùng số nguyên
     String orderInfo = "Thanh toan don hang " + order.getOrderCode();
     String requestType =
-        "captureWallet"; // Hoặc "payWithATM", "payWithCC" tùy theo loại bạn muốn tích hợp
+        "captureWallet"; // Hoặc "payWithATM", "payWithCC" tùy theo loại  muốn tích hợp
     String extraData = ""; // Dữ liệu bổ sung, có thể base64 encode nếu cần
 
     // XÂY DỰNG URL IPN ĐỘNG

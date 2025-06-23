@@ -37,7 +37,7 @@ public class UserFollow {
   @Setter
   @NoArgsConstructor
   public static class UserFollowId implements Serializable {
-    private Long follower; // Tên phải khớp với tên thuộc tính User trong UserFollow
+    private Long follower;
     private Long following;
 
     public UserFollowId(Long followerId, Long followingId) {

@@ -1,4 +1,3 @@
-// File: usermanagement/repository/specification/FarmerProfileSpecification.java (Mới)
 package com.yourcompany.agritrade.usermanagement.repository.specification;
 
 import com.yourcompany.agritrade.common.model.VerificationStatus;

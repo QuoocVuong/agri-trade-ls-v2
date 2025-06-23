@@ -1,12 +1,12 @@
 package com.yourcompany.agritrade.usermanagement.service.impl;
 
-// Thêm nếu service của bạn có thể ném lỗi này
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.usermanagement.domain.BusinessProfile;
 import com.yourcompany.agritrade.usermanagement.domain.Role;
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -18,12 +18,15 @@ import com.yourcompany.agritrade.usermanagement.repository.RoleRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.util.HashSet;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -35,30 +38,33 @@ class BusinessProfileServiceImplUnitTest {
   @Mock private UserRepository userRepository;
   @Mock private BusinessProfileMapper businessProfileMapper;
   @Mock private RoleRepository roleRepository;
-  @Mock private Authentication authentication; // Mock cho các phương thức cần Authentication
+  @Mock private Authentication authentication;
+
+  // SỬA LỖI: Thêm MockedStatic để quản lý mock cho SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
 
   @InjectMocks private BusinessProfileServiceImpl businessProfileService;
 
   private User currentUser;
   private BusinessProfileRequest profileRequest;
   private BusinessProfile existingProfile;
-  // newProfileEntity sẽ được tạo trong các test cụ thể nếu cần
   private Role businessBuyerRole;
 
   @BeforeEach
   void setUp() {
+    // SỬA LỖI: Khởi tạo mock static
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     currentUser = new User();
     currentUser.setId(1L);
     currentUser.setEmail("business@example.com");
     currentUser.setFullName("Business User");
-    currentUser.setRoles(
-        new HashSet<>()); // Khởi tạo roles rỗng ban đầu, sẽ được thêm trong test nếu cần
+    currentUser.setRoles(new HashSet<>());
 
     profileRequest = new BusinessProfileRequest();
     profileRequest.setBusinessName("Test Business Inc.");
     profileRequest.setTaxCode("1234567890");
     profileRequest.setBusinessProvinceCode("20");
-    // ... set các trường khác cho request
 
     existingProfile = new BusinessProfile();
     existingProfile.setUserId(currentUser.getId());
@@ -66,28 +72,29 @@ class BusinessProfileServiceImplUnitTest {
     existingProfile.setBusinessName("Old Business Name");
     existingProfile.setTaxCode("OLD_TAX_CODE");
     existingProfile.setBusinessProvinceCode("20");
-    // ...
 
     businessBuyerRole = new Role(RoleType.ROLE_BUSINESS_BUYER);
-    businessBuyerRole.setId(2); // Giả lập ID
+    businessBuyerRole.setId(2);
+  }
+
+  // SỬA LỖI: Thêm tearDown để đóng mock static sau mỗi test
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
   }
 
   @Test
   void createOrUpdateBusinessProfile_createNewProfile_success() {
     // --- Arrange ---
-    // Mock hành vi của authentication và userRepository cho test này
-    when(authentication.getName()).thenReturn(currentUser.getEmail());
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(userRepository.findByEmail(currentUser.getEmail())).thenReturn(Optional.of(currentUser));
+    // SỬA LỖI: Mock hành vi cho SecurityUtils.getCurrentAuthenticatedUser()
+    mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(currentUser);
 
-    // Dữ liệu cho việc tạo mới
     BusinessProfile profileToBeCreatedByMapper = new BusinessProfile();
     profileToBeCreatedByMapper.setBusinessName(profileRequest.getBusinessName());
     profileToBeCreatedByMapper.setTaxCode(profileRequest.getTaxCode());
     profileToBeCreatedByMapper.setBusinessProvinceCode(profileRequest.getBusinessProvinceCode());
-    // User sẽ được service gán
 
-    BusinessProfile savedNewProfile = new BusinessProfile(); // Entity sau khi service xử lý và save
+    BusinessProfile savedNewProfile = new BusinessProfile();
     savedNewProfile.setUserId(currentUser.getId());
     savedNewProfile.setUser(currentUser);
     savedNewProfile.setBusinessName(profileRequest.getBusinessName());
@@ -100,14 +107,14 @@ class BusinessProfileServiceImplUnitTest {
     expectedResponse.setTaxCode(profileRequest.getTaxCode());
     expectedResponse.setBusinessProvinceCode(profileRequest.getBusinessProvinceCode());
 
-    when(businessProfileRepository.existsById(currentUser.getId()))
-        .thenReturn(false); // Profile chưa tồn tại
+    when(businessProfileRepository.existsById(currentUser.getId())).thenReturn(false);
+    when(businessProfileRepository.findById(currentUser.getId())).thenReturn(Optional.empty());
     when(businessProfileMapper.requestToBusinessProfile(profileRequest))
         .thenReturn(profileToBeCreatedByMapper);
     when(businessProfileRepository.save(any(BusinessProfile.class))).thenReturn(savedNewProfile);
     when(roleRepository.findByName(RoleType.ROLE_BUSINESS_BUYER))
         .thenReturn(Optional.of(businessBuyerRole));
-    when(userRepository.save(any(User.class))).thenReturn(currentUser); // User sau khi thêm role
+    when(userRepository.save(any(User.class))).thenReturn(currentUser);
     when(businessProfileMapper.toBusinessProfileResponse(savedNewProfile))
         .thenReturn(expectedResponse);
 
@@ -139,18 +146,13 @@ class BusinessProfileServiceImplUnitTest {
   @Test
   void createOrUpdateBusinessProfile_updateExistingProfile_success() {
     // --- Arrange ---
-    when(authentication.getName()).thenReturn(currentUser.getEmail());
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(userRepository.findByEmail(currentUser.getEmail())).thenReturn(Optional.of(currentUser));
-
-    // profileRequest có businessName = "Test Business Inc."
-    // existingProfile có businessName = "Old Business Name"
+    // SỬA LỖI: Mock hành vi cho SecurityUtils.getCurrentAuthenticatedUser()
+    mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(currentUser);
 
     BusinessProfileResponse expectedResponseAfterUpdate = new BusinessProfileResponse();
     expectedResponseAfterUpdate.setUserId(currentUser.getId());
-    expectedResponseAfterUpdate.setBusinessName(profileRequest.getBusinessName()); // Tên mới
-    expectedResponseAfterUpdate.setTaxCode(profileRequest.getTaxCode()); // Tax code mới
-    // ... các trường khác từ profileRequest ...
+    expectedResponseAfterUpdate.setBusinessName(profileRequest.getBusinessName());
+    expectedResponseAfterUpdate.setTaxCode(profileRequest.getTaxCode());
 
     when(businessProfileRepository.existsById(currentUser.getId())).thenReturn(true);
     when(businessProfileRepository.findById(currentUser.getId()))
@@ -160,19 +162,15 @@ class BusinessProfileServiceImplUnitTest {
             invocation -> {
               BusinessProfileRequest req = invocation.getArgument(0);
               BusinessProfile profileToUpdate = invocation.getArgument(1);
-              // Giả lập mapper cập nhật các trường từ request vào existingProfile
               profileToUpdate.setBusinessName(req.getBusinessName());
               profileToUpdate.setTaxCode(req.getTaxCode());
               profileToUpdate.setBusinessProvinceCode(req.getBusinessProvinceCode());
-              // ...
               return null;
             })
         .when(businessProfileMapper)
         .updateBusinessProfileFromRequest(eq(profileRequest), eq(existingProfile));
 
-    // Giả sử save trả về existingProfile đã được cập nhật
     when(businessProfileRepository.save(existingProfile)).thenReturn(existingProfile);
-    // Mapper sẽ map existingProfile (đã được cập nhật) sang DTO
     when(businessProfileMapper.toBusinessProfileResponse(existingProfile))
         .thenReturn(expectedResponseAfterUpdate);
 
@@ -182,19 +180,16 @@ class BusinessProfileServiceImplUnitTest {
 
     // --- Assert ---
     assertNotNull(result);
-    assertEquals(
-        profileRequest.getBusinessName(),
-        result.getBusinessName()); // Kiểm tra tên đã được cập nhật trong DTO trả về
+    assertEquals(profileRequest.getBusinessName(), result.getBusinessName());
     assertEquals(profileRequest.getTaxCode(), result.getTaxCode());
 
-    // Kiểm tra xem existingProfile (đối tượng mock) có được cập nhật không
     assertEquals(profileRequest.getBusinessName(), existingProfile.getBusinessName());
     assertEquals(profileRequest.getTaxCode(), existingProfile.getTaxCode());
 
     verify(businessProfileRepository).findById(currentUser.getId());
     verify(businessProfileMapper).updateBusinessProfileFromRequest(profileRequest, existingProfile);
     verify(businessProfileRepository).save(existingProfile);
-    verify(userRepository, never()).save(any(User.class)); // Không cập nhật role cho user
+    verify(userRepository, never()).save(any(User.class));
     verify(businessProfileMapper).toBusinessProfileResponse(existingProfile);
   }
 
@@ -202,14 +197,10 @@ class BusinessProfileServiceImplUnitTest {
   void getBusinessProfile_found_success() {
     // Arrange
     Long userIdToFind = 1L;
-    // existingProfile được tạo trong setUp với businessName = "Old Business Name"
-
-    // Tạo DTO response mong đợi khớp với existingProfile
     BusinessProfileResponse expectedResponse = new BusinessProfileResponse();
     expectedResponse.setUserId(existingProfile.getUserId());
     expectedResponse.setBusinessName(existingProfile.getBusinessName());
     expectedResponse.setTaxCode(existingProfile.getTaxCode());
-    // ... map các trường khác từ existingProfile ...
 
     when(businessProfileRepository.findById(userIdToFind)).thenReturn(Optional.of(existingProfile));
     when(businessProfileMapper.toBusinessProfileResponse(existingProfile))
@@ -237,10 +228,7 @@ class BusinessProfileServiceImplUnitTest {
     ResourceNotFoundException exception =
         assertThrows(
             ResourceNotFoundException.class,
-            () -> {
-              businessProfileService.getBusinessProfile(nonExistentUserId);
-            });
-    // Đảm bảo message khớp với cách ResourceNotFoundException của bạn tạo message
+            () -> businessProfileService.getBusinessProfile(nonExistentUserId));
     assertEquals(
         String.format("BusinessProfile not found with userId : '%s'", nonExistentUserId),
         exception.getMessage());
@@ -252,19 +240,19 @@ class BusinessProfileServiceImplUnitTest {
   @Test
   void createOrUpdateBusinessProfile_userNotFound_throwsUsernameNotFoundException() {
     // Arrange
-    // Mock hành vi của authentication
-    when(authentication.getName()).thenReturn(currentUser.getEmail());
-    when(authentication.isAuthenticated()).thenReturn(true);
-    // Quan trọng: Mock userRepository trả về empty để giả lập user không tồn tại
-    when(userRepository.findByEmail(currentUser.getEmail())).thenReturn(Optional.empty());
+    // SỬA LỖI: Mock SecurityUtils để nó ném lỗi UsernameNotFoundException
+    mockedSecurityUtils
+        .when(SecurityUtils::getCurrentAuthenticatedUser)
+        .thenThrow(new UsernameNotFoundException("User not found in DB"));
 
     // Act & Assert
     assertThrows(
         UsernameNotFoundException.class,
-        () -> {
-          businessProfileService.createOrUpdateBusinessProfile(authentication, profileRequest);
-        });
-    verify(userRepository).findByEmail(currentUser.getEmail());
+        () -> businessProfileService.createOrUpdateBusinessProfile(authentication, profileRequest));
+
+    // Verify rằng logic đã dừng lại sau khi không tìm thấy user
     verify(businessProfileRepository, never()).existsById(any());
+    verify(businessProfileRepository, never()).save(any());
+    verify(userRepository, never()).save(any());
   }
 }

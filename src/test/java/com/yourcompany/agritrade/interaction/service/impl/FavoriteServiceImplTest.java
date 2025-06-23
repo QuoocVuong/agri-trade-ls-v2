@@ -2,7 +2,6 @@ package com.yourcompany.agritrade.interaction.service.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 import com.yourcompany.agritrade.catalog.domain.Product;
@@ -10,6 +9,7 @@ import com.yourcompany.agritrade.catalog.dto.response.ProductSummaryResponse;
 import com.yourcompany.agritrade.catalog.mapper.ProductMapper;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.FavoriteProduct;
 import com.yourcompany.agritrade.interaction.repository.FavoriteProductRepository;
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -17,6 +17,7 @@ import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -43,6 +46,9 @@ class FavoriteServiceImplTest {
   @Mock private ProductMapper productMapper;
   @Mock private Authentication authentication;
 
+  // SỬA LỖI: Thêm MockedStatic để quản lý mock cho lớp tiện ích SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
+
   @InjectMocks private FavoriteServiceImpl favoriteService;
 
   private User testUser;
@@ -51,6 +57,9 @@ class FavoriteServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    // SỬA LỖI: Khởi tạo mock static cho SecurityUtils trước mỗi test
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     testUser = new User();
     testUser.setId(1L);
     testUser.setEmail("user@example.com");
@@ -69,12 +78,17 @@ class FavoriteServiceImplTest {
     favoriteProduct1 = new FavoriteProduct();
     favoriteProduct1.setUser(testUser);
     favoriteProduct1.setProduct(product1);
+  }
 
-    lenient().when(authentication.getName()).thenReturn(testUser.getEmail());
-    lenient().when(authentication.isAuthenticated()).thenReturn(true);
-    lenient()
-        .when(userRepository.findByEmail(testUser.getEmail()))
-        .thenReturn(Optional.of(testUser));
+  // SỬA LỖI: Thêm tearDown để đóng mock static sau mỗi test
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
+  }
+
+  private void mockAuthenticatedUser(User user) {
+    // SỬA LỖI: Mock SecurityUtils thay vì các mock không được dùng đến
+    mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(user);
   }
 
   @Nested
@@ -83,12 +97,12 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Add Favorite - New Product - Success")
     void addFavorite_newProduct_shouldSaveFavoriteAndUpdateCount() {
+      mockAuthenticatedUser(testUser);
       when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
       when(favoriteProductRepository.existsByUserIdAndProductId(testUser.getId(), product1.getId()))
           .thenReturn(false);
       when(favoriteProductRepository.save(any(FavoriteProduct.class))).thenReturn(favoriteProduct1);
-      when(favoriteProductRepository.countByProductId(product1.getId()))
-          .thenReturn(1L); // Sau khi thêm, count là 1
+      when(favoriteProductRepository.countByProductId(product1.getId())).thenReturn(1L);
       when(productRepository.save(any(Product.class))).thenReturn(product1);
 
       favoriteService.addFavorite(authentication, product1.getId());
@@ -107,6 +121,7 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Add Favorite - Product Already Favorited - Should Do Nothing")
     void addFavorite_productAlreadyFavorited_shouldDoNothing() {
+      mockAuthenticatedUser(testUser);
       when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
       when(favoriteProductRepository.existsByUserIdAndProductId(testUser.getId(), product1.getId()))
           .thenReturn(true);
@@ -120,6 +135,7 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Add Favorite - Product Not Found - Throws ResourceNotFoundException")
     void addFavorite_productNotFound_shouldThrowResourceNotFoundException() {
+      mockAuthenticatedUser(testUser);
       when(productRepository.findById(99L)).thenReturn(Optional.empty());
 
       assertThrows(
@@ -133,14 +149,14 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Remove Favorite - Product Is Favorited - Success")
     void removeFavorite_productIsFavorited_shouldDeleteFavoriteAndUpdateCount() {
+      mockAuthenticatedUser(testUser);
       when(favoriteProductRepository.existsByUserIdAndProductId(testUser.getId(), product1.getId()))
           .thenReturn(true);
       doNothing()
           .when(favoriteProductRepository)
           .deleteByUserIdAndProductId(testUser.getId(), product1.getId());
       when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
-      when(favoriteProductRepository.countByProductId(product1.getId()))
-          .thenReturn(0L); // Sau khi xóa, count là 0
+      when(favoriteProductRepository.countByProductId(product1.getId())).thenReturn(0L);
       when(productRepository.save(any(Product.class))).thenReturn(product1);
 
       favoriteService.removeFavorite(authentication, product1.getId());
@@ -155,6 +171,7 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Remove Favorite - Product Not Favorited - Should Do Nothing")
     void removeFavorite_productNotFavorited_shouldDoNothing() {
+      mockAuthenticatedUser(testUser);
       when(favoriteProductRepository.existsByUserIdAndProductId(testUser.getId(), product1.getId()))
           .thenReturn(false);
 
@@ -171,6 +188,7 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Get My Favorites - Success")
     void getMyFavorites_shouldReturnPageOfProductSummaries() {
+      mockAuthenticatedUser(testUser);
       Pageable pageable = PageRequest.of(0, 10);
       List<Product> favoriteProductsList = List.of(product1, product2);
       Page<Product> favoriteProductsPage =
@@ -198,6 +216,7 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Get My Favorites - No Favorites")
     void getMyFavorites_whenNoFavorites_shouldReturnEmptyPage() {
+      mockAuthenticatedUser(testUser);
       Pageable pageable = PageRequest.of(0, 10);
       Page<Product> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
 
@@ -218,6 +237,7 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Is Favorite - Product Is Favorited - Returns True")
     void isFavorite_whenProductIsFavorited_shouldReturnTrue() {
+      mockAuthenticatedUser(testUser);
       when(favoriteProductRepository.existsByUserIdAndProductId(testUser.getId(), product1.getId()))
           .thenReturn(true);
       boolean result = favoriteService.isFavorite(authentication, product1.getId());
@@ -227,6 +247,7 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Is Favorite - Product Not Favorited - Returns False")
     void isFavorite_whenProductNotFavorited_shouldReturnFalse() {
+      mockAuthenticatedUser(testUser);
       when(favoriteProductRepository.existsByUserIdAndProductId(testUser.getId(), product2.getId()))
           .thenReturn(false);
       boolean result = favoriteService.isFavorite(authentication, product2.getId());
@@ -240,8 +261,11 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Get User From Authentication - User Not Found - Throws UsernameNotFoundException")
     void getUserFromAuthentication_whenUserNotFound_shouldThrowUsernameNotFoundException() {
-      when(authentication.getName()).thenReturn("unknown@example.com");
-      when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+      // Mock SecurityUtils để nó ném lỗi, đây là cách test đúng
+      mockedSecurityUtils
+          .when(SecurityUtils::getCurrentAuthenticatedUser)
+          .thenThrow(new UsernameNotFoundException("User not found"));
+
       assertThrows(
           UsernameNotFoundException.class,
           () -> favoriteService.addFavorite(authentication, product1.getId()));
@@ -250,17 +274,14 @@ class FavoriteServiceImplTest {
     @Test
     @DisplayName("Get User From Authentication - Not Authenticated - Throws AccessDeniedException")
     void getUserFromAuthentication_whenNotAuthenticated_shouldThrowAccessDeniedException() {
-      when(authentication.isAuthenticated()).thenReturn(false);
+      // Mock SecurityUtils để nó ném lỗi
+      mockedSecurityUtils
+          .when(SecurityUtils::getCurrentAuthenticatedUser)
+          .thenThrow(new AccessDeniedException("Not authenticated"));
+
       assertThrows(
           AccessDeniedException.class,
           () -> favoriteService.addFavorite(authentication, product1.getId()));
     }
   }
-
-  // XÓA BỎ HOÀN TOÀN UpdateFavoriteCountTests
-  // @Nested
-  // @DisplayName("Update Favorite Count Helper Tests")
-  // class UpdateFavoriteCountTests {
-  //     // ... (các test case cũ ở đây) ...
-  // }
 }

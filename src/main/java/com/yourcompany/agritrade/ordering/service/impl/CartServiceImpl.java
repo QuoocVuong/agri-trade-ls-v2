@@ -26,7 +26,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -331,14 +330,12 @@ public class CartServiceImpl implements CartService {
     log.info("Cleared cart for user {}", user.getId());
   }
 
-
-
   private Product findAvailableProduct(Long productId) {
     Product product =
         productRepository
             .findById(productId) // findById đã lọc is_deleted=false
             .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
-    // Thêm kiểm tra isDeleted (dù @Where đã làm) để chắc chắn
+    // Thêm kiểm tra isDeleted  để chắc chắn
     if (product.isDeleted()) {
       log.warn("Attempted to access a soft-deleted product with id: {}", productId);
       throw new ResourceNotFoundException("Product", "id", productId);

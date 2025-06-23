@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** DTO đại diện cho thông tin của một Quyền hạn (Permission) trả về cho client. */
 @Data // Lombok annotation để tự tạo getters, setters, equals, hashCode, toString
 @NoArgsConstructor // Lombok annotation để tự tạo constructor không tham số
 @AllArgsConstructor // Lombok annotation để tự tạo constructor với tất cả tham số

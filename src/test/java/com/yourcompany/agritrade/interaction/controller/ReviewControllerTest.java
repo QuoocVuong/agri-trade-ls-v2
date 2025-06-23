@@ -117,7 +117,7 @@ class ReviewControllerTest {
                   .content(objectMapper.writeValueAsString(invalidRequest)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.success", is(false)))
-          .andExpect(jsonPath("$.message", is("Validation Failed")))
+          .andExpect(jsonPath("$.message", is("Dữ liệu không hợp lệ")))
           .andExpect(jsonPath("$.details.productId", is("Product ID is required")))
           .andExpect(jsonPath("$.details.rating", is("Rating is required")));
     }

@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.usermanagement.dto.response; // Đúng package
+package com.yourcompany.agritrade.usermanagement.dto.response;
 
 import java.time.LocalDateTime;
 import java.util.Set;

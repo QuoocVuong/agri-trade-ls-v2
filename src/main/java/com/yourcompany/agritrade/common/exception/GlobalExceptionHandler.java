@@ -53,9 +53,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             .map(entry -> String.format("'%s': %s", entry.getKey(), entry.getValue()))
             .collect(Collectors.joining(", "));
     log.warn(
-        "Lỗi xác thực: [{}] cho request: {}",
-        errorDetailsMessage,
-        request.getDescription(false));
+        "Lỗi xác thực: [{}] cho request: {}", errorDetailsMessage, request.getDescription(false));
 
     // Tạo ApiResponse với details chứa các lỗi field
     ApiResponse<Object> apiResponse =
@@ -175,7 +173,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(BadRequestException.class)
   public ResponseEntity<ApiResponse<Object>> handleBadRequestException(
-      BadRequestException ex, WebRequest request) { // Đổi kiểu trả về
+      BadRequestException ex, WebRequest request) {
     log.warn(
         "Yêu cầu không hợp lệ: {}. Request: {}", ex.getMessage(), request.getDescription(false));
     // Tạo ApiResponse
@@ -187,10 +185,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(OutOfStockException.class)
   public ResponseEntity<ApiResponse<Object>> handleOutOfStockException(
       OutOfStockException ex, WebRequest request) {
-    log.warn(
-        "Hết hàng: {}. Request: {}",
-        ex.getMessage(),
-        request.getDescription(false));
+    log.warn("Hết hàng: {}. Request: {}", ex.getMessage(), request.getDescription(false));
     Map<String, Object> errorDetails = new HashMap<>();
     errorDetails.put("errorCode", "ERR_OUT_OF_STOCK");
     if (ex.getAvailableStock() != null) {
@@ -204,7 +199,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ApiResponse<Object>> handleResourceNotFoundException(
-      ResourceNotFoundException ex, WebRequest request) { // Đổi kiểu trả về
+      ResourceNotFoundException ex, WebRequest request) {
     log.warn(
         "Tài nguyên không tìm thấy: {}. cho Request: {}",
         ex.getMessage(),
@@ -217,7 +212,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(EntityNotFoundException.class)
   public ResponseEntity<ApiResponse<Object>> handleEntityNotFound(
-      EntityNotFoundException ex, WebRequest request) { // Đổi kiểu trả về
+      EntityNotFoundException ex, WebRequest request) {
     String message = "The requested entity was not found.";
     log.warn(
         "Entity Not Found: {} for request: {}", ex.getMessage(), request.getDescription(false));
@@ -232,7 +227,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(BadCredentialsException.class)
   public ResponseEntity<ApiResponse<Object>> handleBadCredentialsException(
-      BadCredentialsException ex, WebRequest request) { // Đổi kiểu trả về
+      BadCredentialsException ex, WebRequest request) {
     String message = "Email hoặc mật khẩu không chính xác.";
     log.warn(
         "Authentication Failed: Invalid credentials for request: {}",
@@ -245,7 +240,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(AccessDeniedException.class)
   public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(
-      AccessDeniedException ex, WebRequest request) { // Đổi kiểu trả về
+      AccessDeniedException ex, WebRequest request) {
     String message = "Bạn không có quyền thực hiện hành động này.";
     log.warn("Access Denied: {} for request: {}", ex.getMessage(), request.getDescription(false));
     // Tạo ApiResponse
@@ -259,10 +254,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(
-      DataIntegrityViolationException ex, WebRequest request) { // Đổi kiểu trả về
+      DataIntegrityViolationException ex, WebRequest request) {
     String specificCauseMessage = ex.getMostSpecificCause().getMessage();
-    String message =
-        "Thao tác không thành công. Dữ liệu có thể đã bị trùng lặp";
+    String message = "Thao tác không thành công. Dữ liệu có thể đã bị trùng lặp";
     log.error(
         "Data Integrity Violation: {} for request: {}",
         specificCauseMessage,
@@ -321,17 +315,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * Xử lý lỗi khi người dùng chưa có vai trò BUSINESS_BUYER.
-   * Trả về status 403 Forbidden và một mã lỗi tùy chỉnh.
+   * Xử lý lỗi khi người dùng chưa có vai trò BUSINESS_BUYER. Trả về status 403 Forbidden và một mã
+   * lỗi tùy chỉnh.
    */
   @ExceptionHandler(BusinessAccountRequiredException.class)
-  public ResponseEntity<ApiResponse<Object>> handleBusinessAccountRequired(BusinessAccountRequiredException ex) {
+  public ResponseEntity<ApiResponse<Object>> handleBusinessAccountRequired(
+      BusinessAccountRequiredException ex) {
     // Tạo một map để chứa mã lỗi tùy chỉnh
     Map<String, Object> details = new HashMap<>();
     details.put("errorCode", "BUSINESS_ACCOUNT_REQUIRED");
 
     // Tạo ApiResponse với thông báo lỗi từ exception và details
-    ApiResponse<Object> apiResponse = ApiResponse.builder()
+    ApiResponse<Object> apiResponse =
+        ApiResponse.builder()
             .success(false)
             .message(ex.getMessage()) // Lấy message gốc từ exception
             .status(HttpStatus.FORBIDDEN.value())
@@ -341,15 +337,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * Xử lý lỗi khi người dùng là BUSINESS_BUYER nhưng chưa hoàn thiện hồ sơ.
-   * Trả về status 400 Bad Request và một mã lỗi tùy chỉnh.
+   * Xử lý lỗi khi người dùng là BUSINESS_BUYER nhưng chưa hoàn thiện hồ sơ. Trả về status 400 Bad
+   * Request và một mã lỗi tùy chỉnh.
    */
   @ExceptionHandler(BusinessProfileRequiredException.class)
-  public ResponseEntity<ApiResponse<Object>> handleBusinessProfileRequired(BusinessProfileRequiredException ex) {
+  public ResponseEntity<ApiResponse<Object>> handleBusinessProfileRequired(
+      BusinessProfileRequiredException ex) {
     Map<String, Object> details = new HashMap<>();
     details.put("errorCode", "BUSINESS_PROFILE_REQUIRED");
 
-    ApiResponse<Object> apiResponse = ApiResponse.builder()
+    ApiResponse<Object> apiResponse =
+        ApiResponse.builder()
             .success(false)
             .message(ex.getMessage())
             .status(HttpStatus.BAD_REQUEST.value())
@@ -358,17 +356,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
   }
 
-
   /**
-   * Xử lý lỗi khi người dùng là FARMER nhưng chưa hoàn thiện hồ sơ.
-   * Trả về status 400 Bad Request và một mã lỗi tùy chỉnh.
+   * Xử lý lỗi khi người dùng là FARMER nhưng chưa hoàn thiện hồ sơ. Trả về status 400 Bad Request
+   * và một mã lỗi tùy chỉnh.
    */
   @ExceptionHandler(FarmerProfileRequiredException.class)
-  public ResponseEntity<ApiResponse<Object>> handleFarmerProfileRequired(FarmerProfileRequiredException ex) {
+  public ResponseEntity<ApiResponse<Object>> handleFarmerProfileRequired(
+      FarmerProfileRequiredException ex) {
     Map<String, Object> details = new HashMap<>();
     details.put("errorCode", "FARMER_PROFILE_REQUIRED");
 
-    ApiResponse<Object> apiResponse = ApiResponse.builder()
+    ApiResponse<Object> apiResponse =
+        ApiResponse.builder()
             .success(false)
             .message(ex.getMessage())
             .status(HttpStatus.BAD_REQUEST.value())
@@ -376,5 +375,4 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             .build();
     return new ResponseEntity<>(apiResponse, HttpStatus.BAD_REQUEST);
   }
-
 }

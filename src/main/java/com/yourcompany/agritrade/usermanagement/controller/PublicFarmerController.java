@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.usermanagement.controller; // Hoặc package public
+package com.yourcompany.agritrade.usermanagement.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;
 import com.yourcompany.agritrade.usermanagement.dto.response.FarmerSummaryResponse;
@@ -36,7 +36,7 @@ public class PublicFarmerController {
     return ResponseEntity.ok(ApiResponse.success(featuredFarmers));
   }
 
-  // ===== ENDPOINT MỚI CHO TÌM KIẾM/LỌC =====
+  // ===== ENDPOINT  CHO TÌM KIẾM/LỌC =====
   @GetMapping
   public ResponseEntity<ApiResponse<Page<FarmerSummaryResponse>>> searchPublicFarmers(
       @RequestParam(required = false) String keyword,

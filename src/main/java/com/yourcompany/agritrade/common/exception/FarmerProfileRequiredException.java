@@ -5,8 +5,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class FarmerProfileRequiredException extends RuntimeException {
-    public FarmerProfileRequiredException(String message) {
+  public FarmerProfileRequiredException(String message) {
 
-        super(message);
-    }
+    super(message);
+  }
 }

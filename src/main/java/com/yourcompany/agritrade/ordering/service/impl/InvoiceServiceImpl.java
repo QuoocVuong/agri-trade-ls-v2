@@ -66,7 +66,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     } else {
       // Đối với các phương thức thanh toán khác, hóa đơn có thể là DRAFT hoặc ISSUED ngay
       // và có thể được đánh dấu PAID ngay nếu thanh toán thành công tức thì.
-      // Hoặc bạn có thể không tạo Invoice cho các đơn hàng không phải công nợ.
+      // Hoặc  có thể không tạo Invoice cho các đơn hàng không phải công nợ.
       if (order.getPaymentStatus() == PaymentStatus.PAID) {
         invoice.setStatus(InvoiceStatus.PAID);
       } else {
@@ -108,7 +108,6 @@ public class InvoiceServiceImpl implements InvoiceService {
       PdfWriter writer = PdfWriter.getInstance(document, out);
       document.open();
 
-      // *** Cần đăng ký và sử dụng Font tiếng Việt ở đây ***
       Font fontTitle =
           FontFactory.getFont(
               "../fonts/font.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, 18, Font.BOLD);
@@ -328,7 +327,7 @@ public class InvoiceServiceImpl implements InvoiceService {
       PaymentStatus paymentStatus,
       String keyword,
       Pageable pageable) {
-    User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // Hàm helper của bạn
+    User farmer = SecurityUtils.getCurrentAuthenticatedUser(); // Hàm helper của
     Specification<Invoice> spec =
         Specification.where(InvoiceSpecifications.fetchOrderAndBuyer())
             .and(InvoiceSpecifications.isFarmerInvoice(farmer.getId())); // Spec mới

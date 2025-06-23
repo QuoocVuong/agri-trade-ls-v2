@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -23,9 +22,6 @@ public class ApiResponse<T> {
   private T data; // Dữ liệu trả về (generic)
   private Integer status; // Mã trạng thái HTTP
   private LocalDateTime timestamp;
-
-  // Có thể thêm trường mã lỗi tùy chỉnh
-  // private String errorCode;
 
   // Constructor private để khuyến khích dùng static factory methods
   private ApiResponse(boolean success, String message, T data, HttpStatus status) {
@@ -60,11 +56,6 @@ public class ApiResponse<T> {
   public static <T> ApiResponse<T> created(T data) {
     return created(data, "Resource created successfully");
   }
-
-  // Response lỗi chung
-  //      public static <T> ApiResponse<T> error(String message, HttpStatus status) {
-  //          return new ApiResponse<>(false, message, null, status);
-  //      }
 
   // Response lỗi cụ thể hơn (ví dụ: Bad Request)
   public static <T> ApiResponse<T> badRequest(String message) {

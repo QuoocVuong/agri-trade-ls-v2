@@ -16,5 +16,4 @@ public class FarmerSummaryResponse {
   private String avatarUrl; // Lấy từ User
   private String provinceCode; // Lấy từ FarmerProfile
   private Integer followerCount; // Thêm để kiểm tra sắp xếp (tùy chọn)
-  // Thêm các trường khác nếu cần (rating,...)
 }

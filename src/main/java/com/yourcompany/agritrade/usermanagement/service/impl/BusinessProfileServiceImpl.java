@@ -14,9 +14,7 @@ import com.yourcompany.agritrade.usermanagement.repository.RoleRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import com.yourcompany.agritrade.usermanagement.service.BusinessProfileService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +26,6 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
   private final UserRepository userRepository;
   private final BusinessProfileMapper businessProfileMapper;
   private final RoleRepository roleRepository;
-  private static final String LANG_SON_PROVINCE_CODE = "20"; // Định nghĩa mã tỉnh Lạng Sơn
 
   @Override
   @Transactional
@@ -88,6 +85,4 @@ public class BusinessProfileServiceImpl implements BusinessProfileService {
 
     return businessProfileMapper.toBusinessProfileResponse(profile);
   }
-
-
 }

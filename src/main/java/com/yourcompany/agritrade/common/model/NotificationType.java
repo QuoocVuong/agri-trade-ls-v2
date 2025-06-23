@@ -20,7 +20,7 @@ public enum NotificationType {
   REVIEW_REJECTED,
   // User related
   WELCOME,
-  PASSWORD_RESET, // Có thể không cần lưu DB, chỉ gửi mail
+  PASSWORD_RESET,
   EMAIL_VERIFIED,
   // System/Admin related
   SYSTEM_ANNOUNCEMENT,

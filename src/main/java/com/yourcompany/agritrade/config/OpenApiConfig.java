@@ -22,8 +22,7 @@ public class OpenApiConfig {
                 .title("AgriTrade API")
                 .version("v1.0")
                 .description("API Documentation for AgriTradeLS Application (B2B & B2C E-commerce)")
-                .termsOfService(
-                    "http://swagger.io/terms/") // Thay bằng link điều khoản sử dụng nếu có
+                .termsOfService("http://swagger.io/terms/")
                 .license(new License().name("Apache 2.0").url("http://springdoc.org")))
         // Cấu hình cho JWT Authentication trong Swagger UI
         .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))

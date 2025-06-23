@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.config.properties; // Tạo package mới
+package com.yourcompany.agritrade.config.properties;
 
 import lombok.Getter;
 import lombok.Setter;

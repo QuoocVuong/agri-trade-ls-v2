@@ -50,7 +50,6 @@ public interface ReviewRepository
   // Lấy các review mới nhất (pending)
   List<Review> findTopNByStatusOrderByCreatedAtDesc(ReviewStatus status, Pageable pageable);
 
-  // ****** THÊM PHƯƠNG THỨC NÀY ******
   /**
    * Tìm tất cả các review cho các sản phẩm thuộc về một Farmer cụ thể. Sắp xếp theo ngày tạo giảm
    * dần (mới nhất trước).
@@ -66,9 +65,6 @@ public interface ReviewRepository
   // khi lấy
   // productId
   Page<Review> findReviewsForFarmerProducts(@Param("farmerId") Long farmerId, Pageable pageable);
-
-  // Hoặc dùng tên phương thức nếu mapping đúng:
-  // Page<Review> findByProduct_Farmer_Id(Long farmerId, Pageable pageable); // Thử cách này trước
 
   // (Tùy chọn) Thêm phương thức lọc theo trạng thái cho Farmer
   @Query(

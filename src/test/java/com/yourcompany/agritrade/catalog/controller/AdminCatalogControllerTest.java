@@ -109,7 +109,7 @@ class AdminCatalogControllerTest {
                   .content(objectMapper.writeValueAsString(invalidRequest)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.success", is(false)))
-          .andExpect(jsonPath("$.message", is("Validation Failed")))
+          .andExpect(jsonPath("$.message", is("Dữ liệu không hợp lệ")))
           .andExpect(jsonPath("$.details.name", is("Category name is required")));
 
       verify(categoryService, never()).createCategory(any());

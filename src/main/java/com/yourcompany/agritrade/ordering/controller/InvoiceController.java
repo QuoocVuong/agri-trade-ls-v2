@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.ordering.controller; // Đặt trong module ordering
+package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.ordering.domain.Invoice;

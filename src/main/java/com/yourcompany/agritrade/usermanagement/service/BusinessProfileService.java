@@ -26,5 +26,5 @@ public interface BusinessProfileService {
    */
   BusinessProfileResponse getBusinessProfile(Long userId);
 
-  // Có thể thêm các phương thức khác nếu cần (ví dụ: cho Admin)
+  //  thêm các phương thức khác nếu cần (ví dụ: cho Admin)
 }

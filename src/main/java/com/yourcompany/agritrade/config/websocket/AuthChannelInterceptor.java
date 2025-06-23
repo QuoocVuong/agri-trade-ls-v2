@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.config.websocket; // Ví dụ package
+package com.yourcompany.agritrade.config.websocket;
 
 import com.yourcompany.agritrade.config.security.JwtTokenProvider;
 import com.yourcompany.agritrade.config.security.UserDetailsServiceImpl;

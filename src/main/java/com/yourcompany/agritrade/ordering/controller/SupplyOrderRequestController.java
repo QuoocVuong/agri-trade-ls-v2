@@ -98,20 +98,21 @@ public class SupplyOrderRequestController {
   }
 
   /**
-   * Endpoint để kiểm tra quyền tạo yêu cầu cung ứng mà không thực sự tạo request.
-   * Nó sẽ chạy qua các bước kiểm tra quyền trong service và trả về lỗi nếu không hợp lệ.
+   * Endpoint để kiểm tra quyền tạo yêu cầu cung ứng mà không thực sự tạo request. Nó sẽ chạy qua
+   * các bước kiểm tra quyền trong service và trả về lỗi nếu không hợp lệ.
    *
    * @param authentication Đối tượng xác thực của người dùng hiện tại.
    * @return ApiResponse với success=true nếu người dùng có quyền, hoặc lỗi 403/400 nếu không.
    */
   @PostMapping("/check-permission")
-  public ResponseEntity<ApiResponse<Void>> checkCreateRequestPermission(Authentication authentication) { // Không cần @Valid ở đây
+  public ResponseEntity<ApiResponse<Void>> checkCreateRequestPermission(
+      Authentication authentication) { // Không cần @Valid ở đây
 
     // Gọi một phương thức mới trong service chỉ để kiểm tra quyền
     requestService.checkCreatePermission(authentication);
 
     // Nếu không có exception nào được ném ra, nghĩa là người dùng có quyền
-    return ResponseEntity.ok(ApiResponse.success(null, "User has permission to create supply request."));
+    return ResponseEntity.ok(
+        ApiResponse.success(null, "User has permission to create supply request."));
   }
-
 }

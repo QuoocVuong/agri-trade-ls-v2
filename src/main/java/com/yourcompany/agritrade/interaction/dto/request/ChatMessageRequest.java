@@ -13,9 +13,6 @@ public class ChatMessageRequest {
   @NotNull(message = "Recipient ID is required")
   private Long recipientId;
 
-  // thêm roomId nếu client biết trước phòng chat
-  // private Long roomId;
-
   @NotBlank(message = "Message content cannot be blank")
   @Size(max = 2000, message = "Message content is too long") // Giới hạn độ dài tin nhắn
   private String content;

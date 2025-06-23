@@ -1,7 +1,5 @@
-// src/main/java/com/yourcompany/agritrade/ordering/service/impl/SupplyOrderRequestServiceImpl.java
 package com.yourcompany.agritrade.ordering.service.impl;
 
-// ... (imports cho các class đã tạo ở trên, OrderService, NotificationService, etc.) ...
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.*;
@@ -22,6 +20,7 @@ import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.BusinessProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,8 +30,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -52,7 +49,7 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
   @Transactional
   public SupplyOrderRequestResponse createSupplyOrderRequest(
       Authentication authentication, SupplyOrderPlacementRequest requestDto) {
-    User buyer = SecurityUtils.getCurrentAuthenticatedUser(); // Hoặc getUserFromAuthentication
+    User buyer = SecurityUtils.getCurrentAuthenticatedUser();
 
     // Gọi lại hàm kiểm tra quyền ở đầu để tái sử dụng logic
     checkCreatePermission(authentication);
@@ -71,7 +68,7 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
     if (buyer.getId().equals(farmer.getId())) {
       throw new BadRequestException("Cannot send supply request to yourself.");
     }
-    // Kiểm tra sản phẩm có thuộc farmer không (tùy chọn, nhưng nên có)
+    // Kiểm tra sản phẩm có thuộc farmer không
     if (!product.getFarmer().getId().equals(farmer.getId())) {
       throw new BadRequestException("Product does not belong to the specified farmer.");
     }
@@ -182,7 +179,6 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
           "Request cannot be accepted from its current status: " + supplyRequest.getStatus());
     }
 
-
     // Chỉ cập nhật trạng thái. Việc tạo Order sẽ do một API khác xử lý.
     supplyRequest.setStatus(SupplyOrderRequestStatus.FARMER_ACCEPTED); // Trạng thái mới
     SupplyOrderRequest savedRequest = requestRepository.save(supplyRequest);
@@ -260,7 +256,6 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
     requestRepository.save(request);
     log.info("Buyer {} cancelled SupplyOrderRequest {}", buyer.getId(), requestId);
 
-
     // notificationService.sendSupplyRequestCancelledByBuyerNotification(request.getFarmer(),
     // request);
   }
@@ -269,37 +264,41 @@ public class SupplyOrderRequestServiceImpl implements SupplyOrderRequestService 
   public void checkCreatePermission(Authentication authentication) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser();
 
-
     // 1. Lấy danh sách các vai trò của người dùng
     Set<Role> userRoles = buyer.getRoles();
 
     // 2. Kiểm tra xem người dùng có vai trò FARMER hoặc BUSINESS_BUYER không
-    boolean isFarmer = userRoles.stream()
-            .anyMatch(role -> role.getName() == RoleType.ROLE_FARMER);
+    boolean isFarmer = userRoles.stream().anyMatch(role -> role.getName() == RoleType.ROLE_FARMER);
 
-    boolean isBusinessBuyer = userRoles.stream()
-            .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
+    boolean isBusinessBuyer =
+        userRoles.stream().anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
 
     // 3. Nếu người dùng KHÔNG phải là Farmer VÀ cũng KHÔNG phải là Business Buyer
     if (!isFarmer && !isBusinessBuyer) {
       // Ném ra exception yêu cầu nâng cấp tài khoản.
       // Thông báo này vẫn hợp lý vì người dùng có thể chọn nâng cấp lên Business Buyer.
       throw new BusinessAccountRequiredException(
-              "Chức năng này chỉ dành cho tài khoản Nông dân hoặc Doanh nghiệp. Vui lòng đăng ký hồ sơ phù hợp để tiếp tục.");
+          "Chức năng này chỉ dành cho tài khoản Nông dân hoặc Doanh nghiệp. Vui lòng đăng ký hồ sơ phù hợp để tiếp tục.");
     }
 
     // 4. Nếu người dùng là BUSINESS_BUYER, yêu cầu phải có hồ sơ doanh nghiệp
     if (isBusinessBuyer) {
-      businessProfileRepository.findById(buyer.getId())
-              .orElseThrow(() -> new BusinessProfileRequiredException(
+      businessProfileRepository
+          .findById(buyer.getId())
+          .orElseThrow(
+              () ->
+                  new BusinessProfileRequiredException(
                       "Bạn cần hoàn thiện hồ sơ doanh nghiệp trước khi gửi yêu cầu cung ứng."));
     }
 
     // 5. Nếu người dùng là FARMER (nhưng không phải Business Buyer), yêu cầu phải có hồ sơ nông dân
     // Điều này đảm bảo chỉ những nông dân đã đăng ký hồ sơ mới có thể mua hàng B2B.
     if (isFarmer && !isBusinessBuyer) {
-      farmerProfileRepository.findById(buyer.getId())
-              .orElseThrow(() -> new FarmerProfileRequiredException( // <<< TẠO EXCEPTION MỚI
+      farmerProfileRepository
+          .findById(buyer.getId())
+          .orElseThrow(
+              () ->
+                  new FarmerProfileRequiredException( // <<< TẠO EXCEPTION MỚI
                       "Bạn cần hoàn thiện hồ sơ nông dân trước khi gửi yêu cầu cung ứng."));
     }
 

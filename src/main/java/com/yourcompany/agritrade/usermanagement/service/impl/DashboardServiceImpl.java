@@ -41,9 +41,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -187,7 +185,7 @@ public class DashboardServiceImpl implements DashboardService {
     return topProductsStats;
   }
 
-  // ===== IMPLEMENT PHƯƠNG THỨC MỚI CHO FARMER ORDER COUNT CHART =====
+  // ===== IMPLEMENT PHƯƠNG THỨC  CHO FARMER ORDER COUNT CHART =====
   @Override
   public List<FarmerChartDataResponse> getFarmerOrderCountChartData(
       Authentication authentication, LocalDate startDate, LocalDate endDate) {
@@ -359,7 +357,7 @@ public class DashboardServiceImpl implements DashboardService {
         .totalOrdersThisMonth(totalOrdersThisMonth)
         .totalRevenueToday(totalRevenueToday)
         .totalRevenueThisMonth(totalRevenueThisMonth)
-        .totalUsers(totalUsers) // Cần làm rõ là active hay total
+        .totalUsers(totalUsers)
         .totalFarmers(totalFarmers)
         .totalConsumers(totalConsumers)
         .totalBusinessBuyers(totalBusinessBuyers)
@@ -377,8 +375,7 @@ public class DashboardServiceImpl implements DashboardService {
   @Override
   public List<TimeSeriesDataPoint<BigDecimal>> getDailyRevenueForAdminChart(
       LocalDate startDate, LocalDate endDate) {
-    // ... implementation đã có ...
-    // Đảm bảo logic xử lý kiểu Date từ DB là chính xác (như code bạn đã cung cấp)
+
     LocalDateTime startDateTime = startDate.atStartOfDay();
     LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
     List<Object[]> results =
@@ -415,8 +412,7 @@ public class DashboardServiceImpl implements DashboardService {
   @Override
   public List<TimeSeriesDataPoint<Long>> getDailyOrderCountForAdminChart(
       LocalDate startDate, LocalDate endDate) {
-    // ... implementation đã có ...
-    // Đảm bảo logic xử lý kiểu Date từ DB là chính xác
+
     LocalDateTime startDateTime = startDate.atStartOfDay();
     LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
     List<Object[]> results = orderRepository.findDailyOrderCountBetween(startDateTime, endDateTime);
@@ -513,8 +509,6 @@ public class DashboardServiceImpl implements DashboardService {
     return counts;
   }
 
-
-
   // Helper function để parse Date từ Object trả về của query (tránh lặp code)
   private LocalDate parseDateFromResult(Object dateObject) {
     if (dateObject instanceof java.sql.Date) {
@@ -526,7 +520,7 @@ public class DashboardServiceImpl implements DashboardService {
         return LocalDate.parse((String) dateObject);
       } catch (Exception e) {
         log.warn("Could not parse date string: {}", dateObject, e);
-        return null; // Hoặc throw exception nếu muốn chặt chẽ hơn
+        return null;
       }
     } else if (dateObject instanceof java.util.Date) { // Xử lý java.util.Date
       return new java.sql.Date(((java.util.Date) dateObject).getTime()).toLocalDate();
@@ -544,9 +538,6 @@ public class DashboardServiceImpl implements DashboardService {
     LocalDateTime monthEnd = LocalDate.now().atTime(LocalTime.MAX);
     Pageable pageable = PageRequest.of(0, limit);
 
-    // Cần một query mới trong OrderRepository để lấy top farmer theo doanh thu
-    // Ví dụ: findTopFarmersByRevenue(statuses, start, end, pageable)
-    // Dưới đây là cách triển khai giả định
     List<Object[]> topFarmerData =
         orderRepository.findTopFarmersByRevenue(
             REVENUE_ORDER_STATUSES, monthStart, monthEnd, pageable);

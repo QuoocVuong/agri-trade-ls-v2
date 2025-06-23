@@ -27,14 +27,14 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
 
   // Chỉ map các trường cơ bản từ User sang UserResponse
   @Mapping(source = "roles", target = "roles", qualifiedByName = "rolesToRoleNames")
-  @Named("toUserResponse") // *** Đặt tên cho phương thức nà
+  @Named("toUserResponse")
   public abstract UserResponse toUserResponse(User user);
 
   // Mapping cho UserProfileResponse (kết hợp)
   @Mapping(source = "roles", target = "roles", qualifiedByName = "rolesToRoleNames")
   public abstract UserProfileResponse toUserProfileResponse(User user);
 
-  //  THÊM PHƯƠNG THỨC MAP SANG UserInfoSimpleResponse
+  //   PHƯƠNG THỨC MAP SANG UserInfoSimpleResponse
   @Mapping(target = "id", source = "id")
   @Mapping(target = "fullName", source = "fullName")
   @Mapping(target = "avatarUrl", source = "avatarUrl")
@@ -42,7 +42,7 @@ public abstract class UserMapper { // Đổi thành abstract class để inject 
   @Mapping(target = "online", expression = "java(presenceService.isUserOnline(user.getId()))")
   public abstract UserInfoSimpleResponse toUserInfoSimpleResponse(User user);
 
-  // THÊM PHƯƠNG THỨC MAP LIST SANG UserInfoSimpleResponse
+  //  PHƯƠNG THỨC MAP LIST SANG UserInfoSimpleResponse
   public abstract List<UserInfoSimpleResponse> toUserInfoSimpleResponseList(List<User> users);
 
   @Named("rolesToRoleNames")

@@ -19,8 +19,6 @@ public interface OrderRepository
     extends JpaRepository<Order, Long>,
         JpaSpecificationExecutor<Order> { // Thêm JpaSpecificationExecutor
 
-  //  Optional<Order> findByOrderCode(String orderCode);
-
   // Lấy đơn hàng của người mua (phân trang)
   @Query(
       value =
@@ -58,18 +56,6 @@ public interface OrderRepository
       })
   Optional<Order> findById(Long orderId); // Ghi đè phương thức findById mặc định
 
-  //  @Query("SELECT o FROM Order o WHERE o.id = :orderId") // Thêm lại @Query đơn giản
-  //  @EntityGraph(attributePaths = {
-  //          "buyer",
-  //          "farmer",
-  //          "farmer.farmerProfile",
-  //          "orderItems",
-  //          "orderItems.product",
-  //          "payments"
-  //  })
-  //  Optional<Order> findByIdWithDetails(@Param("orderId") Long orderId);
-
-  // Làm tương tự cho findByOrderCodeWithDetails nếu nó cũng gây lỗi
   @EntityGraph(
       attributePaths = {
         "buyer",
@@ -80,18 +66,6 @@ public interface OrderRepository
         "payments"
       })
   Optional<Order> findByOrderCode(String orderCode); // Ghi đè findByOrderCode
-
-  //  // Lấy chi tiết đơn hàng theo Code (bao gồm items, payments)
-  //  @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode") // Thêm lại @Query đơn giản
-  //  @EntityGraph(attributePaths = {
-  //          "buyer",
-  //          "farmer",
-  //          "farmer.farmerProfile",
-  //          "orderItems",
-  //          "orderItems.product",
-  //          "payments"
-  //  })
-  //  Optional<Order> findByOrderCodeWithDetails(@Param("orderCode") String orderCode);
 
   // Tìm đơn hàng theo ID và Buyer ID (kiểm tra ownership)
   Optional<Order> findByIdAndBuyerId(Long orderId, Long buyerId);

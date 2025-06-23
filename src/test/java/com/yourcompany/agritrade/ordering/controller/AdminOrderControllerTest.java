@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.service.ExcelExportService;
 import com.yourcompany.agritrade.config.TestSecurityConfig;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.ordering.domain.OrderType;
@@ -52,6 +53,8 @@ class AdminOrderControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockBean private OrderService orderService;
+
+  @MockBean private ExcelExportService excelExportService;
 
   // Authentication sẽ được cung cấp bởi @WithMockUser
 

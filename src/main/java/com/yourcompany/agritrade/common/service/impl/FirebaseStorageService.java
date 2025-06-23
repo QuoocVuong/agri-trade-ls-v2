@@ -146,7 +146,7 @@ public class FirebaseStorageService implements FileStorageService {
     }
   }
 
-  @Override // Đảm bảo @Override khớp với interface mới
+  @Override
   public void delete(String blobPath) { // Nhận vào đường dẫn đầy đủ
     try {
       BlobId blobId = BlobId.of(bucketName, blobPath);

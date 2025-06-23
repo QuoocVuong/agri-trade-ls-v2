@@ -1,10 +1,9 @@
 package com.yourcompany.agritrade.usermanagement.service.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.catalog.domain.ProductImage;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
 import com.yourcompany.agritrade.catalog.dto.response.TopProductResponse;
@@ -13,17 +12,21 @@ import com.yourcompany.agritrade.common.model.NotificationType;
 import com.yourcompany.agritrade.common.model.ReviewStatus;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
+import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.interaction.repository.ReviewRepository;
 import com.yourcompany.agritrade.ordering.domain.Order;
 import com.yourcompany.agritrade.ordering.domain.OrderStatus;
+import com.yourcompany.agritrade.ordering.domain.SupplyOrderRequestStatus;
 import com.yourcompany.agritrade.ordering.dto.response.OrderSummaryResponse;
 import com.yourcompany.agritrade.ordering.mapper.OrderMapper;
 import com.yourcompany.agritrade.ordering.repository.OrderRepository;
+import com.yourcompany.agritrade.ordering.repository.SupplyOrderRequestRepository;
 import com.yourcompany.agritrade.usermanagement.domain.User;
-import com.yourcompany.agritrade.usermanagement.dto.response.DashboardStatsResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.FarmerChartDataResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.RecentActivityResponse;
-import com.yourcompany.agritrade.usermanagement.dto.response.TimeSeriesDataPoint;
+import com.yourcompany.agritrade.usermanagement.dto.response.*;
+import com.yourcompany.agritrade.usermanagement.mapper.FarmerSummaryMapper;
+import com.yourcompany.agritrade.usermanagement.mapper.UserMapper;
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import jakarta.persistence.Tuple;
@@ -33,13 +36,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
 import org.springframework.security.access.AccessDeniedException;
@@ -54,14 +56,20 @@ class DashboardServiceImplTest {
   @Mock private UserRepository userRepository;
   @Mock private FarmerProfileRepository farmerProfileRepository;
   @Mock private ReviewRepository reviewRepository;
+  @Mock private SupplyOrderRequestRepository supplyOrderRequestRepository;
   @Mock private OrderMapper orderMapper;
+  @Mock private FileStorageService fileStorageService;
+  @Mock private UserMapper userMapper;
+  @Mock private FarmerSummaryMapper farmerSummaryMapper;
   @Mock private Authentication authentication;
+
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
 
   @InjectMocks private DashboardServiceImpl dashboardService;
 
   private User testFarmer;
+  private User testBuyer;
   private final Long FARMER_ID = 1L;
-  private final String FARMER_EMAIL = "farmer@example.com";
   private final List<OrderStatus> REVENUE_STATUSES =
       Arrays.asList(OrderStatus.SHIPPING, OrderStatus.DELIVERED);
   private final List<OrderStatus> PENDING_STATUSES =
@@ -69,19 +77,31 @@ class DashboardServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     testFarmer = new User();
     testFarmer.setId(FARMER_ID);
-    testFarmer.setEmail(FARMER_EMAIL);
     testFarmer.setFullName("Test Farmer");
 
-    lenient().when(authentication.getName()).thenReturn(FARMER_EMAIL);
-    lenient().when(authentication.isAuthenticated()).thenReturn(true);
-    lenient().when(userRepository.findByEmail(FARMER_EMAIL)).thenReturn(Optional.of(testFarmer));
+    testBuyer = new User();
+    testBuyer.setId(2L);
+    testBuyer.setFullName("Test Buyer");
+  }
+
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
   }
 
   @Nested
   @DisplayName("Farmer Dashboard Tests")
   class FarmerDashboard {
+
+    @BeforeEach
+    void farmerSetup() {
+      mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(testFarmer);
+    }
+
     @Test
     @DisplayName("Get Farmer Dashboard Stats - Success")
     void getFarmerDashboardStats_success() {
@@ -89,25 +109,28 @@ class DashboardServiceImplTest {
       LocalDateTime todayEnd = LocalDate.now().atTime(LocalTime.MAX);
       LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
 
-      when(orderRepository.countByFarmerIdAndCreatedAtBetween(
-              eq(FARMER_ID), eq(todayStart), eq(todayEnd)))
+      when(orderRepository.countByFarmerIdAndCreatedAtBetween(FARMER_ID, todayStart, todayEnd))
           .thenReturn(5L);
-      when(orderRepository.countByFarmerIdAndCreatedAtBetween(
-              eq(FARMER_ID), eq(monthStart), eq(todayEnd)))
+      when(orderRepository.countByFarmerIdAndCreatedAtBetween(FARMER_ID, monthStart, todayEnd))
           .thenReturn(20L);
       when(orderRepository.sumTotalAmountByFarmerIdAndStatusInAndCreatedAtBetween(
-              eq(FARMER_ID), eq(REVENUE_STATUSES), eq(todayStart), eq(todayEnd)))
+              FARMER_ID, REVENUE_STATUSES, todayStart, todayEnd))
           .thenReturn(new BigDecimal("1500.00"));
       when(orderRepository.sumTotalAmountByFarmerIdAndStatusInAndCreatedAtBetween(
-              eq(FARMER_ID), eq(REVENUE_STATUSES), eq(monthStart), eq(todayEnd)))
+              FARMER_ID, REVENUE_STATUSES, monthStart, todayEnd))
           .thenReturn(new BigDecimal("10000.00"));
-      when(orderRepository.countByFarmerIdAndStatusIn(eq(FARMER_ID), eq(PENDING_STATUSES)))
-          .thenReturn(3L);
-      when(productRepository.countByFarmerIdAndStockQuantityLessThan(eq(FARMER_ID), anyInt()))
+      when(orderRepository.countByFarmerIdAndStatusIn(FARMER_ID, PENDING_STATUSES)).thenReturn(3L);
+      when(productRepository.countByFarmerIdAndB2bEnabledAndStockQuantityLessThan(
+              FARMER_ID, false, 5))
           .thenReturn(2L);
-      when(reviewRepository.countByProductFarmerIdAndStatus(
-              eq(FARMER_ID), eq(ReviewStatus.PENDING)))
+      when(productRepository.countByFarmerIdAndB2bEnabledAndStockQuantityLessThan(
+              FARMER_ID, true, 5))
           .thenReturn(1L);
+      when(reviewRepository.countByProductFarmerIdAndStatus(FARMER_ID, ReviewStatus.PENDING))
+          .thenReturn(4L);
+      when(supplyOrderRequestRepository.countByFarmerIdAndStatus(
+              FARMER_ID, SupplyOrderRequestStatus.PENDING_FARMER_ACTION))
+          .thenReturn(6L);
 
       DashboardStatsResponse stats = dashboardService.getFarmerDashboardStats(authentication);
 
@@ -118,7 +141,9 @@ class DashboardServiceImplTest {
       assertEquals(new BigDecimal("10000.00"), stats.getTotalRevenueThisMonth());
       assertEquals(3L, stats.getPendingOrders());
       assertEquals(2L, stats.getLowStockProducts());
-      assertEquals(1L, stats.getPendingReviewsOnMyProducts());
+      assertEquals(1L, stats.getLowStockSupplies());
+      assertEquals(4L, stats.getPendingReviewsOnMyProducts());
+      assertEquals(6L, stats.getPendingSupplyRequests());
     }
 
     @Test
@@ -137,7 +162,7 @@ class DashboardServiceImplTest {
       summary2.setId(102L);
 
       when(orderRepository.findByFarmerIdWithDetails(FARMER_ID, pageable)).thenReturn(orderPage);
-      when(orderMapper.toOrderSummaryResponseList(List.of(order1, order2)))
+      when(orderMapper.toOrderSummaryResponseList(orderPage.getContent()))
           .thenReturn(List.of(summary1, summary2));
 
       List<OrderSummaryResponse> result =
@@ -155,58 +180,26 @@ class DashboardServiceImplTest {
       Pageable pageable = PageRequest.of(0, limit);
       TopProductResponse topProduct1 =
           new TopProductResponse(201L, "Product X", "prod-x", 10L, new BigDecimal("1000"));
-      TopProductResponse topProduct2 =
-          new TopProductResponse(202L, "Product Y", "prod-y", 8L, new BigDecimal("800"));
-      List<TopProductResponse> topProductsFromRepo = List.of(topProduct1, topProduct2);
+      List<TopProductResponse> topProductsFromRepo = List.of(topProduct1);
+
+      Product p1 = new Product();
+      p1.setId(201L);
+      ProductImage img1 = new ProductImage();
+      img1.setBlobPath("path/to/image1.jpg");
+      img1.setDefault(true);
+      p1.setImages(new HashSet<>(Set.of(img1)));
 
       when(productRepository.findTopSellingProductsByFarmerWithoutThumbnail(FARMER_ID, pageable))
           .thenReturn(topProductsFromRepo);
-      // Giả sử productRepository.findById trả về product có ảnh để test logic gán thumbnail
-      com.yourcompany.agritrade.catalog.domain.Product p1 =
-          new com.yourcompany.agritrade.catalog.domain.Product();
-      p1.setId(201L);
-      ProductImage img1 = new ProductImage();
-      img1.setImageUrl("url1");
-      img1.setDefault(true);
-      p1.setImages(new HashSet<>(Set.of(img1)));
-      when(productRepository.findById(201L)).thenReturn(Optional.of(p1));
+      when(productRepository.findByIdInWithImages(List.of(201L))).thenReturn(List.of(p1));
+      when(fileStorageService.getFileUrl("path/to/image1.jpg")).thenReturn("signed-url-for-image1");
 
       List<TopProductResponse> result =
           dashboardService.getTopSellingFarmerProducts(authentication, limit);
 
       assertNotNull(result);
-      assertEquals(2, result.size());
-      assertEquals("url1", result.get(0).getThumbnailUrl()); // Kiểm tra thumbnail đã được gán
-    }
-
-    @Test
-    @DisplayName("Get Farmer Order Count Chart Data - Success")
-    void getFarmerOrderCountChartData_success() {
-      LocalDate startDate = LocalDate.now().minusDays(2);
-      LocalDate endDate = LocalDate.now();
-      LocalDateTime startDateTime = startDate.atStartOfDay();
-      LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
-
-      Tuple tuple1 = mock(Tuple.class);
-      when(tuple1.get(0)).thenReturn(Date.valueOf(startDate)); // Trả về java.sql.Date
-      when(tuple1.get(1, Long.class)).thenReturn(5L);
-
-      Tuple tuple2 = mock(Tuple.class);
-      when(tuple2.get(0)).thenReturn(Date.valueOf(endDate));
-      when(tuple2.get(1, Long.class)).thenReturn(10L);
-
-      when(orderRepository.countOrdersByDayForFarmer(FARMER_ID, startDateTime, endDateTime))
-          .thenReturn(List.of(tuple1, tuple2));
-
-      List<FarmerChartDataResponse> result =
-          dashboardService.getFarmerOrderCountChartData(authentication, startDate, endDate);
-
-      assertNotNull(result);
-      assertEquals(3, result.size()); // startDate, startDate+1, endDate
-      assertEquals(5L, result.get(0).getValue().longValue());
-      assertEquals(0L, result.get(1).getValue().longValue()); // Ngày ở giữa không có data
-      assertEquals(10L, result.get(2).getValue().longValue());
-      assertEquals(startDate.toString(), result.get(0).getLabel());
+      assertEquals(1, result.size());
+      assertEquals("signed-url-for-image1", result.get(0).getThumbnailUrl());
     }
 
     @Test
@@ -245,23 +238,37 @@ class DashboardServiceImplTest {
       LocalDateTime todayStart = LocalDate.now().atStartOfDay();
       LocalDateTime todayEnd = LocalDate.now().atTime(LocalTime.MAX);
       LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+      LocalDateTime prevMonthStart = monthStart.minusMonths(1);
+      LocalDateTime prevMonthEnd = monthStart.minusNanos(1);
 
-      when(orderRepository.countByCreatedAtBetween(eq(todayStart), eq(todayEnd))).thenReturn(10L);
-      when(orderRepository.countByCreatedAtBetween(eq(monthStart), eq(todayEnd))).thenReturn(50L);
+      when(orderRepository.countByCreatedAtBetween(todayStart, todayEnd)).thenReturn(10L);
+      when(orderRepository.countByCreatedAtBetween(monthStart, todayEnd)).thenReturn(50L);
       when(orderRepository.sumTotalAmountByStatusInAndCreatedAtBetween(
-              eq(REVENUE_STATUSES), eq(todayStart), eq(todayEnd)))
+              REVENUE_STATUSES, todayStart, todayEnd))
           .thenReturn(new BigDecimal("5000.00"));
       when(orderRepository.sumTotalAmountByStatusInAndCreatedAtBetween(
-              eq(REVENUE_STATUSES), eq(monthStart), eq(todayEnd)))
+              REVENUE_STATUSES, monthStart, todayEnd))
           .thenReturn(new BigDecimal("25000.00"));
+      when(orderRepository.sumTotalAmountByStatusInAndCreatedAtBetween(
+              REVENUE_STATUSES, prevMonthStart, prevMonthEnd))
+          .thenReturn(new BigDecimal("20000.00"));
+
       when(userRepository.count()).thenReturn(100L);
       when(userRepository.countByRoleName(RoleType.ROLE_FARMER)).thenReturn(20L);
       when(userRepository.countByRoleName(RoleType.ROLE_CONSUMER)).thenReturn(70L);
       when(userRepository.countByRoleName(RoleType.ROLE_BUSINESS_BUYER)).thenReturn(10L);
+
       when(farmerProfileRepository.countByVerificationStatus(VerificationStatus.PENDING))
           .thenReturn(5L);
       when(productRepository.countByStatus(ProductStatus.PENDING_APPROVAL)).thenReturn(8L);
       when(reviewRepository.countByStatus(ReviewStatus.PENDING)).thenReturn(12L);
+
+      Arrays.stream(OrderStatus.values())
+          .forEach(
+              status ->
+                  when(orderRepository.countByStatus(status))
+                      .thenReturn(2L) // Giả sử mỗi status có 2 order
+              );
 
       DashboardStatsResponse stats = dashboardService.getAdminDashboardStats();
 
@@ -269,10 +276,14 @@ class DashboardServiceImplTest {
       assertEquals(10L, stats.getTotalOrdersToday());
       assertEquals(50L, stats.getTotalOrdersThisMonth());
       assertEquals(new BigDecimal("5000.00"), stats.getTotalRevenueToday());
+      assertEquals(new BigDecimal("25000.00"), stats.getTotalRevenueThisMonth());
+      assertEquals(new BigDecimal("20000.00"), stats.getTotalRevenuePreviousMonth());
       assertEquals(100L, stats.getTotalUsers());
       assertEquals(5L, stats.getPendingFarmerApprovals());
       assertEquals(8L, stats.getPendingProductApprovals());
       assertEquals(12L, stats.getPendingReviews());
+      assertNotNull(stats.getOrderStatusDistribution());
+      assertEquals(2L, stats.getOrderStatusDistribution().get(OrderStatus.PENDING.name()));
     }
 
     @Test
@@ -322,16 +333,14 @@ class DashboardServiceImplTest {
     @Test
     @DisplayName("Get Recent Activities For Admin - Success")
     void getRecentActivitiesForAdmin_success() {
-      int limit = 2;
+      int limit = 5;
       Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
 
       Order recentOrder = new Order();
       recentOrder.setId(1L);
       recentOrder.setOrderCode("ORD-RECENT");
       recentOrder.setCreatedAt(LocalDateTime.now().minusHours(1));
-      User buyerForRecentOrder = new User();
-      buyerForRecentOrder.setFullName("Recent Buyer");
-      recentOrder.setBuyer(buyerForRecentOrder);
+      recentOrder.setBuyer(testBuyer);
 
       User recentUser = new User();
       recentUser.setId(10L);
@@ -339,11 +348,9 @@ class DashboardServiceImplTest {
       recentUser.setEmail("new@example.com");
       recentUser.setCreatedAt(LocalDateTime.now().minusMinutes(30));
 
-      com.yourcompany.agritrade.interaction.domain.Review recentReview =
-          new com.yourcompany.agritrade.interaction.domain.Review();
+      Review recentReview = new Review();
       recentReview.setId(5L);
-      com.yourcompany.agritrade.catalog.domain.Product reviewedProduct =
-          new com.yourcompany.agritrade.catalog.domain.Product();
+      Product reviewedProduct = new Product();
       reviewedProduct.setId(50L);
       recentReview.setProduct(reviewedProduct);
       recentReview.setCreatedAt(LocalDateTime.now().minusMinutes(15));
@@ -357,18 +364,11 @@ class DashboardServiceImplTest {
       List<RecentActivityResponse> result = dashboardService.getRecentActivitiesForAdmin(limit);
 
       assertNotNull(result);
-      // Kết quả sẽ được sắp xếp lại và giới hạn, nên số lượng có thể là `limit` hoặc ít hơn
-      assertTrue(result.size() <= limit);
-      // Kiểm tra xem các loại hoạt động khác nhau có được thêm vào không (tùy thuộc vào timestamp)
-      boolean hasOrderActivity =
-          result.stream().anyMatch(r -> r.getType() == NotificationType.ORDER_PLACED);
-      boolean hasUserActivity =
-          result.stream().anyMatch(r -> r.getType() == NotificationType.WELCOME);
-      boolean hasReviewActivity =
-          result.stream().anyMatch(r -> r.getType() == NotificationType.REVIEW_PENDING);
-
-      // Ít nhất một trong số chúng phải có mặt nếu limit đủ lớn
-      if (limit >= 1) assertTrue(hasOrderActivity || hasUserActivity || hasReviewActivity);
+      assertEquals(3, result.size());
+      // Sắp xếp theo thời gian, review là mới nhất
+      assertEquals(NotificationType.REVIEW_PENDING, result.get(0).getType());
+      assertEquals(NotificationType.WELCOME, result.get(1).getType());
+      assertEquals(NotificationType.ORDER_PLACED, result.get(2).getType());
     }
 
     @Test
@@ -389,26 +389,23 @@ class DashboardServiceImplTest {
   }
 
   @Test
-  @DisplayName("Get User From Authentication - User Not Found - Throws UsernameNotFoundException")
-  void getUserFromAuthentication_whenUserNotFound_shouldThrowUsernameNotFoundException() {
-    String unknownEmail = "unknown@example.com";
-    when(authentication.getName()).thenReturn(unknownEmail);
-    when(authentication.isAuthenticated())
-        .thenReturn(true); // <<< QUAN TRỌNG: Đảm bảo user được coi là đã xác thực
-    when(userRepository.findByEmail(unknownEmail))
-        .thenReturn(Optional.empty()); // User không tồn tại
+  @DisplayName("Get Farmer Stats - User Not Found - Throws UsernameNotFoundException")
+  void getFarmerStats_whenUserNotFound_shouldThrowException() {
+    mockedSecurityUtils
+        .when(SecurityUtils::getCurrentAuthenticatedUser)
+        .thenThrow(new UsernameNotFoundException("User not found"));
 
-    // Gọi một phương thức bất kỳ trong service mà sử dụng getUserFromAuthentication
     assertThrows(
         UsernameNotFoundException.class,
         () -> dashboardService.getFarmerDashboardStats(authentication));
   }
 
   @Test
-  @DisplayName("Get User From Authentication - Not Authenticated - Throws AccessDeniedException")
-  void getUserFromAuthentication_whenNotAuthenticated_shouldThrowAccessDeniedException() {
-    when(authentication.isAuthenticated()).thenReturn(false); // Giả lập chưa xác thực
-    // Không cần mock getName() hoặc userRepository.findByEmail() vì service sẽ ném lỗi trước đó
+  @DisplayName("Get Farmer Stats - Not Authenticated - Throws AccessDeniedException")
+  void getFarmerStats_whenNotAuthenticated_shouldThrowException() {
+    mockedSecurityUtils
+        .when(SecurityUtils::getCurrentAuthenticatedUser)
+        .thenThrow(new AccessDeniedException("Not authenticated"));
 
     assertThrows(
         AccessDeniedException.class,

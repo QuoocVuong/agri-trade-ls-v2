@@ -120,7 +120,7 @@ public class OrderSpecifications {
     return Specification.anyOf(hasOrderCode(keyword), hasBuyerName(keyword));
   }
 
-  // (Tùy chọn) Specification để fetch thông tin cho Summary
+  //  Specification để fetch thông tin cho Summary
   public static Specification<Order> fetchBuyerAndFarmerSummary() {
     return (root, query, criteriaBuilder) -> {
       if (query.getResultType() != Long.class && query.getResultType() != long.class) {

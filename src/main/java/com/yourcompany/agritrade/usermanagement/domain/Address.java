@@ -12,7 +12,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.Where;
 
 @Entity
-@Table(name = "addresses") // Tên bảng đã tạo trong migration V2
+@Table(name = "addresses")
 @Getter
 @Setter
 @NoArgsConstructor

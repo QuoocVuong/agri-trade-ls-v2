@@ -111,14 +111,21 @@ public class OrderServiceImpl implements OrderService {
   @Override
   @Transactional(isolation = Isolation.READ_COMMITTED)
   @Retryable(
-          retryFor = {OptimisticLockingFailureException.class, ObjectOptimisticLockingFailureException.class},
-          maxAttempts = 3,
-          backoff = @Backoff(delay = 100)
-  )
+      retryFor = {
+        OptimisticLockingFailureException.class,
+        ObjectOptimisticLockingFailureException.class
+      },
+      maxAttempts = 3,
+      backoff = @Backoff(delay = 100))
   public List<OrderResponse> checkout(Authentication authentication, CheckoutRequest request) {
     User buyer = SecurityUtils.getCurrentAuthenticatedUser();
-    Address shippingAddress = addressRepository.findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Shipping Address", "id", request.getShippingAddressId()));
+    Address shippingAddress =
+        addressRepository
+            .findByIdAndUserId(request.getShippingAddressId(), buyer.getId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Shipping Address", "id", request.getShippingAddressId()));
 
     List<CartItem> cartItems = cartItemRepository.findByUserId(buyer.getId());
     if (cartItems.isEmpty()) {
@@ -155,36 +162,51 @@ public class OrderServiceImpl implements OrderService {
         continue;
       }
       if (productFromDb.getStockQuantity() < requestedQuantity) {
-        validationErrors.add("Sản phẩm '" + productFromDb.getName() + "' không đủ số lượng tồn kho (chỉ còn " + productFromDb.getStockQuantity() + ").");
+        validationErrors.add(
+            "Sản phẩm '"
+                + productFromDb.getName()
+                + "' không đủ số lượng tồn kho (chỉ còn "
+                + productFromDb.getStockQuantity()
+                + ").");
         continue; // Không xóa, chỉ báo lỗi để người dùng sửa
       }
 
       // Nếu sản phẩm hợp lệ, thêm vào map để xử lý sau và tính tổng phụ
       validatedProducts.put(productId, productFromDb);
-      currentActualSubTotal = currentActualSubTotal.add(productFromDb.getPrice().multiply(BigDecimal.valueOf(requestedQuantity)));
+      currentActualSubTotal =
+          currentActualSubTotal.add(
+              productFromDb.getPrice().multiply(BigDecimal.valueOf(requestedQuantity)));
     }
 
     // Nếu có bất kỳ lỗi nào về tồn kho hoặc trạng thái, dừng lại ngay
     if (!validationErrors.isEmpty()) {
       String combinedErrorMessage = String.join("\n", validationErrors);
-      throw new BadRequestException("Không thể đặt hàng. Vui lòng kiểm tra lại giỏ hàng:\n" + combinedErrorMessage);
+      throw new BadRequestException(
+          "Không thể đặt hàng. Vui lòng kiểm tra lại giỏ hàng:\n" + combinedErrorMessage);
     }
 
     // --- BƯỚC 2: KIỂM TRA TỔNG TIỀN CUỐI CÙNG ---
     BigDecimal totalShippingFee = calculateTotalShippingFee(cartItems, buyer, shippingAddress);
     BigDecimal totalDiscount = calculateDiscount(buyer, currentActualSubTotal);
-    BigDecimal currentActualTotal = currentActualSubTotal.add(totalShippingFee).subtract(totalDiscount).setScale(2, RoundingMode.HALF_UP);
+    BigDecimal currentActualTotal =
+        currentActualSubTotal
+            .add(totalShippingFee)
+            .subtract(totalDiscount)
+            .setScale(2, RoundingMode.HALF_UP);
 
     if (request.getConfirmedTotalAmount().compareTo(currentActualTotal) != 0) {
-      log.warn("Price/Total mismatch during checkout for user {}. Confirmed: {}, Actual: {}",
-              buyer.getEmail(), request.getConfirmedTotalAmount(), currentActualTotal);
+      log.warn(
+          "Price/Total mismatch during checkout for user {}. Confirmed: {}, Actual: {}",
+          buyer.getEmail(),
+          request.getConfirmedTotalAmount(),
+          currentActualTotal);
       throw new BadRequestException(
-              "Tổng giá trị đơn hàng đã thay đổi do cập nhật giá hoặc phí vận chuyển. Vui lòng quay lại giỏ hàng để xác nhận lại."
-      );
+          "Tổng giá trị đơn hàng đã thay đổi do cập nhật giá hoặc phí vận chuyển. Vui lòng quay lại giỏ hàng để xác nhận lại.");
     }
 
     // --- BƯỚC 3: TẠO ĐƠN HÀNG (KHI MỌI THỨ ĐỀU HỢP LỆ) ---
-    Map<Long, List<CartItem>> itemsByFarmer = cartItems.stream()
+    Map<Long, List<CartItem>> itemsByFarmer =
+        cartItems.stream()
             .collect(Collectors.groupingBy(item -> item.getProduct().getFarmer().getId()));
 
     List<Order> createdOrders = new ArrayList<>();
@@ -192,8 +214,15 @@ public class OrderServiceImpl implements OrderService {
     for (Map.Entry<Long, List<CartItem>> entry : itemsByFarmer.entrySet()) {
       Long farmerId = entry.getKey();
       List<CartItem> farmerCartItems = entry.getValue();
-      User farmer = userRepository.findById(farmerId).orElseThrow(() -> new IllegalStateException("Farmer not found during order creation"));
-      FarmerProfile farmerProfile = farmerProfileRepository.findById(farmerId).orElseThrow(() -> new IllegalStateException("Farmer profile not found"));
+      User farmer =
+          userRepository
+              .findById(farmerId)
+              .orElseThrow(
+                  () -> new IllegalStateException("Farmer not found during order creation"));
+      FarmerProfile farmerProfile =
+          farmerProfileRepository
+              .findById(farmerId)
+              .orElseThrow(() -> new IllegalStateException("Farmer profile not found"));
 
       Order order = new Order();
       order.setBuyer(buyer);
@@ -215,6 +244,9 @@ public class OrderServiceImpl implements OrderService {
         // Trừ tồn kho trên đối tượng đã được xác thực
         product.setStockQuantity(product.getStockQuantity() - requestedQuantity);
 
+        // Thêm dòng này để lưu lại sự thay đổi tồn kho của sản phẩm
+        productRepository.saveAndFlush(product);
+
         // Tạo OrderItem với giá hiện tại
         OrderItem orderItem = new OrderItem();
         orderItem.setProduct(product);
@@ -222,7 +254,8 @@ public class OrderServiceImpl implements OrderService {
         orderItem.setUnit(determineUnit(product, order.getOrderType()));
         orderItem.setPricePerUnit(product.getPrice());
         orderItem.setQuantity(requestedQuantity);
-        BigDecimal itemTotalPrice = product.getPrice().multiply(BigDecimal.valueOf(requestedQuantity));
+        BigDecimal itemTotalPrice =
+            product.getPrice().multiply(BigDecimal.valueOf(requestedQuantity));
         orderItem.setTotalPrice(itemTotalPrice);
 
         order.addOrderItem(orderItem);
@@ -230,8 +263,11 @@ public class OrderServiceImpl implements OrderService {
       }
 
       // Tính toán các loại phí cho từng đơn hàng của từng farmer
-      BigDecimal farmerShippingFee = calculateShippingFee(shippingAddress, farmerProfile, farmerCartItems, order.getOrderType());
-      BigDecimal farmerDiscount = calculateDiscount(buyer, farmerSubTotal); // Discount có thể tính trên từng đơn hoặc tổng
+      BigDecimal farmerShippingFee =
+          calculateShippingFee(
+              shippingAddress, farmerProfile, farmerCartItems, order.getOrderType());
+      BigDecimal farmerDiscount =
+          calculateDiscount(buyer, farmerSubTotal); // Discount có thể tính trên từng đơn hoặc tổng
 
       order.setSubTotal(farmerSubTotal);
       order.setShippingFee(farmerShippingFee);
@@ -253,13 +289,15 @@ public class OrderServiceImpl implements OrderService {
     cartItemRepository.deleteAllInBatch(cartItems);
 
     return createdOrders.stream()
-            .map(o -> orderRepository.findById(o.getId()).orElse(o))
-            .map(orderMapper::toOrderResponse)
-            .collect(Collectors.toList());
+        .map(o -> orderRepository.findById(o.getId()).orElse(o))
+        .map(orderMapper::toOrderResponse)
+        .collect(Collectors.toList());
   }
 
-  private BigDecimal calculateTotalShippingFee(List<CartItem> cartItems, User buyer, Address shippingAddress) {
-    Map<Long, List<CartItem>> itemsByFarmer = cartItems.stream()
+  private BigDecimal calculateTotalShippingFee(
+      List<CartItem> cartItems, User buyer, Address shippingAddress) {
+    Map<Long, List<CartItem>> itemsByFarmer =
+        cartItems.stream()
             .collect(Collectors.groupingBy(item -> item.getProduct().getFarmer().getId()));
 
     BigDecimal totalShippingFee = BigDecimal.ZERO;
@@ -272,7 +310,9 @@ public class OrderServiceImpl implements OrderService {
       OrderType orderType = determineOrderType(buyer, farmerCartItems);
 
       if (farmerProfile != null) {
-        totalShippingFee = totalShippingFee.add(calculateShippingFee(shippingAddress, farmerProfile, farmerCartItems, orderType));
+        totalShippingFee =
+            totalShippingFee.add(
+                calculateShippingFee(shippingAddress, farmerProfile, farmerCartItems, orderType));
       }
     }
     return totalShippingFee;
@@ -511,7 +551,7 @@ public class OrderServiceImpl implements OrderService {
         previousOrderStatus);
 
     // Bước 6: Gửi thông báo hủy đơn
-    // (NotificationService nên tự xử lý việc gửi cho buyer và farmer nếu cần)
+    // (NotificationService nên tự xử lý việc gửi cho buyer và farmer)
     notificationService.sendOrderCancellationNotification(cancelledOrder);
 
     // Bước 7: Load lại đầy đủ thông tin và trả về
@@ -749,8 +789,8 @@ public class OrderServiceImpl implements OrderService {
 
   private OrderType determineOrderType(User buyer, List<CartItem> items) {
     // 1. Kiểm tra xem người mua có vai trò BUSINESS_BUYER không.
-    boolean isBusinessBuyer = buyer.getRoles().stream()
-            .anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
+    boolean isBusinessBuyer =
+        buyer.getRoles().stream().anyMatch(role -> role.getName() == RoleType.ROLE_BUSINESS_BUYER);
 
     // 2. Nếu người mua không phải là Business Buyer, đơn hàng luôn là B2C.
     if (!isBusinessBuyer) {
@@ -766,7 +806,8 @@ public class OrderServiceImpl implements OrderService {
 
     // allMatch sẽ trả về true nếu tất cả các item thỏa mãn điều kiện,
     // hoặc trả về true nếu danh sách item rỗng (đã kiểm tra ở trên).
-    boolean allItemsAreB2BEnabled = items.stream()
+    boolean allItemsAreB2BEnabled =
+        items.stream()
             .allMatch(item -> item.getProduct() != null && item.getProduct().isB2bEnabled());
 
     if (allItemsAreB2BEnabled) {
@@ -775,7 +816,9 @@ public class OrderServiceImpl implements OrderService {
       return OrderType.B2B;
     } else {
       // Nếu có ít nhất một sản phẩm không hỗ trợ B2B, toàn bộ đơn hàng được coi là B2C.
-      log.info("Determined order type as B2C for buyer ID {} because at least one item is not B2B enabled.", buyer.getId());
+      log.info(
+          "Determined order type as B2C for buyer ID {} because at least one item is not B2B enabled.",
+          buyer.getId());
       return OrderType.B2C;
     }
   }
@@ -824,7 +867,7 @@ public class OrderServiceImpl implements OrderService {
     // --- Xác định giao nội tỉnh hay ngoại tỉnh ---
     boolean isIntraProvinceShipment = buyerProvinceCode.equals(farmerProvinceCode);
 
-    // --- Định nghĩa các mức phí (Ví dụ - bạn cần điều chỉnh theo thực tế) ---
+    // --- Định nghĩa các mức phí  ---
     final BigDecimal INTRA_PROVINCE_FEE =
         new BigDecimal("15000.00"); // Phí giao nội tỉnh (B2C & B2B)
     final BigDecimal INTER_PROVINCE_FEE =
@@ -1163,7 +1206,7 @@ public class OrderServiceImpl implements OrderService {
           .ifPresent(
               invoice -> {
                 invoice.setStatus(InvoiceStatus.PAID);
-                // invoice.setPaymentDate(LocalDate.now()); // Có thể thêm trường này
+                // invoice.setPaymentDate(LocalDate.now());
                 invoiceRepository.save(invoice);
                 log.info(
                     "Invoice {} for order {} marked as PAID.",
@@ -1316,7 +1359,7 @@ public class OrderServiceImpl implements OrderService {
   }
 
   @Override
-  @Transactional // Có thể cần @Transactional nếu bạn cập nhật trạng thái Order
+  @Transactional // Có thể cần @Transactional nếu  cập nhật trạng thái Order
   public PaymentUrlResponse createPaymentUrl(
       Authentication authentication,
       Long orderId,
@@ -1444,10 +1487,9 @@ public class OrderServiceImpl implements OrderService {
       order.setPaymentStatus(PaymentStatus.PENDING); // Chờ thanh toán (ví dụ: chuyển khoản)
     }
     order.setNotes(request.getNotes());
-    // order.setExpectedDeliveryDate(request.getExpectedDeliveryDate()); // Nếu có trường này trong
-    // Order
+    // order.setExpectedDeliveryDate(request.getExpectedDeliveryDate());
 
-    // *** LOGIC MỚI ĐỂ LIÊN KẾT VỚI REQUEST GỐC ***
+    // *** LOGIC  ĐỂ LIÊN KẾT VỚI REQUEST GỐC ***
     if (request.getSourceRequestId() != null) {
       // Tìm SupplyOrderRequest gốc từ ID trong request
       SupplyOrderRequest sourceRequest =
@@ -1505,7 +1547,8 @@ public class OrderServiceImpl implements OrderService {
       BigDecimal quantityToDeductInKg =
           unitFarmerChot.convertToKg(new BigDecimal(requestedQuantityFromForm));
 
-      // === KIỂM TRA VÀ TRỪ KHO ===   // 3. Kiểm tra và trừ kho (stockQuantity của Product là số
+      // === KIỂM TRA VÀ TRỪ KHO ===
+      //  3. Kiểm tra và trừ kho (stockQuantity của Product là số
       // nguyên, lưu theo KG)
       if (productRef.getStatus() != ProductStatus.PUBLISHED || productRef.isDeleted()) {
         throw new BadRequestException("Nguồn cung '" + productRef.getName() + "' không khả dụng.");
@@ -1567,7 +1610,7 @@ public class OrderServiceImpl implements OrderService {
       invoiceService.getOrCreateInvoiceForOrder(savedOrder);
     }
 
-    // (Tùy chọn) Cập nhật trạng thái của SupplyOrderRequest gốc thành ACCEPTED sau khi đã tạo Order
+    // Cập nhật trạng thái của SupplyOrderRequest gốc thành ACCEPTED sau khi đã tạo Order
     // thành công
     if (order.getSourceRequest() != null) {
       SupplyOrderRequest sourceRequest = order.getSourceRequest();
@@ -1615,11 +1658,6 @@ public class OrderServiceImpl implements OrderService {
       return;
     }
 
-    // Lưu thông tin thông báo của buyer (ví dụ vào một trường mới trong Order hoặc Invoice)
-    // Ví dụ: order.setBuyerPaymentNotificationNote(buildNotificationNote(request));
-    // Hoặc tạo một entity riêng để lưu lịch sử thông báo thanh toán nếu cần chi tiết.
-    // Hiện tại, chúng ta chỉ gửi thông báo.
-
     log.info(
         "Buyer {} notified payment for order {}. Ref: {}, Notes: {}",
         buyer.getEmail(),
@@ -1630,22 +1668,9 @@ public class OrderServiceImpl implements OrderService {
     // Gửi thông báo cho Admin và Farmer (nếu Farmer quản lý đơn này)
     // notificationService.sendBuyerPaymentNotifiedToAdmin(order, request);
     // notificationService.sendBuyerPaymentNotifiedToFarmer(order, request);
-    // (Cần tạo các hàm này trong NotificationService)
+    // )
 
-    // QUAN TRỌNG: KHÔNG thay đổi Order.paymentStatus ở đây.
-    // Việc này sẽ do Admin/Farmer thực hiện sau khi xác minh.
   }
-
-  // private String buildNotificationNote(PaymentNotificationRequest request) {
-  //     StringBuilder note = new StringBuilder("Buyer payment notification:");
-  //     if (StringUtils.hasText(request.getReferenceCode())) {
-  //         note.append("\nRef Code: ").append(request.getReferenceCode());
-  //     }
-  //     if (StringUtils.hasText(request.getNotes())) {
-  //         note.append("\nNotes: ").append(request.getNotes());
-  //     }
-  //     return note.toString();
-  // }
 
   @Override
   @Transactional(readOnly = true)

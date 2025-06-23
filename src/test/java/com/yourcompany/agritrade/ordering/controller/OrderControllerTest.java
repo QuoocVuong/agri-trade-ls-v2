@@ -21,6 +21,7 @@ import com.yourcompany.agritrade.ordering.domain.PaymentStatus;
 import com.yourcompany.agritrade.ordering.dto.request.CheckoutRequest;
 import com.yourcompany.agritrade.ordering.dto.request.OrderCalculationRequest;
 import com.yourcompany.agritrade.ordering.dto.response.*;
+import com.yourcompany.agritrade.ordering.service.InvoiceService;
 import com.yourcompany.agritrade.ordering.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
@@ -51,6 +52,8 @@ class OrderControllerTest {
 
   @MockBean private OrderService orderService;
 
+  @MockBean private InvoiceService invoiceService;
+
   // Mock HttpServletRequest vì nó được inject vào một số phương thức controller
   @MockBean private HttpServletRequest httpServletRequest;
 
@@ -68,6 +71,8 @@ class OrderControllerTest {
     checkoutRequest = new CheckoutRequest();
     checkoutRequest.setShippingAddressId(1L);
     checkoutRequest.setPaymentMethod(PaymentMethod.COD);
+
+    checkoutRequest.setConfirmedTotalAmount(new BigDecimal("150.00"));
 
     orderResponse = new OrderResponse();
     orderResponse.setId(1L);

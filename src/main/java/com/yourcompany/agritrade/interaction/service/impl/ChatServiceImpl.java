@@ -32,7 +32,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,7 +117,7 @@ public class ChatServiceImpl implements ChatService {
                 log.info(
                     "SupplyOrderRequest {} status updated to NEGOTIATING due to chat initiation.",
                     req.getId());
-                // (Tùy chọn) Gửi thông báo cập nhật trạng thái qua WebSocket cho cả hai bên
+                // Gửi thông báo cập nhật trạng thái qua WebSocket cho cả hai bên
               });
     }
 
@@ -209,7 +208,7 @@ public class ChatServiceImpl implements ChatService {
     messagingTemplate.convertAndSend(destination, responseDto);
     log.info("Sent WebSocket message to {}: {}", destination, responseDto.getId());
 
-    // (Tùy chọn) Gửi lại cho người gửi để xác nhận đã gửi thành công
+    //  Gửi lại cho người gửi để xác nhận đã gửi thành công
     String senderDestination =
         "/user/" + sender.getEmail() + "/queue/messages"; // Gửi vào cùng queue
     messagingTemplate.convertAndSend(senderDestination, responseDto);
@@ -332,6 +331,4 @@ public class ChatServiceImpl implements ChatService {
     User user = SecurityUtils.getCurrentAuthenticatedUser();
     return chatRoomRepository.getTotalUnreadCountForUser(user.getId()).orElse(0);
   }
-
-
 }

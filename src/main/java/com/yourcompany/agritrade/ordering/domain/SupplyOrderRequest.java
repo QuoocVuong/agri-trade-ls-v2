@@ -41,7 +41,7 @@ public class SupplyOrderRequest {
   private String requestedUnit; // Đơn vị người mua yêu cầu (có thể khác với đơn vị sỉ của farmer)
 
   @Column(precision = 15, scale = 2)
-  private BigDecimal proposedPricePerUnit; // Giá người mua đề xuất (tùy chọn)
+  private BigDecimal proposedPricePerUnit; // Giá người mua đề xuất
 
   @Lob private String buyerNotes;
 

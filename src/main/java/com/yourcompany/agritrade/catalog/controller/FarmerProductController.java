@@ -29,8 +29,8 @@ public class FarmerProductController {
   @GetMapping("/products/me")
   public ResponseEntity<ApiResponse<Page<ProductSummaryResponse>>> getMyProducts(
       Authentication authentication,
-      @RequestParam(required = false) String keyword, // NHẬN KEYWORD
-      @RequestParam(required = false) String status, // NHẬN STATUS DẠNG STRING
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String status,
       @PageableDefault(size = 10, sort = "updatedAt,desc") Pageable pageable) {
 
     ProductStatus statusEnum = null;
@@ -97,8 +97,7 @@ public class FarmerProductController {
       }
     }
     Page<ProductSummaryResponse> supplies =
-        productService.getMySupplyProducts(
-            authentication, keyword, statusEnum, pageable); // Gọi hàm mới
+        productService.getMySupplyProducts(authentication, keyword, statusEnum, pageable);
     return ResponseEntity.ok(ApiResponse.success(supplies));
   }
 }

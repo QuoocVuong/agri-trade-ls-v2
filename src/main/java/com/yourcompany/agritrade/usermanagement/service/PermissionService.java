@@ -1,4 +1,3 @@
-// src/main/java/com/yourcompany/agritrade/usermanagement/service/PermissionService.java
 package com.yourcompany.agritrade.usermanagement.service;
 
 import com.yourcompany.agritrade.usermanagement.dto.request.PermissionRequest;

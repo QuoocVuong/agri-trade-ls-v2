@@ -16,9 +16,7 @@ public interface ChatMessageMapper {
   // MapStruct sẽ dùng UserMapper trong 'uses' để gọi hàm map User -> UserInfoSimpleResponse
   @Mapping(target = "sender", source = "sender")
   @Mapping(target = "recipient", source = "recipient")
-  ChatMessageResponse toChatMessageResponse(
-      ChatMessage chatMessage); // Đổi về non-abstract nếu là interface
+  ChatMessageResponse toChatMessageResponse(ChatMessage chatMessage);
 
-  List<ChatMessageResponse> toChatMessageResponseList(
-      List<ChatMessage> messages); // Đổi về non-abstract
+  List<ChatMessageResponse> toChatMessageResponseList(List<ChatMessage> messages);
 }

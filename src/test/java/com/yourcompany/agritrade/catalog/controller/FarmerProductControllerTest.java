@@ -6,7 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yourcompany.agritrade.catalog.domain.ProductStatus;
@@ -37,10 +38,6 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(FarmerProductController.class)
-// Chỉ test FarmerProductController, không load toàn bộ context
-// Cần có SecurityConfig trong context để @PreAuthorize hoạt động,
-// hoặc mock SecurityContext nếu không muốn load SecurityConfig.
-// @WithMockUser giả lập user đã đăng nhập với vai trò FARMER.
 @WithMockUser(
     username = "farmer@example.com",
     roles = {"FARMER"})
@@ -48,33 +45,23 @@ import org.springframework.test.web.servlet.MockMvc;
 class FarmerProductControllerTest {
 
   @Autowired private MockMvc mockMvc;
-
   @MockBean private ProductService productService;
-
-  @Autowired private ObjectMapper objectMapper; // Spring Boot tự động cấu hình bean này
+  @Autowired private ObjectMapper objectMapper;
 
   private ProductSummaryResponse productSummaryResponse;
   private ProductDetailResponse productDetailResponse;
   private ProductRequest productRequest;
 
-  // private Authentication mockAuthentication; // Sẽ được cung cấp bởi @WithMockUser
-
   @BeforeEach
   void setUp() {
-    // mockAuthentication sẽ được tự động tạo bởi @WithMockUser
-    // Nếu cần truy cập trực tiếp, có thể lấy từ SecurityContextHolder trong test
-    // hoặc truyền vào như một tham số (khó hơn với MockMvc)
-
     productSummaryResponse = new ProductSummaryResponse();
     productSummaryResponse.setId(1L);
     productSummaryResponse.setName("Test Product Summary");
-    // ... các trường khác
 
     productDetailResponse = new ProductDetailResponse();
     productDetailResponse.setId(1L);
     productDetailResponse.setName("Test Product Detail");
     productDetailResponse.setPrice(new BigDecimal("100.00"));
-    // ... các trường khác
 
     productRequest = new ProductRequest();
     productRequest.setName("New Valid Product");
@@ -82,13 +69,6 @@ class FarmerProductControllerTest {
     productRequest.setUnit("kg");
     productRequest.setPrice(new BigDecimal("150.00"));
     productRequest.setStockQuantity(10);
-    // ... các trường khác
-
-    // Mock các giá trị cho JwtProperties
-    //        JwtProperties.RefreshToken mockRefreshTokenProps = new JwtProperties.RefreshToken();
-    //        mockRefreshTokenProps.setExpirationMs(TimeUnit.DAYS.toMillis(7));
-    //        // Sử dụng lenient() vì các mock này có thể không được dùng trong mọi test case
-
   }
 
   @Nested
@@ -100,7 +80,9 @@ class FarmerProductControllerTest {
       Pageable pageable = PageRequest.of(0, 10);
       Page<ProductSummaryResponse> productPage =
           new PageImpl<>(List.of(productSummaryResponse), pageable, 1);
-      when(productService.getMyProducts(
+
+      // SỬA LỖI: Mock đúng phương thức getMyB2CProducts
+      when(productService.getMyB2CProducts(
               any(Authentication.class), isNull(), isNull(), any(Pageable.class)))
           .thenReturn(productPage);
 
@@ -115,8 +97,9 @@ class FarmerProductControllerTest {
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].name", is(productSummaryResponse.getName())));
 
+      // SỬA LỖI: Verify đúng phương thức
       verify(productService)
-          .getMyProducts(any(Authentication.class), isNull(), isNull(), any(Pageable.class));
+          .getMyB2CProducts(any(Authentication.class), isNull(), isNull(), any(Pageable.class));
     }
 
     @Test
@@ -129,7 +112,8 @@ class FarmerProductControllerTest {
       String statusStr = "PUBLISHED";
       ProductStatus expectedStatusEnum = ProductStatus.PUBLISHED;
 
-      when(productService.getMyProducts(
+      // SỬA LỖI: Mock đúng phương thức
+      when(productService.getMyB2CProducts(
               any(Authentication.class), eq(keyword), eq(expectedStatusEnum), any(Pageable.class)))
           .thenReturn(productPage);
 
@@ -143,8 +127,9 @@ class FarmerProductControllerTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name", is(productSummaryResponse.getName())));
 
+      // SỬA LỖI: Verify đúng phương thức
       verify(productService)
-          .getMyProducts(
+          .getMyB2CProducts(
               any(Authentication.class), eq(keyword), eq(expectedStatusEnum), any(Pageable.class));
     }
 
@@ -156,7 +141,8 @@ class FarmerProductControllerTest {
           new PageImpl<>(Collections.emptyList(), pageable, 0);
       String invalidStatusStr = "INVALID_STATUS";
 
-      when(productService.getMyProducts(
+      // SỬA LỖI: Mock đúng phương thức
+      when(productService.getMyB2CProducts(
               any(Authentication.class), isNull(), isNull(), any(Pageable.class)))
           .thenReturn(productPage);
 
@@ -168,8 +154,9 @@ class FarmerProductControllerTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(0)));
 
+      // SỬA LỖI: Verify đúng phương thức
       verify(productService)
-          .getMyProducts(any(Authentication.class), isNull(), isNull(), any(Pageable.class));
+          .getMyB2CProducts(any(Authentication.class), isNull(), isNull(), any(Pageable.class));
     }
   }
 
@@ -203,7 +190,7 @@ class FarmerProductControllerTest {
           .perform(
               get("/api/farmer/products/me/{id}", productId)
                   .contentType(MediaType.APPLICATION_JSON))
-          .andExpect(status().isNotFound()) // GlobalExceptionHandler sẽ xử lý
+          .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.success", is(false)))
           .andExpect(jsonPath("$.message", is("Product not found with id : '99'")));
     }
@@ -232,8 +219,7 @@ class FarmerProductControllerTest {
     @Test
     @DisplayName("should return 400 Bad Request for invalid product request")
     void createMyProduct_invalidRequest_returnsBadRequest() throws Exception {
-      ProductRequest invalidRequest = new ProductRequest(); // Thiếu các trường bắt buộc
-      // Không cần mock productService vì validation sẽ fail trước đó
+      ProductRequest invalidRequest = new ProductRequest();
 
       mockMvc
           .perform(
@@ -242,9 +228,9 @@ class FarmerProductControllerTest {
                   .content(objectMapper.writeValueAsString(invalidRequest)))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.success", is(false)))
-          .andExpect(jsonPath("$.message", is("Validation Failed")))
-          .andExpect(
-              jsonPath("$.details.name", is("Product name is required"))) // Ví dụ lỗi validation
+          // SỬA LỖI: Cập nhật message lỗi cho đúng
+          .andExpect(jsonPath("$.message", is("Dữ liệu không hợp lệ")))
+          .andExpect(jsonPath("$.details.name", is("Product name is required")))
           .andExpect(jsonPath("$.details.categoryId", is("Category ID is required")));
     }
   }
@@ -279,13 +265,11 @@ class FarmerProductControllerTest {
     @DisplayName("should delete product and return 200 OK")
     void deleteMyProduct_validId_returnsOk() throws Exception {
       Long productId = 1L;
-      // Không cần mock authentication ở đây vì @WithMockUser đã xử lý
       doNothing().when(productService).deleteMyProduct(any(Authentication.class), eq(productId));
 
       mockMvc
           .perform(
               delete("/api/farmer/products/me/{id}", productId)
-                  // .with(authentication(mockAuthentication)) // Không cần dòng này nữa
                   .contentType(MediaType.APPLICATION_JSON))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.success", is(true)))

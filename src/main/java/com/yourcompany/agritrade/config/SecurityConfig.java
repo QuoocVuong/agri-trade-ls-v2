@@ -57,10 +57,10 @@ public class SecurityConfig {
   CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
     // Cho phép cả localhost và tất cả các subdomain của vercel.app
-    configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:4200",
-            "https://*.vercel.app" // << DÙNG WILDCARD CHO SUBDOMAIN
-    ));
+    configuration.setAllowedOriginPatterns(
+        Arrays.asList(
+            "http://localhost:4200", "https://*.vercel.app" // << DÙNG WILDCARD CHO SUBDOMAIN
+            ));
     // Cho phép các method HTTP phổ biến
     configuration.setAllowedMethods(
         Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
@@ -94,9 +94,9 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(
+                auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+                    .permitAll()
+                    .requestMatchers(
                         "/api/auth/**", // Auth endpoints
                         "/api/public/**", // Public APIs
                         "/api/files/download/**", // Public file downloads
@@ -105,8 +105,7 @@ public class SecurityConfig {
                         "/api/auth/refresh-token",
                         "/swagger-ui.html",
                         "/ws/**", // <-- Cho phép kết nối WebSocket ban đầu
-                        "/api/payments/callback/**"
-                        )
+                        "/api/payments/callback/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated() // Tất cả các request khác cần xác thực

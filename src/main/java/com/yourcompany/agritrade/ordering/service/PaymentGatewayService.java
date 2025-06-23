@@ -10,8 +10,6 @@ public interface PaymentGatewayService {
 
   PaymentUrlResponse createMoMoPaymentUrl(Order order, String returnUrl, String notifyUrl);
 
-  // Thêm các cổng khác nếu cần
-
   /**
    * Gửi yêu cầu hoàn tiền đến cổng thanh toán.
    *
@@ -22,5 +20,4 @@ public interface PaymentGatewayService {
    *     quá trình gửi yêu cầu. Lưu ý: true không có nghĩa là tiền đã được hoàn ngay lập tức.
    */
   boolean requestRefund(String originalTransactionCode, BigDecimal refundAmount, String reason);
-  // Thêm các cổng khác nếu cần
 }

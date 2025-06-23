@@ -15,9 +15,7 @@ import com.yourcompany.agritrade.usermanagement.repository.RoleRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import com.yourcompany.agritrade.usermanagement.service.FarmerProfileService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,6 +83,4 @@ public class FarmerProfileServiceImpl implements FarmerProfileService {
     // Có thể thêm kiểm tra xem user có phải là farmer không nếu cần
     return farmerProfileMapper.toFarmerProfileResponse(profile);
   }
-
-
 }

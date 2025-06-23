@@ -1,4 +1,3 @@
-// src/test/java/com/yourcompany/agritrade/catalog/controller/PublicCatalogControllerTest.java
 package com.yourcompany.agritrade.catalog.controller;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -37,7 +36,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(PublicCatalogController.class)
-@Import(TestSecurityConfig.class) // <<< THÊM DÒNG NÀY
+@Import(TestSecurityConfig.class)
 class PublicCatalogControllerTest {
 
   @Autowired private MockMvc mockMvc;
@@ -72,7 +71,6 @@ class PublicCatalogControllerTest {
     productDetailResponse.setDescription("Mô tả chi tiết cà rốt");
   }
 
-  // ... các test case còn lại giữ nguyên ...
   @Nested
   @DisplayName("Category Endpoints Tests")
   class CategoryEndpoints {

@@ -26,9 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,7 +42,7 @@ public class AdminUserServiceImpl implements AdminUserService {
   private final UserMapper userMapper;
   private final FarmerProfileMapper farmerProfileMapper;
   private final BusinessProfileMapper businessProfileMapper;
-  private final NotificationService notificationService; // Inject NotificationService
+  private final NotificationService notificationService;
 
   @Override
   @Transactional(readOnly = true)
@@ -194,7 +192,7 @@ public class AdminUserServiceImpl implements AdminUserService {
   @Override
   @Transactional
   public void approveFarmer(Long userId, Authentication adminAuth) {
-    User admin =SecurityUtils.getCurrentAuthenticatedUser();// Lấy thông tin Admin
+    User admin = SecurityUtils.getCurrentAuthenticatedUser(); // Lấy thông tin Admin
     FarmerProfile profile =
         farmerProfileRepository
             .findById(userId)
@@ -218,7 +216,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     log.info("Farmer profile {} approved by admin {}", userId, admin.getEmail());
     // Gửi thông báo cho Farmer
-    notificationService.sendFarmerProfileApprovedNotification(profile); // Cần tạo hàm này
+    notificationService.sendFarmerProfileApprovedNotification(profile);
   }
 
   @Override
@@ -244,8 +242,6 @@ public class AdminUserServiceImpl implements AdminUserService {
     log.info(
         "Farmer profile {} rejected by admin {}. Reason: {}", userId, admin.getEmail(), reason);
     // Gửi thông báo cho Farmer
-    notificationService.sendFarmerProfileRejectedNotification(profile, reason); // Cần tạo hàm này
+    notificationService.sendFarmerProfileRejectedNotification(profile, reason);
   }
-
-
 }

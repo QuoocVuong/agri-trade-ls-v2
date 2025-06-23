@@ -20,7 +20,7 @@ public class AgreedOrderRequest {
 
   @NotNull private PaymentMethod agreedPaymentMethod; // Phương thức thanh toán đã thỏa thuận
 
-  private Long sourceRequestId; // ID của SupplyOrderRequest gốc (có thể null
+  private Long sourceRequestId; // ID của SupplyOrderRequest gốc
 
   private String shippingAddressDetail; // Địa chỉ giao hàng thỏa thuận
   private String shippingProvinceCode;
@@ -31,6 +31,4 @@ public class AgreedOrderRequest {
 
   private String notes; // Ghi chú thêm
   private LocalDate expectedDeliveryDate; // Ngày giao hàng dự kiến (thỏa thuận)
-
-  // Thêm các trường khác nếu cần cho "Đơn hàng thỏa thuận"
 }

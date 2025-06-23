@@ -27,7 +27,7 @@ app:
     url: "http://localhost:4200"
     vnpayReturnUrl: "${app.frontend.url}/payment/vnpay/result"
   backend:
-    url: "http://localhost:8080" # Hoặc dùng ngrok nếu cần test callback từ bên ngoài
+    url: "http://localhost:8080"
     vnpayIpnUrl: "${app.backend.url}/api/payments/callback/vnpay/ipn"
   # Các URL callback sẽ được xây dựng từ 2 URL trên
   bank:

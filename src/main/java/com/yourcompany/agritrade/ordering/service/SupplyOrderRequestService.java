@@ -20,7 +20,7 @@ public interface SupplyOrderRequestService {
   SupplyOrderRequestResponse getRequestDetails(Authentication authentication, Long requestId);
 
   SupplyOrderRequestResponse acceptSupplyOrderRequest(
-      Authentication authentication, Long requestId /*, Optional: AgreedPrice, etc. */);
+      Authentication authentication, Long requestId);
 
   SupplyOrderRequestResponse rejectSupplyOrderRequest(
       Authentication authentication, Long requestId, String reason);
@@ -28,11 +28,9 @@ public interface SupplyOrderRequestService {
   void cancelSupplyOrderRequestByBuyer(Authentication authentication, Long requestId);
 
   /**
-   * Kiểm tra quyền tạo yêu cầu cung ứng của người dùng.
-   * Ném ra exception nếu không đủ quyền.
+   * Kiểm tra quyền tạo yêu cầu cung ứng của người dùng. Ném ra exception nếu không đủ quyền.
    *
    * @param authentication Đối tượng xác thực.
-
    */
   void checkCreatePermission(Authentication authentication);
 }

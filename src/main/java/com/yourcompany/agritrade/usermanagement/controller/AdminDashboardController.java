@@ -59,8 +59,6 @@ public class AdminDashboardController {
     return ResponseEntity.ok(ApiResponse.success(counts));
   }
 
-  // *** THÊM CÁC ENDPOINT MỚI ***
-
   @GetMapping("/top-farmers")
   public ResponseEntity<ApiResponse<List<FarmerSummaryResponse>>> getTopFarmers(
       @RequestParam(defaultValue = "5") int limit) {

@@ -1,4 +1,3 @@
-// Ví dụ: com.yourcompany.agritrade.catalog.domain.MassUnit.java (Backend)
 package com.yourcompany.agritrade.catalog.domain;
 
 import java.math.BigDecimal;

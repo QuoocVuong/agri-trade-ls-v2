@@ -15,6 +15,6 @@ public class OrderCalculationResponse {
   private BigDecimal discountAmount;
   private BigDecimal totalAmount;
   private OrderType calculatedOrderType; // Trả về cả loại đơn hàng đã xác định
-  // Có thể thêm chi tiết item với giá đã tính nếu cần
+  // Có thể thêm chi tiết item với giá đã tính
   // private List<CalculatedOrderItem> items;
 }

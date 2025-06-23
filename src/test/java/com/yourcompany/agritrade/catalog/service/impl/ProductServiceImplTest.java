@@ -2,9 +2,6 @@ package com.yourcompany.agritrade.catalog.service.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.github.slugify.Slugify;
@@ -22,6 +19,9 @@ import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
 import com.yourcompany.agritrade.common.service.FileStorageService;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
+import com.yourcompany.agritrade.interaction.dto.response.ReviewResponse;
+import com.yourcompany.agritrade.interaction.service.ReviewService;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
@@ -32,21 +32,17 @@ import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceImplTest {
@@ -56,51 +52,60 @@ class ProductServiceImplTest {
   @Mock private UserRepository userRepository;
   @Mock private FarmerProfileRepository farmerProfileRepository;
   @Mock private ProductImageRepository productImageRepository;
-
   @Mock private ProductMapper productMapper;
   @Mock private ProductImageMapper productImageMapper;
-
   @Mock private FileStorageService fileStorageService;
   @Mock private NotificationService notificationService;
   @Mock private EmailService emailService;
   @Mock private Authentication authentication;
 
+  // SỬA LỖI: Thêm mock cho ReviewService
+  @Mock private ReviewService reviewService;
+
   @Spy private Slugify slugify = Slugify.builder().build();
+
+  // SỬA LỖI: Thêm MockedStatic để quản lý mock cho lớp tiện ích SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
 
   @InjectMocks private ProductServiceImpl productService;
 
   private User farmerUser, adminUser, buyerUser;
-  private FarmerProfile verifiedFarmerProfile, pendingFarmerProfile;
+  private FarmerProfile verifiedFarmerProfile;
   private Category categoryEntity;
   private ProductRequest productRequest;
-  private Product productEntity, productEntity2; // Thêm productEntity2
+  private Product productEntity, productEntity2;
   private ProductDetailResponse productDetailResponse;
-  private ProductSummaryResponse productSummaryResponse,
-      productSummaryResponse2; // Thêm productSummaryResponse2
+  private ProductSummaryResponse productSummaryResponse, productSummaryResponse2;
 
   @BeforeEach
   void setUp() {
+    // SỬA LỖI: Khởi tạo mock static cho SecurityUtils trước mỗi test
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     // Users
-    farmerUser = new User();
-    farmerUser.setId(1L);
-    farmerUser.setEmail("farmer@example.com");
-    farmerUser.setFullName("Test Farmer");
-    farmerUser.setRoles(Set.of(new Role(RoleType.ROLE_FARMER)));
-    farmerUser.setFarmerProfile(new FarmerProfile());
+    farmerUser =
+        User.builder()
+            .id(1L)
+            .email("farmer@example.com")
+            .fullName("Test Farmer")
+            .roles(Set.of(new Role(RoleType.ROLE_FARMER)))
+            .build();
+    adminUser =
+        User.builder()
+            .id(2L)
+            .email("admin@example.com")
+            .fullName("Test Admin")
+            .roles(Set.of(new Role(RoleType.ROLE_ADMIN)))
+            .build();
+    buyerUser =
+        User.builder()
+            .id(3L)
+            .email("buyer@example.com")
+            .fullName("Test Buyer")
+            .roles(Set.of(new Role(RoleType.ROLE_CONSUMER)))
+            .build();
 
-    adminUser = new User();
-    adminUser.setId(2L);
-    adminUser.setEmail("admin@example.com");
-    adminUser.setFullName("Test Admin");
-    adminUser.setRoles(Set.of(new Role(RoleType.ROLE_ADMIN)));
-
-    buyerUser = new User();
-    buyerUser.setId(3L);
-    buyerUser.setEmail("buyer@example.com");
-    buyerUser.setFullName("Test Buyer");
-    buyerUser.setRoles(Set.of(new Role(RoleType.ROLE_CONSUMER)));
-
-    // Farmer Profiles
+    // Farmer Profile
     verifiedFarmerProfile = new FarmerProfile();
     verifiedFarmerProfile.setUserId(farmerUser.getId());
     verifiedFarmerProfile.setUser(farmerUser);
@@ -108,12 +113,6 @@ class ProductServiceImplTest {
     verifiedFarmerProfile.setProvinceCode("20");
     verifiedFarmerProfile.setFarmName("Test Farm");
     farmerUser.setFarmerProfile(verifiedFarmerProfile);
-
-    pendingFarmerProfile = new FarmerProfile();
-    pendingFarmerProfile.setUserId(farmerUser.getId());
-    pendingFarmerProfile.setUser(farmerUser);
-    pendingFarmerProfile.setVerificationStatus(VerificationStatus.PENDING);
-    pendingFarmerProfile.setProvinceCode("20");
 
     // Category
     categoryEntity = new Category();
@@ -139,54 +138,56 @@ class ProductServiceImplTest {
     productRequest.setImages(List.of(imageReq));
 
     // Product Entity 1
-    productEntity = new Product();
-    productEntity.setId(1L);
-    productEntity.setName(productRequest.getName());
-    productEntity.setSlug(slugify.slugify(productRequest.getName()));
-    productEntity.setFarmer(farmerUser);
-    productEntity.setCategory(categoryEntity);
-    productEntity.setProvinceCode(verifiedFarmerProfile.getProvinceCode());
-    productEntity.setStatus(ProductStatus.PENDING_APPROVAL);
-    productEntity.setPrice(productRequest.getPrice());
-    productEntity.setUnit(productRequest.getUnit());
-    productEntity.setStockQuantity(productRequest.getStockQuantity());
-    productEntity.setImages(
-        new HashSet<>(
-            Set.of(
-                new ProductImage(
-                    1L,
-                    productEntity,
-                    "http://signed-url.com/images/ca-rot.jpg",
-                    true,
-                    0,
-                    "images/ca-rot.jpg",
-                    LocalDateTime.now()))));
+    productEntity =
+        Product.builder()
+            .id(1L)
+            .name(productRequest.getName())
+            .slug(slugify.slugify(productRequest.getName()))
+            .farmer(farmerUser)
+            .category(categoryEntity)
+            .provinceCode(verifiedFarmerProfile.getProvinceCode())
+            .status(ProductStatus.PENDING_APPROVAL)
+            .price(productRequest.getPrice())
+            .unit(productRequest.getUnit())
+            .stockQuantity(productRequest.getStockQuantity())
+            .images(
+                new HashSet<>(
+                    Set.of(
+                        new ProductImage(
+                            1L,
+                            null,
+                            "http://signed-url.com/images/ca-rot.jpg",
+                            true,
+                            0,
+                            "images/ca-rot.jpg",
+                            LocalDateTime.now()))))
+            .averageRating(0.0f)
+            .ratingCount(0)
+            .favoriteCount(0)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .build();
 
-    productEntity.setAverageRating(0.0f);
-    productEntity.setRatingCount(0);
-    productEntity.setFavoriteCount(0);
-    productEntity.setCreatedAt(LocalDateTime.now());
-    productEntity.setUpdatedAt(LocalDateTime.now());
-
-    // Product Entity 2 (for list testing)
-    productEntity2 = new Product();
-    productEntity2.setId(2L);
-    productEntity2.setName("Bí Đỏ Hồ Lô");
-    productEntity2.setSlug("bi-do-ho-lo");
-    productEntity2.setFarmer(farmerUser);
-    productEntity2.setCategory(categoryEntity);
-    productEntity2.setProvinceCode(verifiedFarmerProfile.getProvinceCode());
-    productEntity2.setStatus(ProductStatus.PUBLISHED);
-    productEntity2.setPrice(new BigDecimal("25000.00"));
-    productEntity2.setUnit("kg");
-    productEntity2.setStockQuantity(150);
-    productEntity2.setImages(new HashSet<>());
-
-    productEntity2.setAverageRating(4.5f);
-    productEntity2.setRatingCount(10);
-    productEntity2.setFavoriteCount(5);
-    productEntity2.setCreatedAt(LocalDateTime.now().minusDays(1));
-    productEntity2.setUpdatedAt(LocalDateTime.now().minusDays(1));
+    // Product Entity 2
+    productEntity2 =
+        Product.builder()
+            .id(2L)
+            .name("Bí Đỏ Hồ Lô")
+            .slug("bi-do-ho-lo")
+            .farmer(farmerUser)
+            .category(categoryEntity)
+            .provinceCode(verifiedFarmerProfile.getProvinceCode())
+            .status(ProductStatus.PUBLISHED)
+            .price(new BigDecimal("25000.00"))
+            .unit("kg")
+            .stockQuantity(150)
+            .images(new HashSet<>())
+            .averageRating(4.5f)
+            .ratingCount(10)
+            .favoriteCount(5)
+            .createdAt(LocalDateTime.now().minusDays(1))
+            .updatedAt(LocalDateTime.now().minusDays(1))
+            .build();
 
     // Product Detail Response
     productDetailResponse = new ProductDetailResponse();
@@ -220,24 +221,25 @@ class ProductServiceImplTest {
     productSummaryResponse2 = new ProductSummaryResponse();
     productSummaryResponse2.setId(2L);
     productSummaryResponse2.setName("Bí Đỏ Hồ Lô");
-    productSummaryResponse2.setThumbnailUrl(null); // Giả sử không có ảnh default
+    productSummaryResponse2.setThumbnailUrl(null);
     productSummaryResponse2.setPrice(new BigDecimal("25000.00"));
     productSummaryResponse2.setUnit("kg");
     productSummaryResponse2.setStatus(ProductStatus.PUBLISHED);
 
-    // Mock authentication
-    lenient().when(authentication.getName()).thenReturn(farmerUser.getEmail());
-    lenient().when(authentication.isAuthenticated()).thenReturn(true);
+    lenient()
+        .when(fileStorageService.getFileUrl(anyString()))
+        .thenAnswer(invocation -> "mockedUrl/" + invocation.getArgument(0));
+  }
+
+  // SỬA LỖI: Thêm tearDown để đóng mock static sau mỗi test
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
   }
 
   private void mockAuthenticatedUser(User user) {
-    lenient().when(authentication.getName()).thenReturn(user.getEmail());
-    lenient().when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-    if (user.getRoles().stream().anyMatch(r -> r.getName() == RoleType.ROLE_ADMIN)) {
-      Set<GrantedAuthority> authoritiesSet = new HashSet<>();
-      authoritiesSet.add(new SimpleGrantedAuthority(RoleType.ROLE_ADMIN.name()));
-      lenient().when(authentication.getAuthorities()).thenReturn((Collection) authoritiesSet);
-    }
+    // SỬA LỖI: Mock SecurityUtils thay vì các mock không được dùng đến
+    mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(user);
   }
 
   @Nested
@@ -256,19 +258,10 @@ class ProductServiceImplTest {
       String keyword = "Cà Rốt";
       ProductStatus status = ProductStatus.PENDING_APPROVAL;
 
-      List<Product> filteredProducts = List.of(productEntity);
-      Page<Product> productPage =
-          new PageImpl<>(filteredProducts, pageable, filteredProducts.size());
+      Page<Product> productPage = new PageImpl<>(List.of(productEntity), pageable, 1);
 
-      // Giả sử productMapper.toProductSummaryResponse sẽ được gọi cho từng product
       when(productMapper.toProductSummaryResponse(productEntity))
           .thenReturn(productSummaryResponse);
-      // Mock cho fileStorageService.getFileUrl nếu productSummaryResponse cần imageUrl
-      lenient()
-          .when(fileStorageService.getFileUrl(anyString()))
-          .thenReturn("http://signed-url.com/some-image.jpg");
-
-      // Quan trọng: Mock productRepository.findAll với Specification
       when(productRepository.findAll(any(Specification.class), eq(pageable)))
           .thenReturn(productPage);
 
@@ -287,13 +280,6 @@ class ProductServiceImplTest {
       when(productRepository.findByIdAndFarmerId(productEntity.getId(), farmerUser.getId()))
           .thenReturn(Optional.of(productEntity));
       when(productMapper.toProductDetailResponse(productEntity)).thenReturn(productDetailResponse);
-      // Giả sử findRelatedProducts trả về rỗng để đơn giản
-      //            when(productRepository.findTopNByCategoryIdAndIdNotAndStatus(any(), anyLong(),
-      // eq(ProductStatus.PUBLISHED), any(Pageable.class)))
-      //                    .thenReturn(Collections.emptyList());
-      //            when(productRepository.findTopNByFarmerIdAndIdNotInAndStatus(anyLong(),
-      // anyList(), eq(ProductStatus.PUBLISHED), any(Pageable.class)))
-      //                    .thenReturn(Collections.emptyList());
 
       ProductDetailResponse result =
           productService.getMyProductById(authentication, productEntity.getId());
@@ -317,10 +303,8 @@ class ProductServiceImplTest {
     @Test
     @DisplayName("Get My Product By Id - Product Not Owned by Farmer")
     void getMyProductById_whenProductNotOwned_shouldThrowResourceNotFoundException() {
-      // Giả sử product 99L thuộc farmer khác
       when(productRepository.findByIdAndFarmerId(99L, farmerUser.getId()))
           .thenReturn(Optional.empty());
-      // Service sẽ ném ResourceNotFound vì query findByIdAndFarmerId không tìm thấy
 
       assertThrows(
           ResourceNotFoundException.class,
@@ -332,17 +316,15 @@ class ProductServiceImplTest {
     void updateMyProduct_whenSlugChanges_shouldGenerateNewUniqueSlug() {
       productEntity.setStatus(ProductStatus.PUBLISHED);
       ProductRequest updateRequest = new ProductRequest();
-      updateRequest.setName("Cà Rốt Siêu Ngọt"); // Tên mới -> slug mới
+      updateRequest.setName("Cà Rốt Siêu Ngọt");
       updateRequest.setCategoryId(categoryEntity.getId());
       String newExpectedSlug = "ca-rot-sieu-ngot";
 
       when(productRepository.findByIdAndFarmerId(productEntity.getId(), farmerUser.getId()))
           .thenReturn(Optional.of(productEntity));
       when(productRepository.existsBySlugAndIdNot(eq(newExpectedSlug), eq(productEntity.getId())))
-          .thenReturn(false); // Slug mới là unique
+          .thenReturn(false);
       when(productRepository.save(any(Product.class))).thenReturn(productEntity);
-      //
-      // when(productRepository.findByIdWithDetails(productEntity.getId())).thenReturn(Optional.of(productEntity));
       when(productMapper.toProductDetailResponse(productEntity)).thenReturn(productDetailResponse);
 
       productService.updateMyProduct(authentication, productEntity.getId(), updateRequest);
@@ -365,8 +347,6 @@ class ProductServiceImplTest {
           .thenReturn(Optional.of(productEntity));
       when(categoryRepository.findById(newCategory.getId())).thenReturn(Optional.of(newCategory));
       when(productRepository.save(any(Product.class))).thenReturn(productEntity);
-      //
-      // when(productRepository.findByIdWithDetails(productEntity.getId())).thenReturn(Optional.of(productEntity));
       when(productMapper.toProductDetailResponse(productEntity)).thenReturn(productDetailResponse);
 
       productService.updateMyProduct(authentication, productEntity.getId(), updateRequest);
@@ -417,55 +397,16 @@ class ProductServiceImplTest {
       when(productImageMapper.requestToProductImage(eq(updatedExistingImageReq)))
           .thenReturn(imageEntityMappedFromUpdatedExistingReq);
 
-      // --- Mock các repository và mapper khác ---
-      //            when(productRepository.findByIdAndFarmerId(productEntity.getId(),
-      // farmerUser.getId())).thenReturn(Optional.of(productEntity));
       when(productRepository.save(any(Product.class)))
           .thenAnswer(invocation -> invocation.getArgument(0));
-
-      // Mock cho lời gọi getMyProductById -> findMyProductById ->
-      // productRepository.findByIdAndFarmerId
-      // Giả sử productEntity là đối tượng đã được cập nhật sau khi save
       when(productRepository.findByIdAndFarmerId(eq(productEntity.getId()), eq(farmerUser.getId())))
-          .thenReturn(Optional.of(productEntity)); // Mock cho lời gọi bên trong getMyProductById
-
-      // Mock cho productMapper.toProductDetailResponse được gọi bởi getMyProductById
+          .thenReturn(Optional.of(productEntity));
       when(productMapper.toProductDetailResponse(eq(productEntity)))
-          .thenAnswer(
-              invocation -> {
-                Product p = invocation.getArgument(0);
-                ProductDetailResponse res = new ProductDetailResponse();
-                res.setId(p.getId());
-                res.setName(p.getName());
-                // ... map các trường khác ...
-                if (p.getImages() != null) {
-                  res.setImages(
-                      p.getImages().stream()
-                          .map(
-                              img -> {
-                                ProductImageResponse imgRes = new ProductImageResponse();
-                                imgRes.setId(img.getId());
-                                imgRes.setBlobPath(img.getBlobPath());
-                                // Giả sử fileStorageService được gọi ở đây để lấy URL
-                                lenient()
-                                    .when(fileStorageService.getFileUrl(img.getBlobPath()))
-                                    .thenReturn("mockedImageUrl/" + img.getBlobPath());
-                                imgRes.setImageUrl(
-                                    fileStorageService.getFileUrl(img.getBlobPath()));
-                                imgRes.setDefault(img.isDefault());
-                                imgRes.setDisplayOrder(img.getDisplayOrder());
-                                return imgRes;
-                              })
-                          .collect(Collectors.toList()));
-                }
-                return res;
-              });
+          .thenReturn(productDetailResponse);
 
-      // --- Act ---
       ProductDetailResponse result =
           productService.updateMyProduct(authentication, productEntity.getId(), updateRequest);
 
-      // --- Assert ---
       assertNotNull(result);
       Set<ProductImage> finalImagesInProduct = productEntity.getImages();
       assertEquals(2, finalImagesInProduct.size());
@@ -499,7 +440,7 @@ class ProductServiceImplTest {
     void updateMyProduct_whenInvalidCategoryId_shouldThrowResourceNotFound() {
       productEntity.setStatus(ProductStatus.PUBLISHED);
       ProductRequest updateRequest = new ProductRequest();
-      updateRequest.setCategoryId(999); // ID không tồn tại
+      updateRequest.setCategoryId(999);
 
       when(productRepository.findByIdAndFarmerId(productEntity.getId(), farmerUser.getId()))
           .thenReturn(Optional.of(productEntity));
@@ -529,17 +470,12 @@ class ProductServiceImplTest {
       Integer categoryId = categoryEntity.getId();
       Long farmerIdParam = farmerUser.getId();
 
-      List<Product> filteredProducts = List.of(productEntity);
-      Page<Product> productPage =
-          new PageImpl<>(filteredProducts, pageable, filteredProducts.size());
+      Page<Product> productPage = new PageImpl<>(List.of(productEntity), pageable, 1);
 
       when(productRepository.findAll(any(Specification.class), eq(pageable)))
           .thenReturn(productPage);
       when(productMapper.toProductSummaryResponse(productEntity))
           .thenReturn(productSummaryResponse);
-      lenient()
-          .when(fileStorageService.getFileUrl(anyString()))
-          .thenReturn("http://signed-url.com/image.jpg");
 
       Page<ProductSummaryResponse> result =
           productService.getAllProductsForAdmin(
@@ -568,11 +504,9 @@ class ProductServiceImplTest {
     @DisplayName("Get Public Product By Id - Success")
     void getPublicProductById_whenProductPublished_shouldReturnDetails() {
       productEntity.setStatus(ProductStatus.PUBLISHED);
-      // Mock Specification execution
       when(productRepository.findOne(any(Specification.class)))
           .thenReturn(Optional.of(productEntity));
       when(productMapper.toProductDetailResponse(productEntity)).thenReturn(productDetailResponse);
-      // Mock related products
       when(productRepository.findTopNByCategoryIdAndIdNotAndStatus(
               any(), anyLong(), eq(ProductStatus.PUBLISHED), any(Pageable.class)))
           .thenReturn(Collections.emptyList());
@@ -580,19 +514,26 @@ class ProductServiceImplTest {
               anyLong(), anyList(), eq(ProductStatus.PUBLISHED), any(Pageable.class)))
           .thenReturn(Collections.emptyList());
 
+      // SỬA LỖI: Mock cho reviewService
+      Page<ReviewResponse> emptyReviewPage = Page.empty();
+      when(reviewService.getApprovedReviewsByProduct(
+              eq(productEntity.getId()), any(Pageable.class)))
+          .thenReturn(emptyReviewPage);
+
       ProductDetailResponse result = productService.getPublicProductById(productEntity.getId());
 
       assertNotNull(result);
       assertEquals(productDetailResponse.getName(), result.getName());
       verify(productRepository).findOne(any(Specification.class));
+      verify(reviewService)
+          .getApprovedReviewsByProduct(eq(productEntity.getId()), any(Pageable.class));
     }
 
     @Test
     @DisplayName("Get Public Product By Id - Product Not Published")
     void getPublicProductById_whenProductNotPublished_shouldThrowResourceNotFound() {
       productEntity.setStatus(ProductStatus.PENDING_APPROVAL);
-      when(productRepository.findOne(any(Specification.class)))
-          .thenReturn(Optional.empty()); // Spec sẽ không tìm thấy
+      when(productRepository.findOne(any(Specification.class))).thenReturn(Optional.empty());
 
       assertThrows(
           ResourceNotFoundException.class,
@@ -603,9 +544,8 @@ class ProductServiceImplTest {
     @DisplayName("Get Public Products By Farmer Id - Success")
     void getPublicProductsByFarmerId_whenFarmerHasPublishedProducts_shouldReturnPage() {
       Pageable pageable = PageRequest.of(0, 10);
-      productEntity.setStatus(ProductStatus.PUBLISHED); // Đảm bảo sản phẩm được published
-      List<Product> farmerProducts = List.of(productEntity);
-      Page<Product> productPage = new PageImpl<>(farmerProducts, pageable, farmerProducts.size());
+      productEntity.setStatus(ProductStatus.PUBLISHED);
+      Page<Product> productPage = new PageImpl<>(List.of(productEntity), pageable, 1);
 
       when(userRepository.existsByIdAndRoles_Name(farmerUser.getId(), RoleType.ROLE_FARMER))
           .thenReturn(true);
@@ -614,9 +554,6 @@ class ProductServiceImplTest {
           .thenReturn(productPage);
       when(productMapper.toProductSummaryResponse(productEntity))
           .thenReturn(productSummaryResponse);
-      lenient()
-          .when(fileStorageService.getFileUrl(anyString()))
-          .thenReturn("http://signed-url.com/image.jpg");
 
       Page<ProductSummaryResponse> result =
           productService.getPublicProductsByFarmerId(farmerUser.getId(), pageable);
@@ -634,43 +571,18 @@ class ProductServiceImplTest {
   class ErrorHandlingAndEdgeCases {
 
     @Test
-    @DisplayName("Create My Product - FileStorageService throws Exception during image processing")
-    void
-        createMyProduct_whenFileStorageServiceFails_shouldStillSaveProductWithoutImageErrorPropagation() {
-      // Kịch bản này khó test ở unit test vì việc xử lý ảnh (updateProductImagesFromRequest)
-      // xảy ra bên trong createMyProduct. Nếu FileStorageService.delete ném lỗi,
-      // nó được log lại nhưng không re-throw để rollback transaction chính.
-      // Chúng ta có thể kiểm tra xem product có được lưu không.
-
+    @DisplayName("Create My Product - Farmer Profile Not Verified")
+    void createMyProduct_whenFarmerProfileNotVerified_shouldThrowBadRequest() {
+      FarmerProfile pendingProfile = new FarmerProfile();
+      pendingProfile.setVerificationStatus(VerificationStatus.PENDING);
+      farmerUser.setFarmerProfile(pendingProfile);
       mockAuthenticatedUser(farmerUser);
       when(farmerProfileRepository.findById(farmerUser.getId()))
-          .thenReturn(Optional.of(verifiedFarmerProfile));
-      when(categoryRepository.findById(categoryEntity.getId()))
-          .thenReturn(Optional.of(categoryEntity));
-      when(productRepository.existsBySlugAndIdNot(anyString(), any())).thenReturn(false);
-      when(productMapper.requestToProduct(productRequest)).thenReturn(productEntity);
-      when(productRepository.save(any(Product.class)))
-          .thenReturn(productEntity); // Product vẫn được lưu
-      when(productRepository.findByIdWithDetails(productEntity.getId()))
-          .thenReturn(Optional.of(productEntity));
-      when(productMapper.toProductDetailResponse(productEntity)).thenReturn(productDetailResponse);
+          .thenReturn(Optional.of(pendingProfile));
 
-      // Giả sử fileStorageService.delete ném lỗi khi xóa ảnh cũ (nếu có)
-      // Trong trường hợp tạo mới, không có ảnh cũ để xóa, nên kịch bản này không áp dụng trực tiếp.
-      // Nếu là update và thay đổi ảnh, thì có thể test.
-
-      // Đối với tạo mới, nếu getFileUrl ném lỗi trong populateImageUrls (sau khi save)
-      // thì DTO trả về có thể có URL placeholder.
-      lenient()
-          .when(fileStorageService.getFileUrl(anyString()))
-          .thenThrow(new RuntimeException("Simulated storage error"));
-
-      ProductDetailResponse result = productService.createMyProduct(authentication, productRequest);
-
-      assertNotNull(result);
-      verify(productRepository).save(any(Product.class)); // Product vẫn được lưu
-      // Kiểm tra xem URL ảnh trong DTO có phải là placeholder không (nếu có logic đó trong mapper)
-      // Hoặc kiểm tra log lỗi (khó trong unit test)
+      assertThrows(
+          BadRequestException.class,
+          () -> productService.createMyProduct(authentication, productRequest));
     }
 
     @Test
@@ -679,14 +591,14 @@ class ProductServiceImplTest {
       mockAuthenticatedUser(farmerUser);
       productEntity.setStatus(ProductStatus.PUBLISHED);
       ProductRequest updateRequest = new ProductRequest();
-      updateRequest.setName("Conflicting Name"); // Dẫn đến slug "conflicting-name"
+      updateRequest.setName("Conflicting Name");
       updateRequest.setCategoryId(categoryEntity.getId());
 
       when(productRepository.findByIdAndFarmerId(productEntity.getId(), farmerUser.getId()))
           .thenReturn(Optional.of(productEntity));
       when(productRepository.existsBySlugAndIdNot(
               eq("conflicting-name"), eq(productEntity.getId())))
-          .thenReturn(true); // Slug bị trùng
+          .thenReturn(true);
 
       BadRequestException ex =
           assertThrows(

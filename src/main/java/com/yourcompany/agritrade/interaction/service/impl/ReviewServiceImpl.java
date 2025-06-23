@@ -25,9 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,7 +99,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     updateProductAverageRating(product.getId());
 
-    // notificationService.sendReviewPendingNotification(savedReview); // Xóa hoặc comment dòng này
+    // notificationService.sendReviewPendingNotification(savedReview); // Xóa hoặc comment dòng
     notificationService.sendReviewApprovedNotification(savedReview);
 
     return reviewMapper.toReviewResponse(savedReview);
@@ -126,7 +124,6 @@ public class ReviewServiceImpl implements ReviewService {
     return reviewMapper.toReviewResponsePage(reviewPage);
   }
 
-  // ****** IMPLEMENT PHƯƠNG THỨC NÀY ******
   @Override
   @Transactional(readOnly = true)
   public Page<ReviewResponse> getReviewsForFarmerProducts(
@@ -138,7 +135,7 @@ public class ReviewServiceImpl implements ReviewService {
     return reviewMapper.toReviewResponsePage(reviewPage);
   }
 
-  // (Tùy chọn) Implement phương thức lọc theo trạng thái
+  // Implement phương thức lọc theo trạng thái
   @Override
   @Transactional(readOnly = true)
   public Page<ReviewResponse> getReviewsForFarmerProductsByStatus(
@@ -222,8 +219,6 @@ public class ReviewServiceImpl implements ReviewService {
       updateProductAverageRating(productId);
     }
   }
-
-
 
   private Review findReviewById(Long reviewId) {
     return reviewRepository

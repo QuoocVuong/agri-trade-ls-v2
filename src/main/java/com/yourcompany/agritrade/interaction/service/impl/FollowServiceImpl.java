@@ -17,9 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -131,8 +129,6 @@ public class FollowServiceImpl implements FollowService {
     User follower = SecurityUtils.getCurrentAuthenticatedUser();
     return userFollowRepository.existsByFollowerIdAndFollowingId(follower.getId(), followingId);
   }
-
-
 
   private void updateFollowCounts(Long followerId, Long followingId, boolean isFollowing) {
     User follower = userRepository.findById(followerId).orElse(null);

@@ -1,4 +1,3 @@
-// src/main/java/com/yourcompany/agritrade/common/util/SecurityUtils.java
 package com.yourcompany.agritrade.common.util;
 
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
 public class SecurityUtils {
 
   private static UserRepository staticUserRepository;
-
 
   public SecurityUtils(UserRepository userRepository) {
     SecurityUtils.staticUserRepository = userRepository;

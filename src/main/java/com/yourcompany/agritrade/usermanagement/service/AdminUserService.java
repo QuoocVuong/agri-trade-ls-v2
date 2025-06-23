@@ -94,5 +94,5 @@ public interface AdminUserService {
    */
   void rejectFarmer(Long userId, String reason, Authentication adminAuth);
 
-  // Có thể thêm các phương thức khác: xóa user, xem chi tiết business buyer...
+  //  thêm các phương thức khác: xóa user, xem chi tiết business buyer...
 }

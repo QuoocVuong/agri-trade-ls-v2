@@ -1,4 +1,3 @@
-// src/main/java/com/yourcompany/agritrade/ordering/controller/AdminInvoiceController.java
 package com.yourcompany.agritrade.ordering.controller;
 
 import com.yourcompany.agritrade.common.dto.ApiResponse;

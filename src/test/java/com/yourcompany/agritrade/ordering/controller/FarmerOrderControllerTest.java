@@ -245,9 +245,8 @@ class FarmerOrderControllerTest {
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.success", is(false)))
           .andExpect(
-              jsonPath(
-                  "$.message",
-                  is("Validation Failed"))) // Hoặc thông báo lỗi cụ thể từ GlobalExceptionHandler
+              jsonPath("$.message", is("Dữ liệu không hợp lệ"))) // Hoặc thông báo lỗi cụ thể từ
+          // GlobalExceptionHandler
           .andExpect(jsonPath("$.details.status", is("New status is required")));
     }
   }

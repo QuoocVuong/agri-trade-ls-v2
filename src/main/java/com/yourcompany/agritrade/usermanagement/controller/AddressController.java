@@ -29,8 +29,6 @@ public class AddressController {
     return ResponseEntity.ok(ApiResponse.success(addresses));
   }
 
-  // ==========================================
-
   @GetMapping("/my/{id}")
   public ResponseEntity<ApiResponse<AddressResponse>> getMyAddressById(
       Authentication authentication, @PathVariable Long id) {
@@ -73,8 +71,7 @@ public class AddressController {
 
   @GetMapping("/user/{userId}/default")
   public ResponseEntity<ApiResponse<AddressResponse>> getDefaultAddressForUser(
-      @PathVariable Long userId,
-      Authentication authentication) { // Thêm Authentication nếu cần cho kiểm tra quyền
+      @PathVariable Long userId, Authentication authentication) {
     AddressResponse defaultAddress = addressService.getDefaultAddressByUserId(userId);
     if (defaultAddress != null) {
       return ResponseEntity.ok(ApiResponse.success(defaultAddress));

@@ -14,9 +14,7 @@ import com.yourcompany.agritrade.usermanagement.service.AddressService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AddressServiceImpl implements AddressService {
 
   private final AddressRepository addressRepository;
-  private final UserRepository userRepository; // Để lấy User từ Authentication
+  private final UserRepository userRepository;
   private final AddressMapper addressMapper;
 
   @Override
@@ -174,8 +172,6 @@ public class AddressServiceImpl implements AddressService {
         .map(addressMapper::toAddressResponse)
         .orElse(null); // Trả về null nếu không có địa chỉ mặc định
   }
-
-
 
   private void unsetDefaultForOtherAddresses(Long userId, Long excludeAddressId) {
     List<Address> currentDefaults =

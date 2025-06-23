@@ -1,6 +1,5 @@
 package com.yourcompany.agritrade.usermanagement.service;
 
-// Cập nhật import cho DTOs
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.usermanagement.dto.request.PasswordChangeRequest;
 import com.yourcompany.agritrade.usermanagement.dto.request.UserRegistrationRequest;

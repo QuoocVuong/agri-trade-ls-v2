@@ -17,7 +17,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-// VnPayServiceImpl.java
 @Service("vnPayService")
 @RequiredArgsConstructor
 @Slf4j
@@ -45,7 +44,7 @@ public class VnPayServiceImpl implements PaymentGatewayService {
 
   @Override
   public PaymentUrlResponse createVnPayPaymentUrl(
-          Order order, String ipAddress, String clientReturnUrl) {
+      Order order, String ipAddress, String clientReturnUrl) {
     // Số tiền cần nhân 100 theo quy định của VNPay
     long amount = order.getTotalAmount().multiply(new BigDecimal(100)).longValue();
 
@@ -106,17 +105,21 @@ public class VnPayServiceImpl implements PaymentGatewayService {
     return new PaymentUrlResponse(paymentUrl, PaymentMethod.VNPAY.name());
   }
 
-  // Implement createMoMoPaymentUrl nếu cần
+  // Implement createMoMoPaymentUrl
   @Override
   public PaymentUrlResponse createMoMoPaymentUrl(Order order, String returnUrl, String notifyUrl) {
-    // TODO: Implement MoMo payment URL creation logic
     log.warn("MoMo payment URL creation is not implemented yet.");
     return null;
   }
+
   @Override
-  public boolean requestRefund(String originalTransactionCode, BigDecimal refundAmount, String reason) {
-    log.info("Requesting VNPay refund for transaction: {}, amount: {}, reason: {}",
-            originalTransactionCode, refundAmount, reason);
+  public boolean requestRefund(
+      String originalTransactionCode, BigDecimal refundAmount, String reason) {
+    log.info(
+        "Requesting VNPay refund for transaction: {}, amount: {}, reason: {}",
+        originalTransactionCode,
+        refundAmount,
+        reason);
 
     // VNPay yêu cầu số tiền hoàn phải là số nguyên (nhân 100)
     long amountToRefund = refundAmount.multiply(new BigDecimal(100)).longValue();
@@ -126,17 +129,24 @@ public class VnPayServiceImpl implements PaymentGatewayService {
     vnp_Params.put("vnp_Version", vnpVersion); // Hoặc phiên bản API hoàn tiền nếu khác
     vnp_Params.put("vnp_Command", "refund"); // Hoặc "partialrefund"
     vnp_Params.put("vnp_TmnCode", vnpTmnCode);
-    vnp_Params.put("vnp_TransactionType", "02"); // 02: Hoàn toàn phần, 03: Hoàn toàn bộ (kiểm tra lại tài liệu)
+    vnp_Params.put(
+        "vnp_TransactionType",
+        "02"); // 02: Hoàn toàn phần, 03: Hoàn toàn bộ (kiểm tra lại tài liệu)
     // Nếu refundAmount bằng số tiền gốc thì có thể là "03"
-    vnp_Params.put("vnp_TxnRef", originalTransactionCode); // Mã giao dịch gốc của VNPay (vnp_TransactionNo)
+    vnp_Params.put(
+        "vnp_TxnRef", originalTransactionCode); // Mã giao dịch gốc của VNPay (vnp_TransactionNo)
     // HOẶC mã đơn hàng của bạn (vnp_TxnRef) nếu API cho phép
     // CẦN KIỂM TRA KỸ TÀI LIỆU VNPay
     vnp_Params.put("vnp_Amount", String.valueOf(amountToRefund));
     vnp_Params.put("vnp_OrderInfo", "Hoan tien don hang " + reason); // Lý do, có thể là mã đơn hàng
-    vnp_Params.put("vnp_TransactionNo", "0"); // Bắt buộc, truyền 0 nếu không có mã giao dịch hoàn tiền trước đó
+    vnp_Params.put(
+        "vnp_TransactionNo",
+        "0"); // Bắt buộc, truyền 0 nếu không có mã giao dịch hoàn tiền trước đó
 
     SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-    vnp_Params.put("vnp_TransactionDate", formatter.format(new Date())); // Thời gian thực hiện giao dịch hoàn tiền
+    vnp_Params.put(
+        "vnp_TransactionDate",
+        formatter.format(new Date())); // Thời gian thực hiện giao dịch hoàn tiền
     vnp_Params.put("vnp_CreateBy", "AgriTradeSystem"); // Người tạo yêu cầu
     vnp_Params.put("vnp_CreateDate", formatter.format(new Date()));
     vnp_Params.put("vnp_IpAddr", "127.0.0.1"); // IP server của bạn
@@ -167,23 +177,33 @@ public class VnPayServiceImpl implements PaymentGatewayService {
     try {
       log.debug("Sending VNPay Refund Request: {}", vnp_Params);
       // VNPay Refund API thường là POST và trả về JSON
-      ResponseEntity<Map> responseEntity = restTemplate.exchange(vnpApiUrl, HttpMethod.POST, entity, Map.class);
+      ResponseEntity<Map> responseEntity =
+          restTemplate.exchange(vnpApiUrl, HttpMethod.POST, entity, Map.class);
       Map<String, Object> responseBody = responseEntity.getBody();
       log.info("VNPay Refund Response: {}", responseBody);
 
       if (responseBody != null && "00".equals(responseBody.get("vnp_ResponseCode"))) {
         // "00" thường là thành công hoặc yêu cầu đã được chấp nhận xử lý
-        log.info("VNPay refund request for transaction {} submitted successfully.", originalTransactionCode);
+        log.info(
+            "VNPay refund request for transaction {} submitted successfully.",
+            originalTransactionCode);
         return true;
       } else {
-        String message = responseBody != null ? (String) responseBody.get("vnp_Message") : "Unknown VNPay refund error";
-        log.error("VNPay refund request for transaction {} failed: {}", originalTransactionCode, message);
+        String message =
+            responseBody != null
+                ? (String) responseBody.get("vnp_Message")
+                : "Unknown VNPay refund error";
+        log.error(
+            "VNPay refund request for transaction {} failed: {}", originalTransactionCode, message);
         return false;
       }
     } catch (Exception e) {
-      log.error("Exception during VNPay refund request for transaction {}: {}", originalTransactionCode, e.getMessage(), e);
+      log.error(
+          "Exception during VNPay refund request for transaction {}: {}",
+          originalTransactionCode,
+          e.getMessage(),
+          e);
       return false;
     }
   }
-
 }

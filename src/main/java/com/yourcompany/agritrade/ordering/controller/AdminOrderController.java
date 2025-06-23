@@ -27,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -43,7 +44,7 @@ public class AdminOrderController {
   @GetMapping
   public ResponseEntity<ApiResponse<Page<OrderSummaryResponse>>> getAllOrders(
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) OrderStatus status,
+      @RequestParam(required = false) String status,
       @RequestParam(required = false) PaymentMethod paymentMethod,
       @RequestParam(required = false) PaymentStatus paymentStatus,
       @RequestParam(required = false) OrderType orderType,
@@ -51,9 +52,25 @@ public class AdminOrderController {
       @RequestParam(required = false) Long farmerId,
       @PageableDefault(size = 20, sort = "createdAt,desc") Pageable pageable) {
 
+    OrderStatus statusEnum = null;
+    if (StringUtils.hasText(status)) {
+      try {
+        statusEnum = OrderStatus.valueOf(status.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        // Log lại cảnh báo nếu cần, nhưng không ném lỗi
+
+      }
+    }
     Page<OrderSummaryResponse> orders =
         orderService.getAllOrdersForAdmin(
-            keyword, status, paymentMethod, paymentStatus, orderType, buyerId, farmerId, pageable);
+            keyword,
+            statusEnum,
+            paymentMethod,
+            paymentStatus,
+            orderType,
+            buyerId,
+            farmerId,
+            pageable);
     return ResponseEntity.ok(ApiResponse.success(orders));
   }
 

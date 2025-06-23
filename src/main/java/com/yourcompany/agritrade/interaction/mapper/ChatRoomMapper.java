@@ -42,8 +42,7 @@ public abstract class ChatRoomMapper {
     Long currentUserId = getCurrentUserId(authentication); // Gọi hàm helper
 
     if (currentUserId != null) {
-      // Tính myUnreadCount và otherUser dựa trên UserInfoSimpleResponse đã được map (bao gồm
-      // isOnline)
+
       if (response.getUser1() != null && response.getUser1().getId().equals(currentUserId)) {
         response.setMyUnreadCount(chatRoom.getUser1UnreadCount()); // Lấy unread count từ entity
         response.setOtherUser(response.getUser2());

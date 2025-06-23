@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.ChatMessage;
 import com.yourcompany.agritrade.interaction.domain.ChatRoom;
 import com.yourcompany.agritrade.interaction.domain.MessageType;
@@ -17,19 +18,19 @@ import com.yourcompany.agritrade.interaction.mapper.ChatMessageMapper;
 import com.yourcompany.agritrade.interaction.mapper.ChatRoomMapper;
 import com.yourcompany.agritrade.interaction.repository.ChatMessageRepository;
 import com.yourcompany.agritrade.interaction.repository.ChatRoomRepository;
+import com.yourcompany.agritrade.ordering.repository.SupplyOrderRequestRepository;
 import com.yourcompany.agritrade.usermanagement.domain.User;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -38,6 +39,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceImplTest {
@@ -48,7 +50,11 @@ class ChatServiceImplTest {
   @Mock private ChatRoomMapper chatRoomMapper;
   @Mock private ChatMessageMapper chatMessageMapper;
   @Mock private SimpMessagingTemplate messagingTemplate;
+  @Mock private SupplyOrderRequestRepository supplyOrderRequestRepository;
   @Mock private Authentication authentication;
+
+  // SỬA LỖI: Thêm MockedStatic để quản lý mock cho lớp tiện ích SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
 
   @InjectMocks private ChatServiceImpl chatService;
 
@@ -61,6 +67,10 @@ class ChatServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    // SỬA LỖI: Khởi tạo mock static cho SecurityUtils trước mỗi test
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+    ReflectionTestUtils.setField(chatService, "frontendUrl", "http://localhost:4200");
+
     senderUser = new User();
     senderUser.setId(1L);
     senderUser.setEmail("sender@example.com");
@@ -71,15 +81,13 @@ class ChatServiceImplTest {
     recipientUser.setEmail("recipient@example.com");
     recipientUser.setFullName("Recipient User");
 
-    chatRoomEntity =
-        new ChatRoom(senderUser, recipientUser); // Constructor đảm bảo user1.id < user2.id
+    chatRoomEntity = new ChatRoom(senderUser, recipientUser);
     chatRoomEntity.setId(10L);
     chatRoomEntity.setUser1UnreadCount(0);
     chatRoomEntity.setUser2UnreadCount(0);
 
     chatRoomResponseDto = new ChatRoomResponse();
     chatRoomResponseDto.setId(10L);
-    // ... các trường khác của DTO
 
     chatMessageRequest = new ChatMessageRequest();
     chatMessageRequest.setRecipientId(recipientUser.getId());
@@ -97,18 +105,17 @@ class ChatServiceImplTest {
     chatMessageResponseDto = new ChatMessageResponse();
     chatMessageResponseDto.setId(100L);
     chatMessageResponseDto.setContent("Hello!");
-    // ...
+  }
 
-    lenient().when(authentication.getName()).thenReturn(senderUser.getEmail());
-    lenient().when(authentication.isAuthenticated()).thenReturn(true);
-    lenient()
-        .when(userRepository.findByEmail(senderUser.getEmail()))
-        .thenReturn(Optional.of(senderUser));
+  // SỬA LỖI: Thêm tearDown để đóng mock static sau mỗi test
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
   }
 
   private void mockAuthenticatedUser(User user) {
-    when(authentication.getName()).thenReturn(user.getEmail());
-    when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+    // SỬA LỖI: Mock SecurityUtils thay vì các mock không được dùng đến
+    mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(user);
   }
 
   @Nested
@@ -138,8 +145,7 @@ class ChatServiceImplTest {
       when(userRepository.findById(recipientUser.getId())).thenReturn(Optional.of(recipientUser));
       when(chatRoomRepository.findRoomBetweenUsers(senderUser.getId(), recipientUser.getId()))
           .thenReturn(Optional.empty());
-      when(chatRoomRepository.save(any(ChatRoom.class)))
-          .thenReturn(chatRoomEntity); // Trả về room đã lưu
+      when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(chatRoomEntity);
       when(chatRoomMapper.toChatRoomResponse(chatRoomEntity)).thenReturn(chatRoomResponseDto);
 
       ChatRoomResponse result =
@@ -169,10 +175,9 @@ class ChatServiceImplTest {
       mockAuthenticatedUser(senderUser);
       when(userRepository.findById(recipientUser.getId())).thenReturn(Optional.of(recipientUser));
       when(chatRoomRepository.findRoomBetweenUsers(senderUser.getId(), recipientUser.getId()))
-          .thenReturn(Optional.of(chatRoomEntity)); // Phòng đã tồn tại
+          .thenReturn(Optional.of(chatRoomEntity));
       when(chatMessageRepository.save(any(ChatMessage.class))).thenReturn(chatMessageEntity);
-      when(chatRoomRepository.save(any(ChatRoom.class)))
-          .thenReturn(chatRoomEntity); // Lưu lại room với lastMessage
+      when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(chatRoomEntity);
       when(chatMessageMapper.toChatMessageResponse(chatMessageEntity))
           .thenReturn(chatMessageResponseDto);
       doNothing()
@@ -192,7 +197,7 @@ class ChatServiceImplTest {
       ArgumentCaptor<ChatRoom> roomCaptor = ArgumentCaptor.forClass(ChatRoom.class);
       verify(chatRoomRepository).save(roomCaptor.capture());
       assertEquals(chatMessageEntity, roomCaptor.getValue().getLastMessage());
-      assertEquals(1, roomCaptor.getValue().getUser2UnreadCount()); // recipientUser là user2
+      assertEquals(1, roomCaptor.getValue().getUser2UnreadCount());
 
       verify(messagingTemplate, times(2)).convertAndSend(anyString(), eq(chatMessageResponseDto));
     }
@@ -203,17 +208,15 @@ class ChatServiceImplTest {
       mockAuthenticatedUser(senderUser);
       when(userRepository.findById(recipientUser.getId())).thenReturn(Optional.of(recipientUser));
       when(chatRoomRepository.findRoomBetweenUsers(senderUser.getId(), recipientUser.getId()))
-          .thenReturn(Optional.empty()); // Phòng chưa tồn tại
-      when(chatRoomRepository.save(any(ChatRoom.class)))
-          .thenReturn(chatRoomEntity); // Lần đầu save room mới, lần sau save room với lastMessage
+          .thenReturn(Optional.empty());
+      when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(chatRoomEntity);
       when(chatMessageRepository.save(any(ChatMessage.class))).thenReturn(chatMessageEntity);
       when(chatMessageMapper.toChatMessageResponse(chatMessageEntity))
           .thenReturn(chatMessageResponseDto);
 
       chatService.sendMessage(authentication, chatMessageRequest);
 
-      verify(chatRoomRepository, times(2))
-          .save(any(ChatRoom.class)); // 1 cho tạo mới, 1 cho cập nhật lastMessage
+      verify(chatRoomRepository, times(2)).save(any(ChatRoom.class));
       verify(messagingTemplate, times(2)).convertAndSend(anyString(), eq(chatMessageResponseDto));
     }
 
@@ -221,7 +224,7 @@ class ChatServiceImplTest {
     @DisplayName("Send Message - To Self - Throws BadRequestException")
     void sendMessage_toSelf_throwsBadRequest() {
       mockAuthenticatedUser(senderUser);
-      chatMessageRequest.setRecipientId(senderUser.getId()); // Gửi cho chính mình
+      chatMessageRequest.setRecipientId(senderUser.getId());
       when(userRepository.findById(senderUser.getId())).thenReturn(Optional.of(senderUser));
 
       assertThrows(
@@ -251,7 +254,7 @@ class ChatServiceImplTest {
     @Test
     @DisplayName("Get Chat Messages - Success")
     void getChatMessages_success() {
-      mockAuthenticatedUser(senderUser); // senderUser là user1 trong chatRoomEntity
+      mockAuthenticatedUser(senderUser);
       Pageable pageable = PageRequest.of(0, 10);
       Page<ChatMessage> messagePage = new PageImpl<>(List.of(chatMessageEntity), pageable, 1);
 
@@ -260,7 +263,7 @@ class ChatServiceImplTest {
       when(chatMessageRepository.findByRoomIdOrderBySentAtDesc(chatRoomEntity.getId(), pageable))
           .thenReturn(messagePage);
       when(chatMessageMapper.toChatMessageResponse(chatMessageEntity))
-          .thenReturn(chatMessageResponseDto); // Cho map()
+          .thenReturn(chatMessageResponseDto);
 
       Page<ChatMessageResponse> result =
           chatService.getChatMessages(authentication, chatRoomEntity.getId(), pageable);
@@ -285,7 +288,7 @@ class ChatServiceImplTest {
       User anotherUser = new User();
       anotherUser.setId(3L);
       anotherUser.setEmail("another@example.com");
-      mockAuthenticatedUser(anotherUser); // User này không thuộc chatRoomEntity
+      mockAuthenticatedUser(anotherUser);
       when(chatRoomRepository.findById(chatRoomEntity.getId()))
           .thenReturn(Optional.of(chatRoomEntity));
 
@@ -303,14 +306,14 @@ class ChatServiceImplTest {
     @Test
     @DisplayName("Mark Messages As Read - Success for User2")
     void markMessagesAsRead_success_forUser2() {
-      mockAuthenticatedUser(recipientUser); // recipientUser (user2) đọc tin nhắn
-      chatRoomEntity.setUser2UnreadCount(5); // Có 5 tin nhắn chưa đọc
+      mockAuthenticatedUser(recipientUser);
+      chatRoomEntity.setUser2UnreadCount(5);
 
       when(chatRoomRepository.findById(chatRoomEntity.getId()))
           .thenReturn(Optional.of(chatRoomEntity));
       when(chatMessageRepository.markMessagesAsRead(
               eq(chatRoomEntity.getId()), eq(recipientUser.getId()), any(LocalDateTime.class)))
-          .thenReturn(5); // 5 tin nhắn được cập nhật
+          .thenReturn(5);
       when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(chatRoomEntity);
       doNothing().when(messagingTemplate).convertAndSend(anyString(), any(MessageReadEvent.class));
 
@@ -327,13 +330,13 @@ class ChatServiceImplTest {
     @DisplayName("Mark Messages As Read - No Messages Updated - Does Not Send WebSocket")
     void markMessagesAsRead_noMessagesUpdated_doesNotSendWebSocket() {
       mockAuthenticatedUser(senderUser);
-      chatRoomEntity.setUser1UnreadCount(0); // Không có tin nhắn chưa đọc
+      chatRoomEntity.setUser1UnreadCount(0);
 
       when(chatRoomRepository.findById(chatRoomEntity.getId()))
           .thenReturn(Optional.of(chatRoomEntity));
       when(chatMessageRepository.markMessagesAsRead(
               eq(chatRoomEntity.getId()), eq(senderUser.getId()), any(LocalDateTime.class)))
-          .thenReturn(0); // 0 tin nhắn được cập nhật
+          .thenReturn(0);
 
       chatService.markMessagesAsRead(authentication, chatRoomEntity.getId());
 
@@ -365,9 +368,11 @@ class ChatServiceImplTest {
   @Test
   @DisplayName("Get User From Authentication - Not Authenticated - Throws AccessDeniedException")
   void getUserFromAuthentication_whenNotAuthenticated_shouldThrowAccessDeniedException() {
-    when(authentication.isAuthenticated()).thenReturn(false);
-    assertThrows(
-        AccessDeniedException.class,
-        () -> chatService.getMyChatRooms(authentication)); // Gọi một hàm bất kỳ cần user
+    // Mock SecurityUtils để nó ném lỗi
+    mockedSecurityUtils
+        .when(SecurityUtils::getCurrentAuthenticatedUser)
+        .thenThrow(new AccessDeniedException("Not authenticated"));
+
+    assertThrows(AccessDeniedException.class, () -> chatService.getMyChatRooms(authentication));
   }
 }

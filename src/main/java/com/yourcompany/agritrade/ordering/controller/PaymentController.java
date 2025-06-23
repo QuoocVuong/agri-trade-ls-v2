@@ -5,8 +5,6 @@ import com.yourcompany.agritrade.common.util.VnPayUtils;
 import com.yourcompany.agritrade.ordering.dto.request.PaymentCallbackRequest;
 import com.yourcompany.agritrade.ordering.service.PaymentService;
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -118,7 +116,7 @@ public class PaymentController {
   }
 
   // Endpoint cho MoMo IPN (MoMo thường dùng POST)
-  @PostMapping("/momo/ipn") // Đường dẫn khớp với ipnUrl bạn cấu hình
+  @PostMapping("/momo/ipn") // Đường dẫn khớp với ipnUrl  cấu hình
   public ResponseEntity<Void> handleMomoIpn(@RequestBody Map<String, Object> momoParams) {
     log.info("Received MoMo IPN: {}", momoParams);
     try {
@@ -129,10 +127,9 @@ public class PaymentController {
         return ResponseEntity.badRequest().build(); // MoMo có thể yêu cầu mã lỗi cụ thể
       }
 
-      // 2. Tạo lại rawHashData từ các tham số khác (THEO ĐÚNG THỨ TỰ VÀ TÊN TRƯỜNG MO MO QUY ĐỊNH
-      // CHO IPN)
+      // 2. Tạo lại rawHashData từ các tham số khác
       // Thứ tự và các trường cho IPN có thể khác với khi tạo request thanh toán.
-      // VÍ DỤ (CẦN XEM LẠI TÀI LIỆU MO MO CHO IPN):
+
       String partnerCode = (String) momoParams.get("partnerCode");
       String accessKey =
           (String) momoParams.get("accessKey"); // MoMo có thể không gửi lại accessKey trong IPN
@@ -153,8 +150,7 @@ public class PaymentController {
       String rawHashData =
           "accessKey="
               + accessKey
-              + // Có thể MoMo không dùng accessKey ở đây
-              "&amount="
+              + "&amount="
               + amount
               + "&extraData="
               + extraData
@@ -178,7 +174,7 @@ public class PaymentController {
               + errorCode
               + "&transId="
               + transId;
-      // LƯU Ý: Đây chỉ là ví dụ, bạn PHẢI xem tài liệu MoMo để biết chính xác các trường và thứ tự
+
       // cho IPN signature.
 
       String calculatedSignature = MoMoUtils.signHmacSHA256(rawHashData, momoSecretKey);
@@ -187,7 +183,7 @@ public class PaymentController {
         log.info("MoMo IPN Signature VALIDATED.");
         PaymentCallbackRequest callbackData = convertMomoParamsToDto(momoParams);
         paymentService.handlePaymentCallback("MOMO_IPN", callbackData);
-        // MoMo thường yêu cầu response trống với status 204 hoặc 200
+        // MoMo  yêu cầu response trống với status 204 hoặc 200
         return ResponseEntity.noContent().build();
       } else {
         log.error(
@@ -208,9 +204,8 @@ public class PaymentController {
   private PaymentCallbackRequest convertMomoParamsToDto(Map<String, Object> params) {
     PaymentCallbackRequest data = new PaymentCallbackRequest();
     data.setOrderCode(
-        (String)
-            params.get("orderId")); // Đây là orderId của MoMo, bạn cần map nó về orderCode của bạn
-    // Hoặc bạn đã lưu orderCode của bạn vào extraData khi tạo request
+        (String) params.get("orderId")); // Đây là orderId của MoMo,  cần map nó về orderCode của
+    // Hoặc  đã lưu orderCode của  vào extraData khi tạo request
     data.setTransactionCode(String.valueOf(params.get("transId")));
     data.setSuccess(
         Integer.valueOf(0).equals(params.get("resultCode"))); // resultCode = 0 là thành công
@@ -244,7 +239,7 @@ public class PaymentController {
     data.setTransactionCode(String.valueOf(params.get("transId"))); // Ví dụ
     // resultCode == 0 là thành công
     data.setSuccess(Integer.valueOf(0).equals(params.get("resultCode")));
-    // ... lấy các trường khác
+
     return data;
   }
 }

@@ -30,7 +30,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -137,7 +136,7 @@ public class NotificationServiceImpl implements NotificationService {
   }
 
   @Override
-  public void sendProductApprovedNotification(Product product, User farmer) { // Thêm User farmer
+  public void sendProductApprovedNotification(Product product, User farmer) {
     if (farmer == null) {
       log.error(
           "Cannot send product approved notification: Farmer is null for product ID: {}",
@@ -243,8 +242,6 @@ public class NotificationServiceImpl implements NotificationService {
     log.info("Deleted notification {} for user {}", notificationId, recipient.getId());
   }
 
-
-
   @Override
   public void sendWelcomeNotification(User user) {
     log.info("Sending welcome notification to user {}", user.getId());
@@ -264,7 +261,7 @@ public class NotificationServiceImpl implements NotificationService {
     // Gửi Email thông báo đổi mật khẩu
     emailService.sendPasswordChangedEmail(user);
 
-    // Gửi In-App notification (tùy chọn, có thể không cần thiết)
+    // Gửi In-App notification
     // String message = "Mật khẩu của bạn đã được thay đổi thành công.";
     // inAppNotificationService.createAndSendInAppNotification(user, message,
     // NotificationType.PASSWORD_RESET, null);
@@ -284,8 +281,8 @@ public class NotificationServiceImpl implements NotificationService {
     inAppNotificationService.createAndSendInAppNotification(
         user, message, NotificationType.OTHER, link); // Có thể tạo Type riêng
 
-    // Gửi Email thông báo (tùy chọn)
-    // emailService.sendAccountStatusUpdateEmail(user, newStatus); // Cần tạo hàm này và template
+    // Gửi Email thông báo
+    // emailService.sendAccountStatusUpdateEmail(user, newStatus);
   }
 
   @Override
@@ -303,8 +300,8 @@ public class NotificationServiceImpl implements NotificationService {
     inAppNotificationService.createAndSendInAppNotification(
         user, message, NotificationType.OTHER, link); // Có thể tạo Type riêng
 
-    // Gửi Email thông báo (tùy chọn)
-    // emailService.sendRolesUpdateEmail(user); // Cần tạo hàm này và template
+    // Gửi Email thông báo
+    // emailService.sendRolesUpdateEmail(user);
   }
 
   @Override
@@ -313,7 +310,7 @@ public class NotificationServiceImpl implements NotificationService {
     String message =
         String.format("<strong>%s</strong> đã bắt đầu theo dõi bạn.", follower.getFullName());
     // Link đến trang profile của người follower
-    String link = frontendUrl + "/profile/" + follower.getId(); // Giả sử có route này
+    String link = frontendUrl + "/profile/" + follower.getId();
     inAppNotificationService.createAndSendInAppNotification(
         followedUser, message, NotificationType.NEW_FOLLOWER, link);
     // Có thể gửi cả email nếu muốn
@@ -352,8 +349,6 @@ public class NotificationServiceImpl implements NotificationService {
     // emailService.sendReviewRejectedEmail(review);
   }
 
-  // *** Implement các phương thức mới cho duyệt Farmer Profile ***
-
   @Override
   public void sendFarmerProfileApprovedNotification(FarmerProfile profile) {
     if (profile == null || profile.getUser() == null) {
@@ -371,8 +366,8 @@ public class NotificationServiceImpl implements NotificationService {
     inAppNotificationService.createAndSendInAppNotification(
         farmer, message, NotificationType.FARMER_PROFILE_APPROVED, link);
 
-    // Gửi Email thông báo (tùy chọn)
-    // emailService.sendFarmerProfileApprovedEmail(profile); // Cần tạo hàm này và template trong
+    // Gửi Email thông báo
+    // emailService.sendFarmerProfileApprovedEmail(profile);
     // EmailService
   }
 
@@ -398,8 +393,8 @@ public class NotificationServiceImpl implements NotificationService {
     inAppNotificationService.createAndSendInAppNotification(
         farmer, message, NotificationType.FARMER_PROFILE_REJECTED, link);
 
-    // Gửi Email thông báo (tùy chọn)
-    // emailService.sendFarmerProfileRejectedEmail(profile, reason); // Cần tạo hàm này và template
+    // Gửi Email thông báo
+    // emailService.sendFarmerProfileRejectedEmail(profile, reason);
     // trong EmailService
   }
 

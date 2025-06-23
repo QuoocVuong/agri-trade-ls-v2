@@ -10,6 +10,7 @@ import com.yourcompany.agritrade.catalog.repository.ProductRepository;
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.OutOfStockException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.ordering.domain.CartItem;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemRequest;
 import com.yourcompany.agritrade.ordering.dto.request.CartItemUpdateRequest;
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,6 +33,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -45,6 +49,9 @@ class CartServiceImplTest {
   @Mock private CartItemMapper cartItemMapper;
   @Mock private Authentication authentication;
 
+  // SỬA LỖI: Thêm MockedStatic để quản lý mock cho lớp tiện ích SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
+
   @InjectMocks private CartServiceImpl cartService;
 
   private User testUser;
@@ -58,9 +65,16 @@ class CartServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    // SỬA LỖI: Khởi tạo mock static cho SecurityUtils trước mỗi test
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     testUser = new User();
     testUser.setId(1L);
     testUser.setEmail("cartuser@example.com");
+
+    // SỬA LỖI: Định nghĩa hành vi mặc định cho SecurityUtils trong setUp
+    // vì tất cả các phương thức trong service đều gọi nó.
+    mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(testUser);
 
     product1 = new Product();
     product1.setId(10L);
@@ -82,7 +96,7 @@ class CartServiceImplTest {
     productUnavailable.setId(30L);
     productUnavailable.setName("Sản phẩm đã ẩn");
     productUnavailable.setPrice(new BigDecimal("50.00"));
-    productUnavailable.setStatus(ProductStatus.UNPUBLISHED); // Không còn bán
+    productUnavailable.setStatus(ProductStatus.UNPUBLISHED);
     productUnavailable.setStockQuantity(10);
     productUnavailable.setDeleted(false);
 
@@ -91,10 +105,10 @@ class CartServiceImplTest {
     productOutOfStock.setName("Sản phẩm hết hàng");
     productOutOfStock.setPrice(new BigDecimal("70.00"));
     productOutOfStock.setStatus(ProductStatus.PUBLISHED);
-    productOutOfStock.setStockQuantity(0); // Hết hàng
+    productOutOfStock.setStockQuantity(0);
     productOutOfStock.setDeleted(false);
 
-    productDeleted = new Product(); // Sản phẩm đã bị soft-delete
+    productDeleted = new Product();
     productDeleted.setId(50L);
     productDeleted.setName("Sản phẩm đã xóa");
     productDeleted.setPrice(new BigDecimal("30.00"));
@@ -129,26 +143,24 @@ class CartServiceImplTest {
     cartItemDeletedProductEntity = new CartItem();
     cartItemDeletedProductEntity.setId(500L);
     cartItemDeletedProductEntity.setUser(testUser);
-    cartItemDeletedProductEntity.setProduct(productDeleted); // Product này đã isDeleted = true
+    cartItemDeletedProductEntity.setProduct(productDeleted);
     cartItemDeletedProductEntity.setQuantity(1);
 
     cartItemResponse1 = new CartItemResponse();
     cartItemResponse1.setId(100L);
     cartItemResponse1.setQuantity(2);
-    cartItemResponse1.setItemTotal(new BigDecimal("200.00")); // Giả lập mapper tính
-    // ... set product summary cho cartItemResponse1
+    cartItemResponse1.setItemTotal(new BigDecimal("200.00"));
 
     cartItemResponse2 = new CartItemResponse();
     cartItemResponse2.setId(200L);
     cartItemResponse2.setQuantity(1);
     cartItemResponse2.setItemTotal(new BigDecimal("200.00"));
-    // ... set product summary cho cartItemResponse2
+  }
 
-    lenient().when(authentication.getName()).thenReturn(testUser.getEmail());
-    lenient().when(authentication.isAuthenticated()).thenReturn(true);
-    lenient()
-        .when(userRepository.findByEmail(testUser.getEmail()))
-        .thenReturn(Optional.of(testUser));
+  // SỬA LỖI: Thêm tearDown để đóng mock static sau mỗi test
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
   }
 
   @Nested
@@ -180,8 +192,6 @@ class CartServiceImplTest {
     void getCart_whenItemProductNotFound_shouldRemoveItemAndAddAdjustment() {
       when(cartItemRepository.findByUserId(testUser.getId()))
           .thenReturn(List.of(cartItemDeletedProductEntity));
-      // productRepository.findById sẽ trả về empty nếu sản phẩm không tồn tại hoặc đã bị
-      // soft-delete (do @Where)
       when(productRepository.findById(productDeleted.getId())).thenReturn(Optional.empty());
 
       CartResponse result = cartService.getCart(authentication);
@@ -203,8 +213,7 @@ class CartServiceImplTest {
       when(cartItemRepository.findByUserId(testUser.getId()))
           .thenReturn(List.of(cartItemUnavailableEntity));
       when(productRepository.findById(productUnavailable.getId()))
-          .thenReturn(
-              Optional.of(productUnavailable)); // Product tồn tại nhưng status khác PUBLISHED
+          .thenReturn(Optional.of(productUnavailable));
 
       CartResponse result = cartService.getCart(authentication);
 
@@ -234,12 +243,12 @@ class CartServiceImplTest {
     @Test
     @DisplayName("Get Cart - Item Quantity Exceeds Stock, Adjusts Quantity")
     void getCart_whenItemQuantityExceedsStock_shouldAdjustQuantityAndAddAdjustment() {
-      product1.setStockQuantity(1); // Chỉ còn 1
-      cartItemEntity1.setQuantity(2); // Trong giỏ là 2
+      product1.setStockQuantity(1);
+      cartItemEntity1.setQuantity(2);
 
       CartItemResponse adjustedResponse = new CartItemResponse();
       adjustedResponse.setId(cartItemEntity1.getId());
-      adjustedResponse.setQuantity(1); // Số lượng đã điều chỉnh
+      adjustedResponse.setQuantity(1);
       adjustedResponse.setItemTotal(product1.getPrice().multiply(BigDecimal.ONE));
 
       when(cartItemRepository.findByUserId(testUser.getId())).thenReturn(List.of(cartItemEntity1));
@@ -292,7 +301,6 @@ class CartServiceImplTest {
                 itemToSave.setId(300L);
                 return itemToSave;
               });
-      // Giả sử cartItemResponse1 đã được setup cho product1 với quantity 1
       cartItemResponse1.setQuantity(1);
       cartItemResponse1.setItemTotal(product1.getPrice());
       when(cartItemMapper.toCartItemResponse(any(CartItem.class))).thenReturn(cartItemResponse1);
@@ -309,10 +317,10 @@ class CartServiceImplTest {
     void addItem_whenExistingProduct_shouldUpdateQuantity() {
       CartItemRequest request = new CartItemRequest();
       request.setProductId(product1.getId());
-      request.setQuantity(1); // Thêm 1 nữa
+      request.setQuantity(1);
 
-      cartItemEntity1.setQuantity(2); // Giả sử trong giỏ đã có 2
-      product1.setStockQuantity(10); // Đủ hàng
+      cartItemEntity1.setQuantity(2);
+      product1.setStockQuantity(10);
 
       when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
       when(cartItemRepository.findByUserIdAndProductId(testUser.getId(), product1.getId()))
@@ -321,7 +329,7 @@ class CartServiceImplTest {
 
       CartItemResponse updatedResponse = new CartItemResponse();
       updatedResponse.setId(cartItemEntity1.getId());
-      updatedResponse.setQuantity(3); // 2 (cũ) + 1 (mới)
+      updatedResponse.setQuantity(3);
       updatedResponse.setItemTotal(product1.getPrice().multiply(BigDecimal.valueOf(3)));
       when(cartItemMapper.toCartItemResponse(cartItemEntity1)).thenReturn(updatedResponse);
 
@@ -368,12 +376,10 @@ class CartServiceImplTest {
     void addItem_whenNotEnoughStockForNewItem_shouldThrowOutOfStockException() {
       CartItemRequest request = new CartItemRequest();
       request.setProductId(product1.getId());
-      request.setQuantity(11); // Yêu cầu 11, tồn kho 10
+      request.setQuantity(11);
       product1.setStockQuantity(10);
 
       when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
-      //            when(cartItemRepository.findByUserIdAndProductId(testUser.getId(),
-      // product1.getId())).thenReturn(Optional.empty());
 
       OutOfStockException exception =
           assertThrows(
@@ -387,10 +393,10 @@ class CartServiceImplTest {
     void addItem_whenNotEnoughStockForExistingItem_shouldThrowOutOfStockException() {
       CartItemRequest request = new CartItemRequest();
       request.setProductId(product1.getId());
-      request.setQuantity(5); // Thêm 5
+      request.setQuantity(5);
 
-      cartItemEntity1.setQuantity(6); // Đã có 6 trong giỏ
-      product1.setStockQuantity(10); // Tồn kho 10. Tổng yêu cầu 6+5=11 > 10
+      cartItemEntity1.setQuantity(6);
+      product1.setStockQuantity(10);
 
       when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
       when(cartItemRepository.findByUserIdAndProductId(testUser.getId(), product1.getId()))
@@ -412,13 +418,12 @@ class CartServiceImplTest {
     @DisplayName("Update Item Quantity - Success")
     void updateItemQuantity_success() {
       CartItemUpdateRequest request = new CartItemUpdateRequest();
-      request.setQuantity(5); // Cập nhật thành 5
-      product1.setStockQuantity(10); // Đủ hàng
+      request.setQuantity(5);
+      product1.setStockQuantity(10);
 
       when(cartItemRepository.findById(cartItemEntity1.getId()))
           .thenReturn(Optional.of(cartItemEntity1));
-      when(productRepository.findById(product1.getId()))
-          .thenReturn(Optional.of(product1)); // Mock findAvailableProduct
+      when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
       when(cartItemRepository.save(any(CartItem.class))).thenReturn(cartItemEntity1);
 
       CartItemResponse updatedResponse = new CartItemResponse();
@@ -453,7 +458,7 @@ class CartServiceImplTest {
       request.setQuantity(1);
       User anotherUser = new User();
       anotherUser.setId(2L);
-      cartItemEntity1.setUser(anotherUser); // Item này không thuộc testUser
+      cartItemEntity1.setUser(anotherUser);
 
       when(cartItemRepository.findById(cartItemEntity1.getId()))
           .thenReturn(Optional.of(cartItemEntity1));
@@ -468,12 +473,11 @@ class CartServiceImplTest {
     void updateItemQuantity_whenProductBecomesUnavailable_shouldRemoveItemAndThrowBadRequest() {
       CartItemUpdateRequest request = new CartItemUpdateRequest();
       request.setQuantity(1);
-      product1.setStatus(ProductStatus.UNPUBLISHED); // Sản phẩm không còn bán
+      product1.setStatus(ProductStatus.UNPUBLISHED);
 
       when(cartItemRepository.findById(cartItemEntity1.getId()))
           .thenReturn(Optional.of(cartItemEntity1));
-      when(productRepository.findById(product1.getId()))
-          .thenReturn(Optional.of(product1)); // Mock findAvailableProduct
+      when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
 
       BadRequestException exception =
           assertThrows(
@@ -491,8 +495,8 @@ class CartServiceImplTest {
     @DisplayName("Update Item Quantity - Not Enough Stock")
     void updateItemQuantity_whenNotEnoughStock_shouldThrowOutOfStockException() {
       CartItemUpdateRequest request = new CartItemUpdateRequest();
-      request.setQuantity(11); // Yêu cầu 11
-      product1.setStockQuantity(10); // Tồn kho 10
+      request.setQuantity(11);
+      product1.setStockQuantity(10);
 
       when(cartItemRepository.findById(cartItemEntity1.getId()))
           .thenReturn(Optional.of(cartItemEntity1));
@@ -553,8 +557,8 @@ class CartServiceImplTest {
     @Test
     @DisplayName("Validate Cart - Item Quantity Adjusted")
     void validateCartForCheckout_whenItemQuantityAdjusted_shouldReturnInvalidWithAdjustments() {
-      product1.setStockQuantity(1); // Chỉ còn 1
-      cartItemEntity1.setQuantity(2); // Trong giỏ là 2
+      product1.setStockQuantity(1);
+      cartItemEntity1.setQuantity(2);
 
       when(cartItemRepository.findByUserId(testUser.getId())).thenReturn(List.of(cartItemEntity1));
       when(productRepository.findById(product1.getId())).thenReturn(Optional.of(product1));
@@ -610,17 +614,22 @@ class CartServiceImplTest {
   @Test
   @DisplayName("Get User From Authentication - User Not Found - Throws UsernameNotFoundException")
   void getUserFromAuthentication_whenUserNotFound_shouldThrowUsernameNotFoundException() {
-    when(authentication.getName()).thenReturn("unknown@example.com");
-    when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
-    assertThrows(
-        UsernameNotFoundException.class,
-        () -> cartService.getCart(authentication)); // Gọi một hàm bất kỳ cần user
+    // Mock SecurityUtils để nó ném lỗi, đây là cách test đúng
+    mockedSecurityUtils
+        .when(SecurityUtils::getCurrentAuthenticatedUser)
+        .thenThrow(new UsernameNotFoundException("User not found"));
+
+    assertThrows(UsernameNotFoundException.class, () -> cartService.getCart(authentication));
   }
 
   @Test
   @DisplayName("Get User From Authentication - Not Authenticated - Throws AccessDeniedException")
   void getUserFromAuthentication_whenNotAuthenticated_shouldThrowAccessDeniedException() {
-    when(authentication.isAuthenticated()).thenReturn(false);
+    // Mock SecurityUtils để nó ném lỗi
+    mockedSecurityUtils
+        .when(SecurityUtils::getCurrentAuthenticatedUser)
+        .thenThrow(new AccessDeniedException("Not authenticated"));
+
     assertThrows(AccessDeniedException.class, () -> cartService.getCart(authentication));
   }
 }

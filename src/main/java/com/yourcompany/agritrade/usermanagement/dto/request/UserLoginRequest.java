@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.usermanagement.dto.request; // Đúng package
+package com.yourcompany.agritrade.usermanagement.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

@@ -39,9 +39,7 @@ public class PaymentServiceImpl implements PaymentService {
     // toán
     //      throw new BadRequestException("Invalid payment callback signature or data.");
     // }
-    log.warn(
-        "Callback validation skipped for gateway: {}",
-        gateway); // Bỏ qua validation trong ví dụ này
+    log.warn("Callback validation skipped for gateway: {}", gateway); // Bỏ qua validation
 
     // --- BƯỚC 2: LẤY THÔNG TIN ---
     String orderCode = callbackData.getOrderCode();

@@ -2,13 +2,13 @@ package com.yourcompany.agritrade.notification.service.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.yourcompany.agritrade.catalog.domain.Product;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.NotificationType;
 import com.yourcompany.agritrade.common.model.RoleType;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.interaction.domain.Review;
 import com.yourcompany.agritrade.notification.domain.Notification;
 import com.yourcompany.agritrade.notification.dto.response.NotificationResponse;
@@ -27,14 +27,13 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -54,6 +53,9 @@ class NotificationServiceImplTest {
   @Mock private UserRepository userRepository;
   @Mock private Authentication authentication;
 
+  // SỬA LỖI: Thêm MockedStatic để quản lý mock cho lớp tiện ích SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
+
   @InjectMocks private NotificationServiceImpl notificationService;
 
   private User testUser, testBuyer, testFarmer, testAdmin;
@@ -67,6 +69,9 @@ class NotificationServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    // SỬA LỖI: Khởi tạo mock static cho SecurityUtils trước mỗi test
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     ReflectionTestUtils.setField(notificationService, "frontendUrl", FRONTEND_URL);
 
     testUser = new User();
@@ -115,17 +120,12 @@ class NotificationServiceImplTest {
     testInvoice.setOrder(testOrder);
     testInvoice.setInvoiceNumber("INV-ORD123");
     testInvoice.setDueDate(LocalDate.now().plusDays(5));
-
-    lenient().when(authentication.getName()).thenReturn(testUser.getEmail());
-    lenient().when(authentication.isAuthenticated()).thenReturn(true);
-    lenient()
-        .when(userRepository.findByEmail(testUser.getEmail()))
-        .thenReturn(Optional.of(testUser));
   }
 
-  private void mockAuthenticatedUser(User user) {
-    when(authentication.getName()).thenReturn(user.getEmail());
-    when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+  // SỬA LỖI: Thêm tearDown để đóng mock static sau mỗi test
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
   }
 
   @Nested
@@ -141,16 +141,13 @@ class NotificationServiceImplTest {
       ArgumentCaptor<String> linkCaptor = ArgumentCaptor.forClass(String.class);
       ArgumentCaptor<NotificationType> typeCaptor = ArgumentCaptor.forClass(NotificationType.class);
 
-      // Verify buyer notification
       verify(inAppNotificationService)
           .createAndSendInAppNotification(
               eq(testBuyer), messageCaptor.capture(), typeCaptor.capture(), linkCaptor.capture());
       assertTrue(messageCaptor.getValue().contains(testOrder.getOrderCode()));
       assertEquals(NotificationType.ORDER_PLACED, typeCaptor.getValue());
       assertTrue(linkCaptor.getValue().contains("/user/orders/" + testOrder.getId()));
-      // verify(emailService).sendOrderConfirmationEmailToBuyer(testOrder); // Uncomment if used
 
-      // Verify farmer notification
       verify(inAppNotificationService)
           .createAndSendInAppNotification(
               eq(testFarmer), messageCaptor.capture(), typeCaptor.capture(), linkCaptor.capture());
@@ -158,27 +155,22 @@ class NotificationServiceImplTest {
       assertTrue(messageCaptor.getValue().contains(testBuyer.getFullName()));
       assertEquals(NotificationType.ORDER_PLACED, typeCaptor.getValue());
       assertTrue(linkCaptor.getValue().contains("/farmer/orders/" + testOrder.getId()));
-      // verify(emailService).sendNewOrderNotificationToFarmer(testOrder); // Uncomment if used
     }
 
     @Test
     @DisplayName("Send Order Status Update Notification")
     void sendOrderStatusUpdateNotification_shouldNotifyBuyerAndFarmerForSpecificStatuses() {
       OrderStatus previousStatus = OrderStatus.PROCESSING;
-      testOrder.setStatus(OrderStatus.DELIVERED); // New status
+      testOrder.setStatus(OrderStatus.DELIVERED);
 
       notificationService.sendOrderStatusUpdateNotification(testOrder, previousStatus);
 
-      // Buyer notification
       verify(inAppNotificationService)
           .createAndSendInAppNotification(
               eq(testBuyer),
               contains("cập nhật trạng thái thành: DELIVERED"),
               eq(NotificationType.ORDER_STATUS_UPDATE),
               contains("/user/orders/" + testOrder.getId()));
-      // verify(emailService).sendOrderStatusUpdateEmailToBuyer(testOrder, previousStatus);
-
-      // Farmer notification (because status is DELIVERED)
       verify(inAppNotificationService)
           .createAndSendInAppNotification(
               eq(testFarmer),
@@ -190,25 +182,10 @@ class NotificationServiceImplTest {
     @Test
     @DisplayName("Send Product Approved Notification - Farmer Null")
     void sendProductApprovedNotification_whenFarmerIsNull_shouldLogAndReturn() {
-      // Capture log output if possible, or just verify no interaction with inAppNotificationService
       notificationService.sendProductApprovedNotification(testProduct, null);
       verify(inAppNotificationService, never())
           .createAndSendInAppNotification(any(), anyString(), any(), anyString());
     }
-
-    //        @Test
-    //        @DisplayName("Send New Chat Message Notification")
-    //        void sendNewChatMessageNotification_shouldCallInAppService() {
-    //            notificationService.sendNewChatMessageNotification(testBuyer, testFarmer, 123L);
-    // // roomId 123
-    //
-    //            verify(inAppNotificationService).createAndSendInAppNotification(
-    //                    eq(testBuyer),
-    //                    contains("tin nhắn mới từ " + testFarmer.getFullName()),
-    //                    eq(NotificationType.NEW_MESSAGE),
-    //                    eq(FRONTEND_URL + "/chat?roomId=123L")
-    //            );
-    //        }
   }
 
   @Nested
@@ -216,7 +193,8 @@ class NotificationServiceImplTest {
   class ManageInAppNotifications {
     @BeforeEach
     void manageSetup() {
-      mockAuthenticatedUser(testUser);
+      // SỬA LỖI: Mock SecurityUtils để trả về testUser cho các test trong nhóm này
+      mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(testUser);
     }
 
     @Test
@@ -225,7 +203,7 @@ class NotificationServiceImplTest {
       Pageable pageable = PageRequest.of(0, 10);
       Notification n1 = new Notification(testUser, "Msg1", NotificationType.OTHER, null);
       Page<Notification> notificationPage = new PageImpl<>(List.of(n1), pageable, 1);
-      NotificationResponse nr1 = new NotificationResponse(); /* map n1 */
+      NotificationResponse nr1 = new NotificationResponse();
 
       when(notificationRepository.findByRecipientIdOrderByCreatedAtDesc(testUser.getId(), pageable))
           .thenReturn(notificationPage);
@@ -254,7 +232,7 @@ class NotificationServiceImplTest {
       Long notificationId = 1L;
       when(notificationRepository.markAsRead(
               eq(notificationId), eq(testUser.getId()), any(LocalDateTime.class)))
-          .thenReturn(1); // 1 row updated
+          .thenReturn(1);
 
       notificationService.markNotificationAsRead(authentication, notificationId);
       verify(notificationRepository)
@@ -267,7 +245,7 @@ class NotificationServiceImplTest {
       Long notificationId = 2L;
       when(notificationRepository.markAsRead(
               eq(notificationId), eq(testUser.getId()), any(LocalDateTime.class)))
-          .thenReturn(0); // 0 rows updated
+          .thenReturn(0);
 
       assertDoesNotThrow(
           () -> notificationService.markNotificationAsRead(authentication, notificationId));
@@ -280,7 +258,7 @@ class NotificationServiceImplTest {
     void markAllMyNotificationsAsRead_success() {
       when(notificationRepository.markAllAsReadForRecipient(
               eq(testUser.getId()), any(LocalDateTime.class)))
-          .thenReturn(3); // 3 rows updated
+          .thenReturn(3);
       notificationService.markAllMyNotificationsAsRead(authentication);
       verify(notificationRepository)
           .markAllAsReadForRecipient(eq(testUser.getId()), any(LocalDateTime.class));
@@ -342,9 +320,6 @@ class NotificationServiceImplTest {
               eq(NotificationType.WELCOME),
               eq(FRONTEND_URL));
     }
-
-    // ... Thêm test cho sendPasswordChangedNotification, sendAccountStatusUpdateNotification,
-    // sendRolesUpdateNotification ...
   }
 
   @Nested
@@ -353,8 +328,7 @@ class NotificationServiceImplTest {
     @Test
     @DisplayName("Send New Follower Notification")
     void sendNewFollowerNotification_callsInAppService() {
-      notificationService.sendNewFollowerNotification(
-          testFarmer, testBuyer); // Buyer follows Farmer
+      notificationService.sendNewFollowerNotification(testFarmer, testBuyer);
       verify(inAppNotificationService)
           .createAndSendInAppNotification(
               eq(testFarmer),
@@ -369,7 +343,7 @@ class NotificationServiceImplTest {
       notificationService.sendReviewApprovedNotification(testReview);
       verify(inAppNotificationService)
           .createAndSendInAppNotification(
-              eq(testBuyer), // Consumer của review
+              eq(testBuyer),
               contains(
                   "Đánh giá của bạn cho sản phẩm '" + testProduct.getName() + "' đã được duyệt"),
               eq(NotificationType.REVIEW_APPROVED),
@@ -392,7 +366,7 @@ class NotificationServiceImplTest {
     @DisplayName("Send Farmer Profile Approved Notification - User Null")
     void sendFarmerProfileApprovedNotification_whenUserNull_shouldLogAndReturn() {
       FarmerProfile profileWithNullUser = new FarmerProfile();
-      profileWithNullUser.setUser(null); // User là null
+      profileWithNullUser.setUser(null);
       notificationService.sendFarmerProfileApprovedNotification(profileWithNullUser);
       verify(inAppNotificationService, never())
           .createAndSendInAppNotification(any(), any(), any(), any());

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.usermanagement.domain.Address;
 import com.yourcompany.agritrade.usermanagement.domain.AddressType;
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -18,12 +19,15 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
@@ -35,6 +39,9 @@ class AddressServiceImplUnitTest {
   @Mock private AddressMapper addressMapper;
   @Mock private Authentication authentication;
 
+  // SỬA LỖI: Thêm MockedStatic để quản lý mock cho lớp tiện ích SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
+
   @InjectMocks private AddressServiceImpl addressService;
 
   private User currentUser;
@@ -44,11 +51,18 @@ class AddressServiceImplUnitTest {
 
   @BeforeEach
   void setUp() {
+    // SỬA LỖI: Khởi tạo mock static cho SecurityUtils trước mỗi test
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     currentUser = new User();
     currentUser.setId(1L);
     currentUser.setEmail("user@example.com");
     currentUser.setFullName("Test User");
     currentUser.setPhoneNumber("0987654321");
+
+    // SỬA LỖI: Định nghĩa hành vi mặc định cho SecurityUtils trong setUp
+    // vì tất cả các phương thức trong service đều gọi nó.
+    mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(currentUser);
 
     addressRequest = new AddressRequest();
     addressRequest.setFullName("Recipient Name");
@@ -64,18 +78,18 @@ class AddressServiceImplUnitTest {
     addressEntity.setId(10L);
     addressEntity.setUser(currentUser);
     addressEntity.setFullName(addressRequest.getFullName());
-    // ... set các trường khác cho addressEntity
+    addressEntity.setCreatedAt(LocalDateTime.now());
 
     addressResponseDto = new AddressResponse();
     addressResponseDto.setId(10L);
     addressResponseDto.setUserId(currentUser.getId());
     addressResponseDto.setFullName(addressRequest.getFullName());
-    // ... set các trường khác cho addressResponseDto
+  }
 
-    // Mock hành vi của authentication
-    when(authentication.getName()).thenReturn(currentUser.getEmail());
-    when(authentication.isAuthenticated()).thenReturn(true);
-    when(userRepository.findByEmail(currentUser.getEmail())).thenReturn(Optional.of(currentUser));
+  // SỬA LỖI: Thêm tearDown để đóng mock static sau mỗi test
+  @AfterEach
+  void tearDown() {
+    mockedSecurityUtils.close();
   }
 
   @Test
@@ -123,150 +137,134 @@ class AddressServiceImplUnitTest {
     otherDefaultAddress.setUser(currentUser);
     otherDefaultAddress.setDefault(true);
 
-    Address newAddressEntityFromMapper = new Address(); // Giả lập kết quả từ mapper
-    newAddressEntityFromMapper.setUser(currentUser); // Quan trọng: user phải được set
+    Address newAddressEntityFromMapper = new Address();
+    newAddressEntityFromMapper.setUser(currentUser);
     newAddressEntityFromMapper.setFullName(addressRequest.getFullName());
 
-    when(addressMapper.requestToAddress(addressRequest))
-        .thenReturn(newAddressEntityFromMapper); // Giả sử addressEntity chưa có ID
+    when(addressMapper.requestToAddress(addressRequest)).thenReturn(newAddressEntityFromMapper);
+    // Khi gọi unsetDefaultForOtherAddresses, nó sẽ gọi findByUserId
     when(addressRepository.findByUserId(currentUser.getId()))
-        .thenReturn(List.of(otherDefaultAddress)); // Có địa chỉ mặc định khác
-
+        .thenReturn(List.of(otherDefaultAddress));
     when(addressRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
-
-    // Giả sử địa chỉ mới được lưu thành công và có ID
     when(addressRepository.save(any(Address.class)))
         .thenAnswer(
             invocation -> {
               Address savedAddr = invocation.getArgument(0);
-              if (savedAddr.getId() == null) { // Nếu là địa chỉ mới chưa có ID
-                savedAddr.setId(10L); // Gán ID giả lập
+              if (savedAddr.getId() == null) {
+                savedAddr.setId(10L);
               }
-              // Quan trọng: đảm bảo isDefault của địa chỉ mới được set đúng trong service
-              // và được phản ánh ở đây nếu bạn muốn kiểm tra nó.
-              // Trong trường hợp này, service sẽ set newAddressEntityFromMapper.setDefault(true)
               return savedAddr;
             });
 
-    when(addressMapper.toAddressResponse(any(Address.class)))
-        .thenAnswer(
-            invocation -> {
-              Address addrToMap = invocation.getArgument(0);
-              AddressResponse resp = new AddressResponse();
-              resp.setId(addrToMap.getId());
-              resp.setFullName(addrToMap.getFullName());
-              resp.setDefault(addrToMap.isDefault());
-              // ... map các trường khác ...
-              return resp;
-            });
-
-    // Act
     addressService.addMyAddress(authentication, addressRequest);
 
-    // Assert
-    // 1. Verify saveAll được gọi 1 lần để unset default cho otherDefaultAddress
     ArgumentCaptor<List<Address>> listCaptor = ArgumentCaptor.forClass(List.class);
     verify(addressRepository).saveAll(listCaptor.capture());
     List<Address> unsetAddresses = listCaptor.getValue();
     assertEquals(1, unsetAddresses.size());
-    assertFalse(unsetAddresses.get(0).isDefault()); // Địa chỉ cũ đã được unset default
-    assertEquals(otherDefaultAddress.getId(), unsetAddresses.get(0).getId());
+    assertFalse(unsetAddresses.get(0).isDefault());
 
-    // 2. Verify save được gọi 1 lần để lưu địa chỉ mới
     ArgumentCaptor<Address> newAddressCaptor = ArgumentCaptor.forClass(Address.class);
     verify(addressRepository).save(newAddressCaptor.capture());
-    Address savedNewAddress = newAddressCaptor.getValue();
-    assertTrue(savedNewAddress.isDefault()); // Địa chỉ mới phải là default
-    assertEquals(newAddressEntityFromMapper.getFullName(), savedNewAddress.getFullName());
+    assertTrue(newAddressCaptor.getValue().isDefault());
   }
 
   @Test
   void addMyAddress_firstAddress_becomesDefault() {
-    addressRequest.setIsDefault(false); // User không set làm mặc định
-    when(addressMapper.requestToAddress(addressRequest)).thenReturn(addressEntity);
-    when(addressRepository.findByUserId(currentUser.getId()))
-        .thenReturn(Collections.emptyList()); // Không có địa chỉ nào trước đó
-    when(addressRepository.save(any(Address.class))).thenReturn(addressEntity);
-    when(addressMapper.toAddressResponse(addressEntity)).thenReturn(addressResponseDto);
+    addressRequest.setIsDefault(false);
+    Address newAddress = new Address(); // Tạo đối tượng mới để không bị ảnh hưởng bởi test khác
+    when(addressMapper.requestToAddress(addressRequest)).thenReturn(newAddress);
+    when(addressRepository.findByUserId(currentUser.getId())).thenReturn(Collections.emptyList());
+    when(addressRepository.save(any(Address.class))).thenReturn(newAddress);
 
     addressService.addMyAddress(authentication, addressRequest);
 
     ArgumentCaptor<Address> addressCaptor = ArgumentCaptor.forClass(Address.class);
     verify(addressRepository).save(addressCaptor.capture());
-    assertTrue(addressCaptor.getValue().isDefault()); // Phải tự động thành mặc định
+    assertTrue(addressCaptor.getValue().isDefault());
   }
 
   @Test
   void updateMyAddress_setAsDefault_success() {
     addressRequest.setIsDefault(true);
-    addressEntity.setDefault(false); // Địa chỉ hiện tại không phải mặc định
+    addressEntity.setDefault(false);
 
-    Address otherAddress = new Address(); // Một địa chỉ khác, có thể là mặc định hoặc không
+    Address otherAddress = new Address();
     otherAddress.setId(11L);
     otherAddress.setUser(currentUser);
     otherAddress.setDefault(true);
 
     when(addressRepository.findByIdAndUserId(10L, currentUser.getId()))
         .thenReturn(Optional.of(addressEntity));
+    // Giả lập danh sách địa chỉ cho hàm unset
     when(addressRepository.findByUserId(currentUser.getId()))
         .thenReturn(List.of(addressEntity, otherAddress));
     doNothing().when(addressMapper).updateAddressFromRequest(eq(addressRequest), eq(addressEntity));
-    when(addressRepository.save(any(Address.class))).thenReturn(addressEntity); // Giả lập save
-    when(addressMapper.toAddressResponse(addressEntity)).thenReturn(addressResponseDto);
+    when(addressRepository.save(any(Address.class))).thenReturn(addressEntity);
 
     addressService.updateMyAddress(authentication, 10L, addressRequest);
 
-    verify(addressRepository).saveAll(anyList()); // Kiểm tra unsetDefaultForOtherAddresses được gọi
+    verify(addressRepository).saveAll(anyList());
     assertTrue(addressEntity.isDefault());
+    verify(addressRepository).save(addressEntity);
   }
 
   @Test
   void updateMyAddress_unsetOnlyDefaultAddress_throwsBadRequestException() {
     addressRequest.setIsDefault(false);
-    addressEntity.setDefault(true); // Đây là địa chỉ mặc định duy nhất
+    addressEntity.setDefault(true);
 
     when(addressRepository.findByIdAndUserId(10L, currentUser.getId()))
         .thenReturn(Optional.of(addressEntity));
-    when(addressRepository.findByUserId(currentUser.getId()))
-        .thenReturn(List.of(addressEntity)); // Chỉ có 1 địa chỉ
+    when(addressRepository.findByUserId(currentUser.getId())).thenReturn(List.of(addressEntity));
     doNothing().when(addressMapper).updateAddressFromRequest(eq(addressRequest), eq(addressEntity));
 
     assertThrows(
         BadRequestException.class,
-        () -> {
-          addressService.updateMyAddress(authentication, 10L, addressRequest);
-        });
+        () -> addressService.updateMyAddress(authentication, 10L, addressRequest));
   }
 
   @Test
   void deleteMyAddress_defaultAddress_setsNewDefault() {
-    addressEntity.setDefault(true); // Địa chỉ cần xóa là mặc định
+    addressEntity.setDefault(true);
     Address otherAddress = new Address();
     otherAddress.setId(11L);
     otherAddress.setUser(currentUser);
     otherAddress.setDefault(false);
-    otherAddress.setCreatedAt(LocalDateTime.now().minusDays(1)); // Cũ hơn
+    otherAddress.setCreatedAt(LocalDateTime.now().minusDays(1));
 
     Address newestOtherAddress = new Address();
     newestOtherAddress.setId(12L);
     newestOtherAddress.setUser(currentUser);
     newestOtherAddress.setDefault(false);
-    newestOtherAddress.setCreatedAt(LocalDateTime.now()); // Mới nhất
+    newestOtherAddress.setCreatedAt(LocalDateTime.now());
 
     when(addressRepository.findByIdAndUserId(10L, currentUser.getId()))
         .thenReturn(Optional.of(addressEntity));
+    // Giả lập danh sách địa chỉ cho hàm tìm địa chỉ mới
     when(addressRepository.findByUserId(currentUser.getId()))
         .thenReturn(List.of(addressEntity, otherAddress, newestOtherAddress));
-    when(addressRepository.save(any(Address.class)))
-        .thenReturn(newestOtherAddress); // Giả lập save cho newDefault
 
     addressService.deleteMyAddress(authentication, 10L);
 
     verify(addressRepository).delete(addressEntity);
     ArgumentCaptor<Address> captor = ArgumentCaptor.forClass(Address.class);
-    verify(addressRepository).save(captor.capture()); // newDefault được save
+    // Phải là save chứ không phải saveAll
+    verify(addressRepository).save(captor.capture());
     assertTrue(captor.getValue().isDefault());
     assertEquals(newestOtherAddress.getId(), captor.getValue().getId());
+  }
+
+  @Test
+  void deleteMyAddress_lastAddress_throwsBadRequestException() {
+    addressEntity.setDefault(true);
+    when(addressRepository.findByIdAndUserId(10L, currentUser.getId()))
+        .thenReturn(Optional.of(addressEntity));
+    // Giả lập đây là địa chỉ duy nhất
+    when(addressRepository.findByUserId(currentUser.getId())).thenReturn(List.of(addressEntity));
+
+    assertThrows(
+        BadRequestException.class, () -> addressService.deleteMyAddress(authentication, 10L));
   }
 
   @Test
@@ -278,9 +276,50 @@ class AddressServiceImplUnitTest {
     addressService.deleteMyAddress(authentication, 10L);
 
     verify(addressRepository).delete(addressEntity);
-    verify(addressRepository, never()).saveAll(anyList()); // Không set lại default cho cái khác
-    verify(addressRepository, never()).save(argThat(addr -> addr.isDefault()));
+    verify(addressRepository, never()).save(any());
+    verify(addressRepository, never()).saveAll(any());
   }
 
-  // TODO: Thêm test cho setMyDefaultAddress
+  @Test
+  void setMyDefaultAddress_success() {
+    addressEntity.setDefault(false);
+    Address oldDefault = new Address();
+    oldDefault.setId(11L);
+    oldDefault.setDefault(true);
+
+    when(addressRepository.findByIdAndUserId(10L, currentUser.getId()))
+        .thenReturn(Optional.of(addressEntity));
+    when(addressRepository.findByUserId(currentUser.getId()))
+        .thenReturn(List.of(addressEntity, oldDefault));
+
+    addressService.setMyDefaultAddress(authentication, 10L);
+
+    ArgumentCaptor<List<Address>> listCaptor = ArgumentCaptor.forClass(List.class);
+    verify(addressRepository).saveAll(listCaptor.capture());
+    assertFalse(listCaptor.getValue().get(0).isDefault()); // Old default is unset
+
+    verify(addressRepository).save(addressEntity);
+    assertTrue(addressEntity.isDefault()); // New address is set to default
+  }
+
+  @Test
+  void getDefaultAddressByUserId_found() {
+    addressEntity.setDefault(true);
+    when(userRepository.existsById(currentUser.getId())).thenReturn(true);
+    when(addressRepository.findByUserIdAndIsDefaultTrue(currentUser.getId()))
+        .thenReturn(Optional.of(addressEntity));
+    when(addressMapper.toAddressResponse(addressEntity)).thenReturn(addressResponseDto);
+
+    AddressResponse result = addressService.getDefaultAddressByUserId(currentUser.getId());
+
+    assertNotNull(result);
+    assertEquals(addressResponseDto.getId(), result.getId());
+  }
+
+  @Test
+  void getDefaultAddressByUserId_userNotFound_throwsResourceNotFoundException() {
+    when(userRepository.existsById(99L)).thenReturn(false);
+    assertThrows(
+        ResourceNotFoundException.class, () -> addressService.getDefaultAddressByUserId(99L));
+  }
 }

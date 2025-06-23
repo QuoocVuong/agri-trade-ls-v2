@@ -1,4 +1,4 @@
-package com.yourcompany.agritrade.common.util; // Hoặc một package utils phù hợp
+package com.yourcompany.agritrade.common.util;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLEncoder;

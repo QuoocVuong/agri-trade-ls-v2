@@ -15,9 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +27,7 @@ public class FavoriteServiceImpl implements FavoriteService {
   private final FavoriteProductRepository favoriteProductRepository;
   private final UserRepository userRepository;
   private final ProductRepository productRepository;
-  private final ProductMapper productMapper; // Inject ProductMapper
+  private final ProductMapper productMapper;
 
   @Override
   @Transactional
@@ -92,8 +90,6 @@ public class FavoriteServiceImpl implements FavoriteService {
     User user = SecurityUtils.getCurrentAuthenticatedUser();
     return favoriteProductRepository.existsByUserIdAndProductId(user.getId(), productId);
   }
-
-
 
   private void updateFavoriteCount(Long productId, boolean increment) {
     // Dùng cách đếm lại cho an toàn

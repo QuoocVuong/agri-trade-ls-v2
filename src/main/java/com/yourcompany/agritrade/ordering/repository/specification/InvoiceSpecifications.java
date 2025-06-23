@@ -1,4 +1,3 @@
-// src/main/java/com/yourcompany/agritrade/ordering/repository/specification/InvoiceSpecifications.java
 package com.yourcompany.agritrade.ordering.repository.specification;
 
 import com.yourcompany.agritrade.ordering.domain.*;

@@ -1,6 +1,4 @@
-package com.yourcompany.agritrade.usermanagement.controller; // Đặt trong usermanagement hoặc module
-
-// dashboard riêng
+package com.yourcompany.agritrade.usermanagement.controller;
 
 import com.yourcompany.agritrade.catalog.dto.response.TopProductResponse;
 import com.yourcompany.agritrade.common.dto.ApiResponse;

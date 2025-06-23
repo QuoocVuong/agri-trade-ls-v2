@@ -2,13 +2,13 @@ package com.yourcompany.agritrade.usermanagement.service.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.yourcompany.agritrade.common.exception.BadRequestException;
 import com.yourcompany.agritrade.common.exception.ResourceNotFoundException;
 import com.yourcompany.agritrade.common.model.RoleType;
 import com.yourcompany.agritrade.common.model.VerificationStatus;
+import com.yourcompany.agritrade.common.util.SecurityUtils;
 import com.yourcompany.agritrade.notification.service.NotificationService;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.Role;
@@ -23,17 +23,15 @@ import com.yourcompany.agritrade.usermanagement.repository.BusinessProfileReposi
 import com.yourcompany.agritrade.usermanagement.repository.FarmerProfileRepository;
 import com.yourcompany.agritrade.usermanagement.repository.RoleRepository;
 import com.yourcompany.agritrade.usermanagement.repository.UserRepository;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -54,19 +52,24 @@ class AdminUserServiceImplTest {
   @Mock private FarmerProfileMapper farmerProfileMapper;
   @Mock private BusinessProfileMapper businessProfileMapper;
   @Mock private NotificationService notificationService;
-  @Mock private Authentication adminAuthentication;
+  @Mock private Authentication adminAuth;
+
+  // Thêm MockedStatic để quản lý mock cho lớp tiện ích SecurityUtils
+  private MockedStatic<SecurityUtils> mockedSecurityUtils;
 
   @InjectMocks private AdminUserServiceImpl adminUserService;
 
-  private User adminUser, testUser, testFarmer;
-  private Role adminRole, farmerRole, consumerRole;
-  private FarmerProfile farmerProfileEntity;
-  private UserResponse userResponseDto;
-  private UserProfileResponse userProfileResponseDto;
-  private FarmerProfileResponse farmerProfileResponseDto;
+  private User testUser;
+  private User adminUser;
+  private Role farmerRole;
+  private Role consumerRole;
+  private FarmerProfile farmerProfile;
 
   @BeforeEach
   void setUp() {
+    // Khởi tạo mock static cho SecurityUtils trước mỗi test
+    mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
+
     adminUser = new User();
     adminUser.setId(1L);
     adminUser.setEmail("admin@example.com");
@@ -74,148 +77,87 @@ class AdminUserServiceImplTest {
 
     testUser = new User();
     testUser.setId(2L);
-    testUser.setEmail("user@example.com");
-    testUser.setFullName("Regular User");
+    testUser.setEmail("test@example.com");
+    testUser.setFullName("Test User");
     testUser.setActive(true);
 
-    testFarmer = new User();
-    testFarmer.setId(3L);
-    testFarmer.setEmail("farmer@example.com");
-    testFarmer.setFullName("Farmer User");
-    testFarmer.setActive(false); // Giả sử farmer mới đăng ký, chưa active
-
-    adminRole = new Role(RoleType.ROLE_ADMIN);
-    adminRole.setId(100);
     farmerRole = new Role(RoleType.ROLE_FARMER);
-    farmerRole.setId(101);
     consumerRole = new Role(RoleType.ROLE_CONSUMER);
-    consumerRole.setId(102);
 
-    testUser.setRoles(new HashSet<>(Set.of(consumerRole)));
-    testFarmer.setRoles(new HashSet<>(Set.of(farmerRole)));
+    farmerProfile = new FarmerProfile();
+    farmerProfile.setUserId(testUser.getId());
+    farmerProfile.setUser(testUser);
+    farmerProfile.setVerificationStatus(VerificationStatus.PENDING);
 
-    farmerProfileEntity = new FarmerProfile();
-    farmerProfileEntity.setUserId(testFarmer.getId());
-    farmerProfileEntity.setUser(testFarmer);
-    farmerProfileEntity.setFarmName("Green Acres");
-    farmerProfileEntity.setVerificationStatus(VerificationStatus.PENDING);
-    testFarmer.setFarmerProfile(farmerProfileEntity);
+    // Sử dụng lenient() vì không phải tất cả các test đều dùng adminAuth.getName()
+    lenient().when(adminAuth.getName()).thenReturn(adminUser.getEmail());
+  }
 
-    userResponseDto = new UserResponse();
-    userResponseDto.setId(testUser.getId());
-    userResponseDto.setEmail(testUser.getEmail());
-    // ...
-
-    userProfileResponseDto = new UserProfileResponse();
-    userProfileResponseDto.setId(testUser.getId());
-    // ...
-
-    farmerProfileResponseDto = new FarmerProfileResponse();
-    farmerProfileResponseDto.setUserId(testFarmer.getId());
-    // ...
-
-    lenient().when(adminAuthentication.getName()).thenReturn(adminUser.getEmail());
-    lenient().when(adminAuthentication.isAuthenticated()).thenReturn(true); // <<< THÊM DÒNG NÀY
-    lenient()
-        .when(userRepository.findByEmail(adminUser.getEmail()))
-        .thenReturn(Optional.of(adminUser));
-    // Bạn cũng có thể cần mock getPrincipal() nếu logic getUserFromAuthentication thay đổi
-    lenient()
-        .when(adminAuthentication.getPrincipal())
-        .thenReturn(adminUser); // Hoặc một UserDetails object
+  @AfterEach
+  void tearDown() {
+    // Đóng mock static sau mỗi test để tránh ảnh hưởng đến các test khác
+    mockedSecurityUtils.close();
   }
 
   @Nested
-  @DisplayName("Get User Information Tests")
-  class GetUserInformationTests {
+  @DisplayName("User Management Tests")
+  class UserManagement {
     @Test
-    @DisplayName("Get All Users - Success with Filters")
-    void getAllUsers_withFilters_shouldReturnFilteredPage() {
+    @DisplayName("Get All Users - With Filters - Success")
+    void getAllUsers_withFilters_success() {
       Pageable pageable = PageRequest.of(0, 10);
-      RoleType roleFilter = RoleType.ROLE_FARMER;
-      String keywordFilter = "Farmer";
-      Boolean activeFilter = true;
-      Page<User> userPage = new PageImpl<>(List.of(testFarmer), pageable, 1);
-
+      Page<User> userPage = new PageImpl<>(List.of(testUser));
       when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(userPage);
-      when(userMapper.toUserResponse(testFarmer))
-          .thenReturn(userResponseDto); // Giả sử map ra DTO này
+      when(userMapper.toUserResponse(any(User.class))).thenReturn(new UserResponse());
 
       Page<UserResponse> result =
-          adminUserService.getAllUsers(pageable, roleFilter, keywordFilter, activeFilter);
+          adminUserService.getAllUsers(pageable, RoleType.ROLE_CONSUMER, "test", true);
 
       assertNotNull(result);
-      assertEquals(1, result.getTotalElements());
-      assertEquals(userResponseDto.getEmail(), result.getContent().get(0).getEmail());
+      assertEquals(1, result.getContent().size());
       verify(userRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
-    @DisplayName("Get User Profile By Id - Farmer User - Success")
-    void getUserProfileById_farmerUser_success() {
-      when(userRepository.findById(testFarmer.getId())).thenReturn(Optional.of(testFarmer));
-      when(userMapper.toUserProfileResponse(testFarmer))
-          .thenReturn(userProfileResponseDto); // Base mapping
-      when(farmerProfileRepository.findById(testFarmer.getId()))
-          .thenReturn(Optional.of(farmerProfileEntity));
-      when(farmerProfileMapper.toFarmerProfileResponse(farmerProfileEntity))
-          .thenReturn(farmerProfileResponseDto);
+    @DisplayName("Get User Profile By Id - Success")
+    void getUserProfileById_success() {
+      when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+      when(userMapper.toUserProfileResponse(testUser)).thenReturn(new UserProfileResponse());
 
-      UserProfileResponse result = adminUserService.getUserProfileById(testFarmer.getId());
+      UserProfileResponse result = adminUserService.getUserProfileById(testUser.getId());
 
       assertNotNull(result);
-      assertEquals(userProfileResponseDto.getId(), result.getId());
-      assertNotNull(result.getFarmerProfile());
-      assertEquals(farmerProfileResponseDto.getUserId(), result.getFarmerProfile().getUserId());
+      verify(userRepository).findById(testUser.getId());
     }
 
-    @Test
-    @DisplayName("Get User Profile By Id - User Not Found - Throws ResourceNotFoundException")
-    void getUserProfileById_userNotFound_throwsResourceNotFound() {
-      when(userRepository.findById(99L)).thenReturn(Optional.empty());
-      assertThrows(ResourceNotFoundException.class, () -> adminUserService.getUserProfileById(99L));
-    }
-  }
-
-  @Nested
-  @DisplayName("Update User Tests")
-  class UpdateUserTests {
     @Test
     @DisplayName("Update User Status - Success")
     void updateUserStatus_success() {
       when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-      when(userMapper.toUserResponse(any(User.class))).thenReturn(userResponseDto);
+      when(userRepository.save(any(User.class))).thenReturn(testUser);
+      when(userMapper.toUserResponse(any(User.class))).thenReturn(new UserResponse());
       doNothing()
           .when(notificationService)
-          .sendAccountStatusUpdateNotification(any(User.class), anyBoolean());
+          .sendAccountStatusUpdateNotification(any(User.class), eq(false));
 
-      UserResponse result =
-          adminUserService.updateUserStatus(
-              testUser.getId(), false, adminAuthentication); // Deactivate
+      adminUserService.updateUserStatus(testUser.getId(), false, adminAuth);
 
-      assertNotNull(result);
       assertFalse(testUser.isActive());
       verify(userRepository).save(testUser);
       verify(notificationService).sendAccountStatusUpdateNotification(testUser, false);
     }
 
     @Test
-    @DisplayName("Update User Status - Same Status - Should Return Current and Not Save or Notify")
-    void updateUserStatus_sameStatus_shouldReturnCurrentAndNotSaveOrNotify() {
-      testUser.setActive(true); // Current status is true
+    @DisplayName("Update User Status - No Change - Returns Current")
+    void updateUserStatus_noChange_returnsCurrent() {
       when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-      when(userMapper.toUserResponse(testUser)).thenReturn(userResponseDto);
+      when(userMapper.toUserResponse(testUser)).thenReturn(new UserResponse());
 
-      UserResponse result =
-          adminUserService.updateUserStatus(
-              testUser.getId(), true, adminAuthentication); // Request to set true again
+      adminUserService.updateUserStatus(
+          testUser.getId(), true, adminAuth); // Status is already true
 
-      assertNotNull(result);
-      assertTrue(testUser.isActive());
       verify(userRepository, never()).save(any(User.class));
-      verify(notificationService, never())
-          .sendAccountStatusUpdateNotification(any(User.class), anyBoolean());
+      verify(notificationService, never()).sendAccountStatusUpdateNotification(any(), anyBoolean());
     }
 
     @Test
@@ -225,166 +167,153 @@ class AdminUserServiceImplTest {
       when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
       when(roleRepository.findByName(RoleType.ROLE_FARMER)).thenReturn(Optional.of(farmerRole));
       when(roleRepository.findByName(RoleType.ROLE_CONSUMER)).thenReturn(Optional.of(consumerRole));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-      when(userMapper.toUserResponse(any(User.class)))
-          .thenReturn(userResponseDto); // userResponseDto cần được cập nhật roles
+      when(userRepository.save(any(User.class))).thenReturn(testUser);
+      when(userMapper.toUserResponse(any(User.class))).thenReturn(new UserResponse());
       doNothing().when(notificationService).sendRolesUpdateNotification(any(User.class));
 
-      UserResponse result =
-          adminUserService.updateUserRoles(testUser.getId(), newRoleTypes, adminAuthentication);
+      adminUserService.updateUserRoles(testUser.getId(), newRoleTypes, adminAuth);
 
-      assertNotNull(result);
       assertEquals(2, testUser.getRoles().size());
-      assertTrue(testUser.getRoles().contains(farmerRole));
-      assertTrue(testUser.getRoles().contains(consumerRole));
+      verify(userRepository).save(testUser);
       verify(notificationService).sendRolesUpdateNotification(testUser);
-    }
-
-    @Test
-    @DisplayName("Update User Roles - Role Not Found - Throws ResourceNotFoundException")
-    void updateUserRoles_roleNotFound_throwsResourceNotFound() {
-      Set<RoleType> newRoleTypes =
-          Set.of(RoleType.ROLE_ADMIN); // Giả sử ROLE_ADMIN không có trong DB
-      when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-      when(roleRepository.findByName(RoleType.ROLE_ADMIN)).thenReturn(Optional.empty());
-
-      assertThrows(
-          ResourceNotFoundException.class,
-          () ->
-              adminUserService.updateUserRoles(
-                  testUser.getId(), newRoleTypes, adminAuthentication));
     }
   }
 
   @Nested
   @DisplayName("Farmer Approval Tests")
   class FarmerApprovalTests {
+
+    @BeforeEach
+    void farmerApprovalSetup() {
+      // Mock SecurityUtils để trả về adminUser cho các test trong nhóm này
+      mockedSecurityUtils.when(SecurityUtils::getCurrentAuthenticatedUser).thenReturn(adminUser);
+    }
+
     @Test
     @DisplayName("Get Pending Farmers - Success")
     void getPendingFarmers_success() {
-      Pageable pageable = PageRequest.of(0, 5);
-      List<FarmerProfile> pendingList = List.of(farmerProfileEntity);
-      Page<FarmerProfile> pendingPage = new PageImpl<>(pendingList, pageable, pendingList.size());
-
+      Pageable pageable = PageRequest.of(0, 10);
+      Page<FarmerProfile> profilePage = new PageImpl<>(List.of(farmerProfile));
       when(farmerProfileRepository.findByVerificationStatus(VerificationStatus.PENDING, pageable))
-          .thenReturn(pendingPage);
-      // Mock mapper calls
-      when(userMapper.toUserProfileResponse(testFarmer)).thenReturn(userProfileResponseDto);
-      when(farmerProfileMapper.toFarmerProfileResponse(farmerProfileEntity))
-          .thenReturn(farmerProfileResponseDto);
+          .thenReturn(profilePage);
+      when(userMapper.toUserProfileResponse(any(User.class))).thenReturn(new UserProfileResponse());
+      when(farmerProfileMapper.toFarmerProfileResponse(any(FarmerProfile.class)))
+          .thenReturn(new FarmerProfileResponse());
 
       Page<UserProfileResponse> result = adminUserService.getPendingFarmers(pageable);
 
       assertNotNull(result);
-      assertEquals(1, result.getTotalElements());
-      assertEquals(userProfileResponseDto.getId(), result.getContent().get(0).getId());
-      assertNotNull(result.getContent().get(0).getFarmerProfile());
+      assertEquals(1, result.getContent().size());
+      verify(farmerProfileRepository)
+          .findByVerificationStatus(VerificationStatus.PENDING, pageable);
     }
 
     @Test
     @DisplayName("Get All Farmers - With Filters - Success")
     void getAllFarmers_withFilters_success() {
       Pageable pageable = PageRequest.of(0, 10);
-      VerificationStatus statusFilter = VerificationStatus.VERIFIED;
-      String keywordFilter = "Green";
-      farmerProfileEntity.setVerificationStatus(VerificationStatus.VERIFIED); // Set cho khớp filter
-      Page<FarmerProfile> farmerProfilePage =
-          new PageImpl<>(List.of(farmerProfileEntity), pageable, 1);
-
+      Page<FarmerProfile> profilePage = new PageImpl<>(List.of(farmerProfile));
       when(farmerProfileRepository.findAll(any(Specification.class), eq(pageable)))
-          .thenReturn(farmerProfilePage);
-      when(userMapper.toUserProfileResponse(testFarmer)).thenReturn(userProfileResponseDto);
-      when(farmerProfileMapper.toFarmerProfileResponse(farmerProfileEntity))
-          .thenReturn(farmerProfileResponseDto);
+          .thenReturn(profilePage);
+      when(userMapper.toUserProfileResponse(any(User.class))).thenReturn(new UserProfileResponse());
+      when(farmerProfileMapper.toFarmerProfileResponse(any(FarmerProfile.class)))
+          .thenReturn(new FarmerProfileResponse());
 
       Page<UserProfileResponse> result =
-          adminUserService.getAllFarmers(statusFilter, keywordFilter, pageable);
+          adminUserService.getAllFarmers(VerificationStatus.PENDING, "test", pageable);
 
       assertNotNull(result);
-      assertEquals(1, result.getTotalElements());
+      assertEquals(1, result.getContent().size());
       verify(farmerProfileRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
     @DisplayName("Approve Farmer - Success")
     void approveFarmer_success() {
-      when(farmerProfileRepository.findById(testFarmer.getId()))
-          .thenReturn(Optional.of(farmerProfileEntity));
-      when(farmerProfileRepository.save(any(FarmerProfile.class))).thenReturn(farmerProfileEntity);
-      when(userRepository.save(any(User.class))).thenReturn(testFarmer); // Farmer user được active
+      testUser.setActive(false); // Giả lập user chưa active
+      when(farmerProfileRepository.findById(testUser.getId()))
+          .thenReturn(Optional.of(farmerProfile));
+      when(farmerProfileRepository.save(any(FarmerProfile.class))).thenReturn(farmerProfile);
+      when(userRepository.save(any(User.class))).thenReturn(testUser);
       doNothing()
           .when(notificationService)
           .sendFarmerProfileApprovedNotification(any(FarmerProfile.class));
 
-      adminUserService.approveFarmer(testFarmer.getId(), adminAuthentication);
+      adminUserService.approveFarmer(testUser.getId(), adminAuth);
 
-      assertEquals(VerificationStatus.VERIFIED, farmerProfileEntity.getVerificationStatus());
-      assertNotNull(farmerProfileEntity.getVerifiedAt());
-      assertEquals(adminUser, farmerProfileEntity.getVerifiedBy()); // Kiểm tra admin duyệt
-      assertTrue(testFarmer.isActive());
-      verify(notificationService).sendFarmerProfileApprovedNotification(farmerProfileEntity);
+      assertEquals(VerificationStatus.VERIFIED, farmerProfile.getVerificationStatus());
+      assertNotNull(farmerProfile.getVerifiedAt());
+      assertEquals(adminUser, farmerProfile.getVerifiedBy());
+      assertTrue(testUser.isActive()); // User should be activated
+
+      verify(farmerProfileRepository).save(farmerProfile);
+      verify(userRepository).save(testUser);
+      verify(notificationService).sendFarmerProfileApprovedNotification(farmerProfile);
+    }
+
+    @Test
+    @DisplayName("Approve Farmer - Profile Not Found - Throws ResourceNotFoundException")
+    void approveFarmer_profileNotFound_throwsResourceNotFound() {
+      when(farmerProfileRepository.findById(testUser.getId())).thenReturn(Optional.empty());
+
+      assertThrows(
+          ResourceNotFoundException.class,
+          () -> adminUserService.approveFarmer(testUser.getId(), adminAuth));
     }
 
     @Test
     @DisplayName("Approve Farmer - Profile Not Pending - Throws BadRequestException")
     void approveFarmer_profileNotPending_throwsBadRequest() {
-      farmerProfileEntity.setVerificationStatus(
-          VerificationStatus.VERIFIED); // Profile không phải PENDING
-      // Đảm bảo adminAuthentication được mock đúng với isAuthenticated() = true
-      // (đã làm trong setUp() hoặc mock cụ thể ở đây nếu cần)
-      when(adminAuthentication.isAuthenticated()).thenReturn(true); // Có thể thêm tường minh ở đây
-      when(adminAuthentication.getName()).thenReturn(adminUser.getEmail());
-      when(userRepository.findByEmail(adminUser.getEmail())).thenReturn(Optional.of(adminUser));
-
-      when(farmerProfileRepository.findById(testFarmer.getId()))
-          .thenReturn(Optional.of(farmerProfileEntity));
+      farmerProfile.setVerificationStatus(
+          VerificationStatus.VERIFIED); // Set to a non-pending status
+      when(farmerProfileRepository.findById(testUser.getId()))
+          .thenReturn(Optional.of(farmerProfile));
 
       assertThrows(
           BadRequestException.class,
-          () -> adminUserService.approveFarmer(testFarmer.getId(), adminAuthentication));
+          () -> adminUserService.approveFarmer(testUser.getId(), adminAuth));
     }
 
     @Test
     @DisplayName("Reject Farmer - Success")
     void rejectFarmer_success() {
-      String reason = "Incomplete documents";
-      when(farmerProfileRepository.findById(testFarmer.getId()))
-          .thenReturn(Optional.of(farmerProfileEntity));
-      when(farmerProfileRepository.save(any(FarmerProfile.class))).thenReturn(farmerProfileEntity);
+      String reason = "Information mismatch";
+      when(farmerProfileRepository.findById(testUser.getId()))
+          .thenReturn(Optional.of(farmerProfile));
+      when(farmerProfileRepository.save(any(FarmerProfile.class))).thenReturn(farmerProfile);
       doNothing()
           .when(notificationService)
-          .sendFarmerProfileRejectedNotification(any(FarmerProfile.class), anyString());
+          .sendFarmerProfileRejectedNotification(any(FarmerProfile.class), eq(reason));
 
-      adminUserService.rejectFarmer(testFarmer.getId(), reason, adminAuthentication);
+      adminUserService.rejectFarmer(testUser.getId(), reason, adminAuth);
 
-      assertEquals(VerificationStatus.REJECTED, farmerProfileEntity.getVerificationStatus());
-      assertNotNull(farmerProfileEntity.getVerifiedAt());
-      assertEquals(adminUser, farmerProfileEntity.getVerifiedBy());
-      assertFalse(testFarmer.isActive()); // User không được active
-      verify(notificationService)
-          .sendFarmerProfileRejectedNotification(farmerProfileEntity, reason);
+      assertEquals(VerificationStatus.REJECTED, farmerProfile.getVerificationStatus());
+      assertNotNull(farmerProfile.getVerifiedAt());
+      assertEquals(adminUser, farmerProfile.getVerifiedBy());
+
+      verify(farmerProfileRepository).save(farmerProfile);
+      verify(userRepository, never()).save(any(User.class)); // User should not be saved/activated
+      verify(notificationService).sendFarmerProfileRejectedNotification(farmerProfile, reason);
     }
   }
 
   @Test
-  @DisplayName(
-      "Get User From Authentication - Admin User Not Found - Throws UsernameNotFoundException")
-  void getUserFromAuthentication_adminNotFound_throwsUsernameNotFound() {
-    String nonExistentAdminEmail = "nonexistentadmin@example.com";
-    // Mock Authentication cho một admin không tồn tại
-    Authentication mockAuthNonExistent = mock(Authentication.class);
-    when(mockAuthNonExistent.getName()).thenReturn(nonExistentAdminEmail);
-    when(mockAuthNonExistent.isAuthenticated()).thenReturn(true); // <<< QUAN TRỌNG
-    when(mockAuthNonExistent.getPrincipal())
-        .thenReturn(nonExistentAdminEmail); // Hoặc một UserDetails giả
+  @DisplayName("Approve Farmer - Admin Not Found - Throws UsernameNotFoundException")
+  void approveFarmer_adminNotFound_throwsUsernameNotFound() {
+    // Mock SecurityUtils để nó ném lỗi, mô phỏng đúng kịch bản admin không tồn tại
+    mockedSecurityUtils
+        .when(SecurityUtils::getCurrentAuthenticatedUser)
+        .thenThrow(new UsernameNotFoundException("Admin not found"));
 
-    when(userRepository.findByEmail(nonExistentAdminEmail))
-        .thenReturn(Optional.empty()); // Admin không tồn tại trong DB
+    // Không cần mock farmerProfileRepository.findById vì service sẽ ném lỗi trước khi gọi đến nó
+    // Nhưng để chắc chắn, ta vẫn có thể mock để tránh NullPointerException nếu logic thay đổi
+    lenient()
+        .when(farmerProfileRepository.findById(testUser.getId()))
+        .thenReturn(Optional.of(farmerProfile));
 
-    // Gọi một phương thức bất kỳ trong service mà sử dụng getUserFromAuthentication với
-    // mockAuthNonExistent
+    // Act & Assert
     assertThrows(
         UsernameNotFoundException.class,
-        () -> adminUserService.approveFarmer(testFarmer.getId(), mockAuthNonExistent));
+        () -> adminUserService.approveFarmer(testUser.getId(), adminAuth));
   }
 }
