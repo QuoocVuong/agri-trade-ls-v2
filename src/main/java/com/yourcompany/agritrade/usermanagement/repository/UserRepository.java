@@ -50,16 +50,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
   List<User> findByRoles_Name(RoleType roleName);
 
-  /**
-   * Tìm top N Users có vai trò là FARMER, sắp xếp theo followerCount giảm dần. Sử dụng Pageable để
-   * giới hạn số lượng (limit).
-   *
-   * @param roleType Vai trò cần tìm (ROLE_FARMER).
-   * @param pageable Chỉ dùng để giới hạn số lượng (PageRequest.of(0, limit)).
-   * @return Danh sách các User là Farmer nổi bật.
-   */
-  List<User> findTopByRoles_NameOrderByFollowerCountDesc(RoleType roleType, Pageable pageable);
-
   // Trong UserRepository.java
   @Query(
       "SELECT FUNCTION('DATE', u.createdAt) as registrationDate, COUNT(u.id) as userCount "
@@ -69,4 +59,27 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
           + "ORDER BY registrationDate ASC")
   List<Object[]> findDailyUserRegistrations(
       @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  /**
+   * Tìm các nông dân có doanh thu cao nhất từ các đơn hàng đã hoàn thành (DELIVERED) trong một
+   * khoảng thời gian nhất định.
+   *
+   * @param roleName Vai trò cần tìm (ROLE_FARMER).
+   * @param orderStatus Trạng thái đơn hàng để tính doanh thu (DELIVERED).
+   * @param startDate Ngày bắt đầu khoảng thời gian tính toán.
+   * @param pageable Đối tượng Pageable để giới hạn số lượng kết quả (limit).
+   * @return Danh sách các User là nông dân có doanh thu cao nhất.
+   */
+  @Query(
+      "SELECT o.farmer FROM Order o JOIN o.farmer.roles r "
+          + "WHERE r.name = :roleName "
+          + "AND o.status = :orderStatus "
+          + "AND o.createdAt >= :startDate "
+          + "GROUP BY o.farmer "
+          + "ORDER BY SUM(o.totalAmount) DESC")
+  List<User> findTopFarmersByRevenue(
+      @Param("roleName") RoleType roleName,
+      @Param("orderStatus") com.yourcompany.agritrade.ordering.domain.OrderStatus orderStatus,
+      @Param("startDate") LocalDateTime startDate,
+      Pageable pageable);
 }

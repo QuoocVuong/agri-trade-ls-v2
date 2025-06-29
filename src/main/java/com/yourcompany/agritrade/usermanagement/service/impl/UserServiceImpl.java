@@ -13,6 +13,7 @@ import com.yourcompany.agritrade.config.properties.JwtProperties;
 import com.yourcompany.agritrade.config.security.JwtTokenProvider;
 import com.yourcompany.agritrade.notification.service.EmailService;
 import com.yourcompany.agritrade.notification.service.NotificationService;
+import com.yourcompany.agritrade.ordering.domain.OrderStatus;
 import com.yourcompany.agritrade.usermanagement.domain.FarmerProfile;
 import com.yourcompany.agritrade.usermanagement.domain.Role;
 import com.yourcompany.agritrade.usermanagement.domain.User;
@@ -410,15 +411,22 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional(readOnly = true)
   public List<FarmerSummaryResponse> getFeaturedFarmers(int limit) {
-    log.debug("Fetching top {} featured farmers based on follower count.", limit);
 
-    // Tạo Pageable để giới hạn kết quả trả về từ repository
-    Pageable pageable = PageRequest.of(0, limit); // Lấy trang đầu tiên, giới hạn số lượng
+    // 1. Xác định khoảng thời gian tính toán (ví dụ: 30 ngày qua)
+    LocalDateTime startDate = LocalDateTime.now().minusDays(30);
 
-    // Gọi repository để lấy danh sách User là Farmer, đã sắp xếp theo followerCount
+    // 2. Tạo Pageable để giới hạn số lượng kết quả
+    Pageable pageable = PageRequest.of(0, limit);
+
+    // 3. Gọi phương thức mới trong repository
     List<User> topFarmers =
-        userRepository.findTopByRoles_NameOrderByFollowerCountDesc(RoleType.ROLE_FARMER, pageable);
+        userRepository.findTopFarmersByRevenue(
+            RoleType.ROLE_FARMER,
+            OrderStatus.DELIVERED, // Chỉ tính trên đơn hàng đã giao thành công
+            startDate,
+            pageable);
 
+    // 4. Logic map dữ liệu sang DTO
     // Map danh sách User sang FarmerSummaryResponse
     // Cần lấy thêm FarmerProfile cho mỗi User để có farmName và provinceCode
     List<FarmerSummaryResponse> responseList = new ArrayList<>();
@@ -439,7 +447,6 @@ public class UserServiceImpl implements UserService {
       responseList.add(summaryDto);
     }
 
-    log.info("Found {} featured farmers.", responseList.size());
     return responseList;
   }
 

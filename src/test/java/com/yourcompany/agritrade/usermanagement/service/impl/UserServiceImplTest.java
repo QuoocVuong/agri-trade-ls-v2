@@ -579,11 +579,23 @@ class UserServiceImplTest {
     @Test
     @DisplayName("Get Featured Farmers - Success")
     void getFeaturedFarmers_success() {
-      Pageable pageable = PageRequest.of(0, 4);
-      List<User> topFarmerUsers = List.of(farmerUser);
-      when(userRepository.findTopByRoles_NameOrderByFollowerCountDesc(
-              RoleType.ROLE_FARMER, pageable))
+      // 1. Arrange - Chuẩn bị dữ liệu giả
+      int limit = 4;
+      Pageable pageable = PageRequest.of(0, limit);
+      List<User> topFarmerUsers =
+          List.of(farmerUser); // Giả sử farmerUser là người có doanh thu cao nhất
+
+      // Mock lời gọi đến phương thức MỚI trong repository
+      when(userRepository.findTopFarmersByRevenue(
+              eq(RoleType.ROLE_FARMER),
+              any(
+                  com.yourcompany.agritrade.ordering.domain.OrderStatus
+                      .class), // Dùng any() cho OrderStatus
+              any(LocalDateTime.class), // Dùng any() cho ngày tháng
+              eq(pageable)))
           .thenReturn(topFarmerUsers);
+
+      // Các mock còn lại để map dữ liệu vẫn giữ nguyên
       when(farmerProfileRepository.findById(farmerUser.getId()))
           .thenReturn(Optional.of(farmerProfileEntity));
 
@@ -594,13 +606,21 @@ class UserServiceImplTest {
       when(farmerSummaryMapper.toFarmerSummaryResponse(farmerUser, farmerProfileEntity))
           .thenReturn(summaryDto);
 
-      List<FarmerSummaryResponse> result = userService.getFeaturedFarmers(4);
+      // 2. Act - Gọi phương thức cần test
+      List<FarmerSummaryResponse> result = userService.getFeaturedFarmers(limit);
 
+      // 3. Assert - Kiểm tra kết quả
       assertNotNull(result);
       assertEquals(1, result.size());
       assertEquals(farmerProfileEntity.getFarmName(), result.get(0).getFarmName());
+
+      // Kiểm tra xem phương thức MỚI đã được gọi đúng cách chưa
       verify(userRepository)
-          .findTopByRoles_NameOrderByFollowerCountDesc(RoleType.ROLE_FARMER, pageable);
+          .findTopFarmersByRevenue(
+              eq(RoleType.ROLE_FARMER),
+              any(com.yourcompany.agritrade.ordering.domain.OrderStatus.class),
+              any(LocalDateTime.class),
+              eq(pageable));
     }
 
     @Test
